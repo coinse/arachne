@@ -41,7 +41,7 @@ if args.err_src != -1 and args.err_dst != -1:
 else:
     targeted = False
 
-# MNIST dataset
+# CIFAR10 dataset
 train_dataset = torchvision.datasets.CIFAR10(root='./',
                                      train=True,
                                      transform=transforms.ToTensor(),
@@ -95,8 +95,6 @@ def setWeights(model, weight_list):
 
 def AdjustWeights(baseWeights, corrDiff, incorrDiff, a, b,
                   strategy='both-org', lr=1e-3):
-    # haha, should I implement this as it is in the paper? or not? 
-    # Honestly I just can't stand this shit. These... how can this be accepted?
     if 'org' in strategy:
         sign = 1
     else:
@@ -130,8 +128,6 @@ def EvaluateModel(model, loader=val_data_loader):
     return correct.item()/total
 
 def TrainingModel(model, epoch_num=retrain_epoch_num):
-    # I mean this is really crazy. 
-    # Train your model every batch? wut?
     model.train()
     for epoch in tqdm.trange(epoch_num):
         for i, (x, x_class) in enumerate(train_data_loader):

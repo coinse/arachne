@@ -25,12 +25,10 @@ num_restrict = 5000
 
 test_dataset = torchvision.datasets.CIFAR10(root='./',
                                      train=False,
-#                                      split='test',
                                      transform=transforms.ToTensor(),
                                      download=False)
 
 # Data loader
-
 test_data_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                                batch_size=batch_size, 
                                                shuffle=False)

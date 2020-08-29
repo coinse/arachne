@@ -26,12 +26,10 @@ rDLM_num = 20
 
 test_dataset = torchvision.datasets.CIFAR10(root='./',
                                      train=False,
-#                                      split='test',
                                      transform=transforms.ToTensor(),
                                      download=False)
 
 # Data loader
-
 test_data_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                                batch_size=batch_size, 
                                                shuffle=False)
@@ -61,9 +59,7 @@ for rdlm_idx in range(rDLM_num):
 
             # Backprop and optimize
             class_loss = loss_fn(class_logits, x_class.cuda())
-#             darc1_loss = torch.max(torch.sum(torch.abs(class_logits), dim=0))
-#             darc1_loss = (darc1_lambda / x.size(0)) * darc1_loss
-            loss = class_loss #+ darc1_loss
+            loss = class_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -88,5 +84,4 @@ for rdlm_idx in range(rDLM_num):
         ))
         model.train()
         
-#     torch.save(model.state_dict(), f'weights/CIFAR10_classifier_CNN3_iDLM.pth')
     torch.save(model.state_dict(), f'rDLM_weights/CIFAR10_classifier_CNN3_rDLM{rdlm_idx}.pth')

@@ -10,15 +10,81 @@ This document explains how to reproduce the six experiments in Arachne.
 unzip models.zip data/
 ```
 
+### Arguments
+
+This a list of arguments commonly used in the experiement scripts.
+* *which*: denote a type of model.
+  * *cnn1*: CNN1 model used in Apricot
+  * *cnn2*: CNN2 model used in Apricot
+  * *cnn3*: CNN3 model used in Apricot
+  
+* *which_data*: denote a dataset type
+  * *fashion_mnist*: FashionMNITS 
+  * *cifar10*: CIFAR-10
+  * *lfw*: LFW (facial image dataset)
+  
+* *datadir*: a path to the data directory. The dataset will be downloaded automatically if it does not exist under the given directory. 
+
+* *dest*: a path to the directory to save generated patches.
+* *pkey*
+
 
 ### Execution
 
-To run each experiment for each RQ, 
+To run an experiment for each RQ, 
+Belwo
 
+For RQ2, 
+```
+./rq2.sh datadir which_data localisation_method pkey dest
+```
+``localisation_method`` can be *localiser* (our method *BL*), *gradient_loss*, and *random*.
+
+e.g.,
+```
+./rq2.sh data/fm fashion_mnist localiser t1 results/rq2/loc
 ```
 
+For RQ3,
+```
+./rq3.sh which_data datadir pkey temp/rq3/
+```
+e.g.,
+```
+./rq3.sh cifar10 data/cm t1 temp/rq3/
 ```
 
+
+For RQ4,
+```
+./rq4.sh which_data datadir pkey dest
+```
+e.g., 
+```
+./rq4.sh cifar10 data/cm/ t1 results/rq4/cm
+```
+
+For RQ5, 
+```
+./rq5.sh which datadir pkey resultdir true_label predicted_label
+```
+Here, *true*
+
+One can repair *3->5* misbehaviour of CNN1 by running the script below:
+e.g.,
+```
+./rq5.sh cnn1 data/cm t1 results/rq5/cnn1 3 5
+```
+
+For RQ6,
+```
+./rq6.sh datadir pkey dest
+```
+
+e.g., 
+```
+./rq6.sh data/lfw/lfw_data/ t1 temp
+```
 
 To apply a patch to the model and use this patched model to predict data, ```run run_mdl.sh``` as below:
 

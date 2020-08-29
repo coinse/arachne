@@ -4,7 +4,7 @@ RQ3 script
 import argparse
 import os, sys
 import utils.data_util as data_util
-import auto_patch_v3 as auto_patch
+import auto_patch
 import time
 import numpy as np
 import gc
@@ -51,12 +51,11 @@ sorted_keys = data_util.sort_keys_by_cnt(misclfds)
 top_n = args.seed # to target a unique type of misbehaviour per run
 misclf_key = sorted_keys[top_n]
 
-print (misclfds.keys())
 indices = misclfds[misclf_key]
 
 print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
-num_of_sampled_correct = num_test - num_entire_misclfs
-print ("The number of correct samples: {}".format(num_of_sampled_correct))
+#num_of_sampled_correct = num_test - num_entire_misclfs
+#print ("The number of correct samples: {}".format(num_of_sampled_correct))
 
 #num_wrong_inputs_to_patch = len(indices)
 #print ('pre_defined', num_wrong_inputs_to_patch)	

@@ -4,7 +4,7 @@ RQ1 script
 import os, sys
 import pandas as pd
 import utils.data_util as data_util
-import auto_patch_v3 as auto_patch
+import auto_patch
 from main_eval import read_and_add_flag, combine_init_aft_predcs
 import json
 import numpy as np

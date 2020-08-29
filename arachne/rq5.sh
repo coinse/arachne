@@ -7,8 +7,10 @@ dest=$4
 org_label=$5
 pred_label=$6
 
+iter_num=100
 seed=0 # can be 0..29
 patch_aggr=10
+
 if [ $which == 'cnn1' ]
 then
 	path_to_keras_model="data/models/ApricotCNN1_full.h5"
@@ -27,4 +29,4 @@ else
 	exit 0
 fi
 
-python3 main_rq5.py -datadir $datadir -which $which -which_dat cifar10 -tensor_name_file data/tensor_names/tensor.lastLayer.names -patch_key $patch_key -path_to_keras_model $path_to_keras_model -seed $seed -iter_num 100 -target_indices_file $indices_file -dest $dest/rq5/cnn1 -patch_aggr $patch_aggr -org_label $org_label -pred_label $pred_label
+python3 main_rq5.py -datadir $datadir -which $which -which_dat cifar10 -tensor_name_file data/tensor_names/tensor.lastLayer.names -patch_key $patch_key -path_to_keras_model $path_to_keras_model -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/$which -patch_aggr $patch_aggr -org_label $org_label -pred_label $pred_label

@@ -4,7 +4,7 @@ RQ6 script
 import argparse
 import os, sys
 import utils.data_util as data_util
-import auto_patch_v3 as auto_patch
+import auto_patch
 import time
 import numpy as np
 import gc
@@ -14,8 +14,6 @@ TOP_N = 1
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-datadir", action = "store", default = "data", type = str)
-parser.add_argument("-which", action = "store", 
-	default = 'lfw_vgg', help = 'lfw_vgg', type = str)
 parser.add_argument('-which_data', action = "store",
 	default = 'cifar10', type = str, help = 'fashion_mnist,cifaf10,lfw')
 parser.add_argument("-tensor_name_file", action = "store",
@@ -27,12 +25,15 @@ parser.add_argument("-iter_num", action = "store", default = 100, type = int)
 parser.add_argument("-target_indices_file", action = "store", default = None)
 parser.add_argument("-dest", default = ".", type = str)
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
-
+parser.add_argument("-female_lst_file", action = 'store', 
+	default = 'lfw_np/female_names_lfw.txt', type = str)
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
 
-train_data, test_data = data_util.load_data(args.which_data, args.datadir, 
+which = 'lfw_vgg'
+which_data = 'lfw'
+train_data, test_data = data_util.load_data(which_data, args.datadir, 
 	path_to_female_names = "lfw_np/female_names_lfw.txt")
 
 train_X,train_y = train_data
@@ -62,13 +63,11 @@ indices = misclfds[misclf_key]
 indices = [int(i/2) for i in indices]
 
 print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
-num_of_sampled_correct = num_test - num_entire_misclfs
-print ("The number of correct samples: {}".format(num_of_sampled_correct))
-
+#num_of_sampled_correct = num_test - num_entire_misclfs
+#print ("The number of correct samples: {}".format(num_of_sampled_correct))
 #num_wrong_inputs_to_patch = len(indices)
 #print ('pre_defined', num_wrong_inputs_to_patch)	
 
-print (type(test_data[0]), type(test_data[1]))
 t1 = time.time()
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 	num_label,
@@ -76,7 +75,7 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	args.tensor_name_file,
 	max_search_num = iter_num, 
 	search_method = 'DE',
-	which = args.which,
+	which = which,
 	loc_method = "localiser",
 	patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
 	path_to_keras_model = args.path_to_keras_model,

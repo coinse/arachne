@@ -4,7 +4,7 @@ RQ2 script
 import argparse
 import os, sys
 import utils.data_util as data_util
-import auto_patch_v3 as auto_patch
+import auto_patch
 import time
 import numpy as np
 import gc
@@ -42,11 +42,9 @@ else:
 
 num_wrong_inputs_to_patch = int(len(indices) * 0.1) # for RQ2
 predef_indices_to_wrong = np.random.choice(indices, num_wrong_inputs_to_patch, replace = False)
-print ("predef", predef_indices_to_wrong, df.loc[df['index'] == predef_indices_to_wrong[0]].values[0])
 
-total_train_data, test_data = data_util.load_data(args.which_data, args.datafile)
+total_train_data, test_data = data_util.load_data(args.which_data, args.datadir)
 
-#num_of_sampled_correct = args.sampled_correct_num
 num_train = len(total_train_data[1])
 num_entire_misclfs = len(indices)
 num_entire_corrclfs = num_train - num_entire_misclfs
@@ -79,7 +77,6 @@ os.replace(patched_model_name.replace("None", "model") + ".json",
 	os.path.join(args.dest, patched_model_name.replace("None", "model") + ".json"))
 
 t2 = time.time()
-print ("So far...", indices_to_patched)
 print ("Time for patching: %f" % (t2 - t1))
 print ("patched_model_name", patched_model_name)
 

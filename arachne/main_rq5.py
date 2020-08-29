@@ -4,7 +4,7 @@ RQ5 script
 import argparse
 import os, sys
 import utils.data_util as data_util
-import auto_patch_v3 as auto_patch
+import auto_patch
 import time
 import numpy as np
 import gc
@@ -66,8 +66,8 @@ misclf_key = (args.org_label, args.pred_label)
 indices = misclfds[misclf_key]
 
 print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
-num_of_sampled_correct = num_test - num_entire_misclfs
-print ("The number of correct samples: {}".format(num_of_sampled_correct))
+#num_of_sampled_correct = num_test - num_entire_misclfs
+#print ("The number of correct samples: {}".format(num_of_sampled_correct))
 
 t1 = time.time()
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(

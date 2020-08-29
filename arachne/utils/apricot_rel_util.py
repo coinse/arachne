@@ -13,7 +13,6 @@ def get_weights(model_name, start_idx = 0):
 	ws = model.get_weights()
 	for i, w in enumerate(ws):
 		if i >= 2*start_idx: # since we are looking at the pairs
-			print (w.shape)
 			if i % 2 == 0: # kernel
 				kernel_and_bias_pairs.append([w])
 			else: # bias

@@ -29,6 +29,7 @@ def set_loc_name(dest, aft_pred_file, key):
 	"""
 	"""
 	basename = os.path.basename(aft_pred_file).replace("indices.csv", "loc.{}.json".format(key))
+	basename = basename.replace(".init_pred.", ".")
 	loc_name = os.path.join(dest, basename)
 	
 	return loc_name
@@ -85,7 +86,8 @@ if __name__ == "__main__":
 		seed = args.seed,
 		only_loc = True)	
 	
-
+	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
+	print ("\t".join([str(index) for index in indices_to_places_to_fix]))
 	if args.loc_method == 'localiser':
 		indices_to_places_to_fix = np.int32(indices_to_places_to_fix).tolist()
 		front_lst = [np.int32(sub_front).tolist() for sub_front in front_lst]

@@ -29,4 +29,4 @@ else
 	exit 0
 fi
 
-python3 main_rq5.py -datadir $datadir -which $which -which_dat cifar10 -tensor_name_file data/tensor_names/tensor.lastLayer.names -patch_key $patch_key -path_to_keras_model $path_to_keras_model -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/$which -patch_aggr $patch_aggr -org_label $org_label -pred_label $pred_label
+python3 main_rq5.py -datadir $datadir -which $which -which_dat cifar10 -tensor_name_file data/tensor_names/tensor.lastLayer.names -patch_key ${patch_key}.${seed} -path_to_keras_model $path_to_keras_model -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/$which -patch_aggr $patch_aggr -org_label $org_label -pred_label $pred_label

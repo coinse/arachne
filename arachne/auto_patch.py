@@ -80,21 +80,14 @@ def patch(
 	only_loc = False,
 	patch_aggr = None):
 	"""
-	Patch a model retrieved from given meta_file and model_name.
-	The patched model will be save as new_model_name
-
-		only_the_max:
-			if it is True, we will only patch one neuron, the one with 
-			the largest gradient, otherwise, both 0 -> 1 and 1 -> 0 will 
-			be patched
-
-		iter_num: will be sent to search
-		search_method: HC (Hill Climbining), PSO
-		which: mnist or cifar10
-		indices_to_target(dict):
-			key = {'correct', 'wrong'}, value = indices to correctly classified (or misclassified) data
-	Ret(str, list):
-		return (a name of patched model, a list to the target misclassified inputs)
+	only_loc = True:
+		Ret(list, list):
+			return (indices to localised nerual weights, full indices)
+	only_loc = False (patch):
+		Ret(str, list, list):
+			return (a path to a generated patch, 
+				indices to the target negative inputs, 
+				indices to patched ones)
 	"""
 	import search.de as de
 	import numpy as np
@@ -113,7 +106,6 @@ def patch(
 	if not isinstance(data_y[0], Iterable):
 		from utils.data_util import format_label
 		data_y = format_label(data_y, num_label)
-		# from hereafter, data_y is one-hot encoded array
 
 	predict_tensor_name = "predc"
 	corr_predict_tensor_name = 'correct_predc'
@@ -289,7 +281,7 @@ def patch(
 		places_to_fix = indices_to_places_to_fix
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)
 		
-		name_key = split_idx if patch_target_key is None else "%s.%s" % (str(patch_target_key), str(0))
+		name_key = str(0) if patch_target_key is None else str(patch_target_key)
 			
 		patched_model_name = searcher.search(
 			places_to_fix,

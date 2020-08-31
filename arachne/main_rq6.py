@@ -26,7 +26,7 @@ parser.add_argument("-target_indices_file", action = "store", default = None)
 parser.add_argument("-dest", default = ".", type = str)
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
 parser.add_argument("-female_lst_file", action = 'store', 
-	default = 'lfw_np/female_names_lfw.txt', type = str)
+	default = 'data/lfw_np/female_names_lfw.txt', type = str)
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
@@ -34,7 +34,7 @@ os.makedirs(args.dest, exist_ok = True)
 which = 'lfw_vgg'
 which_data = 'lfw'
 train_data, test_data = data_util.load_data(which_data, args.datadir, 
-	path_to_female_names = "lfw_np/female_names_lfw.txt")
+	path_to_female_names = args.female_lst_file)
 
 train_X,train_y = train_data
 num_train = len(train_y)

@@ -13,13 +13,15 @@ parser.add_argument("-model", type = str)
 parser.add_argument("-datadir", type = str, default = "data/lfw")
 parser.add_argument("-dest", type = str, default = ".")
 parser.add_argument("-w", type = str, default = None, help = "model.misclf-test.top.0.1.0.json")
+parser.add_argument("-female_lst_file", action = 'store', 
+	default = 'data/lfw_np/female_names_lfw.txt', type = str)
 
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
 
 train_data, test_data = data_util.load_data('lfw', args.datadir,
-	path_to_female_names = "lfw_np/female_names_lfw.txt")
+	path_to_female_names = args.female_lst_file)
 X,y = test_data
 train_X,train_y = train_data
 

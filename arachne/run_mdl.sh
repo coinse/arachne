@@ -33,5 +33,6 @@ then
 	fi
 	python3 run_model_for_fm_c10.py -model $model -datadir $datadir -dest $dest -w $w -which $which -which_data $which_data -val_index_file $val_index_file
 else
-	python3 run_model_for_lfw.py -model data/models/saved_models/LFW_GenderClassifier.pth -datadir $datadir -dest $dest -w $w
+	female_lst_file='data/lfw_np/female_names_lfw.txt'
+	python3 run_model_for_lfw.py -model data/models/saved_models/LFW_GenderClassifier.pth -datadir $datadir -dest $dest -w $w -female_lst_file $female_lst_file
 fi

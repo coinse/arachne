@@ -4,13 +4,13 @@
 
 This document explains how to reproduce the six experiments performed to evaluate Arachne.
 
-Models used in the experiments of Arachne can be downloaded through this link: <a href=https://www.dropbox.com/s/89sb9m6lf4ia2bh/models.tar.gz?raw=1>models.tar.gz</a>
+Models used in the experiments of Arachne can be downloaded through this link: https://www.dropbox.com/s/89sb9m6lf4ia2bh/models.tar.gz?raw=1
 After downloading the zipped file, decompress them to *data* directory. 
 *data* directory is where all data, including both model and image data are stored. 
 ```
 tar -zxvf models.tar.gz -C  data
 ```
-To prepare the dataset used in the experiments, download LFW dataset through this link (<a href=https://www.dropbox.com/s/zrgjb9ramgnc46i/lfw_np.tar.gz?raw=1>lfw_np.tar.gz</a>) and unzip them under *data* directory. 
+To prepare the dataset used in the experiments, download LFW dataset through this link (https://www.dropbox.com/s/zrgjb9ramgnc46i/lfw_np.tar.gz?raw=1) and unzip them under *data* directory. 
 FashionMNIST and CIFAR-10 datasets are automatically download in the scripts if they do not exist under a specified data directory.  
 
 ### Arguments

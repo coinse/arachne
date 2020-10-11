@@ -51,7 +51,10 @@ class DE_searcher(Searcher):
 		# fitness computation related initialisation
 		self.fitness = 0.0
 
-		self.creator.create("FitnessMax", self.base.Fitness, weights = (1.0,)) # maximisation
+		if not self.use_ewc:
+			self.creator.create("FitnessMax", self.base.Fitness, weights = (1.0,)) # maximisation
+		else:
+			self.creator.create("FitnessMax", self.base.Fitness, weights = (-1.0,)) # minimisation
 		self.creator.create("Individual", self.np.ndarray, fitness = self.creator.FitnessMax, model_name = None)
 
 		# store the best performace seen so far
@@ -109,16 +112,21 @@ class DE_searcher(Searcher):
 		num_violated, num_patched = self.get_num_patched_and_broken(
 			predictions) 
 
-		losses_of_correct, losses_of_target = loss_v
-		if self.patch_aggr is None:
-			final_fitness = losses_of_correct + losses_of_target
-		else:
-			final_fitness = losses_of_correct + self.patch_aggr * losses_of_target	
+		if not self.use_ewc:
+			losses_of_correct, losses_of_target = loss_v
+			if self.patch_aggr is None:
+				final_fitness = losses_of_correct + losses_of_target
+			else:
+				final_fitness = losses_of_correct + self.patch_aggr * losses_of_target	
 
-		num_still_correct = len(self.indices_to_correct) - num_violated # N_intac
-		# log
-		#print ("New fitness (num_violatd, num_patched)",
-		#	self.patch_aggr, losses_of_correct, losses_of_target, num_violated, num_patched, final_fitness)
+			num_still_correct = len(self.indices_to_correct) - num_violated # N_intac
+			# log
+			#print ("New fitness (num_violatd, num_patched)",
+			#	self.patch_aggr, losses_of_correct, losses_of_target, num_violated, num_patched, final_fitness)
+		else:
+			final_fitness = loss_v
+			# log
+			print ("New fitness (num_violatd, num_patched)", num_violated, num_patched, final_fitness)
 			
 		return (final_fitness,)
 

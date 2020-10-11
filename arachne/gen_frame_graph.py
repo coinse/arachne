@@ -239,7 +239,7 @@ def build_fm_graph_only_the_last(featuresnp, num_label = 10, weight_shape = 100,
 		acc_op = tf.reduce_mean(tf.cast(correct_predc, tf.float32), name = "acc")
 
 		#####
-		fisher_info_mat = compute_fisher_infomat(predcs, w3, labels, featuresnp_const.shape[0])
+		fisher_info_mat = compute_fisher_infomat(predcs, w3, labels, featuresnp.shape[0])
 		#####
 
 	return graph

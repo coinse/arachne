@@ -52,6 +52,7 @@ if __name__ == "__main__":
 	parser.add_argument("-path_to_keras_model", action = 'store', default = None)
 	parser.add_argument("-seed", action = "store", default = 1, type = int)
 	parser.add_argument("-dest", default = ".", type = str)
+	parser.add_argument("-use_ewc", default = 0, type = int, help = "1 if using ewc extension else 0")
 
 
 	args = parser.parse_args()	
@@ -84,7 +85,8 @@ if __name__ == "__main__":
 		path_to_keras_model = args.path_to_keras_model,
 		predef_indices_to_wrong = indices_to_wrong,
 		seed = args.seed,
-		only_loc = True)	
+		only_loc = True,
+		use_ewc = bool(args.use_ewc))
 	
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
 	print ("\t".join([str(index) for index in indices_to_places_to_fix]))

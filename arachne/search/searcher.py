@@ -35,7 +35,8 @@ class Searcher(object):
 		path_to_keras_model = None,
 		is_empty_one = False,
 		w_gather = False,
-		at_indices = None):
+		at_indices = None,
+		use_ewc = False):
 
 		"""
 		"""
@@ -81,6 +82,15 @@ class Searcher(object):
 			# set search relate parameters
 			self.max_search_num = max_search_num	
 			self.indices_to_sampled_correct = None
+
+		# EWC
+		self.use_ewc = use_ewc
+		#if self.use_ewc:
+		#	self.ewc_inst = self.set_ewc_inst(
+		#		init_weight,
+		#		var_lambda = None)
+		#else:
+		self.ewc_inst = None
 
 
 	@classmethod
@@ -242,6 +252,39 @@ class Searcher(object):
 			self.initial_predictions = initial_predictions
 
 
+	def set_ewc_var_lambda(self, var_lambda):
+		"""
+		"""
+		assert self.use_ewc is not None and self.ewc_inst is not None
+		self.ewc_inst.var_lambda = var_lambda
+
+
+	def set_ewc_inst(self,
+		init_weight,
+		var_lambda = None):
+		"""
+		generate EWC handler
+		"""
+		assert self.use_ewc
+
+		import ewc
+
+		var_lambda = len(self.indices_to_correct)/len(self.indices_to_wrong)
+
+		self.ewc_inst = ewc.EWC_Loss(
+			init_weight, 
+			self.initial_predictions, 
+			self.labels,
+			self.indices_to_correct, 
+			self.indices_to_wrong, 
+			self.empty_graph,
+			self.curr_feed_dict,
+			self.sess,
+			weight_tensor_name = self.tensors['t_weight'],
+			var_lambda = 1,
+			mode = var_lambda)
+
+
 	def move(self, target_tensor_name, delta, new_model_name, 
 		update_op = 'add', values_dict = None):
 		"""
@@ -280,22 +323,28 @@ class Searcher(object):
 			use_pretr_front = self.path_to_keras_model is not None,
 			compute_loss = True)
 		
-		losses_of_correct = all_losses[self.indices_to_correct]
-		##
-		indices_to_corr_false = self.np.where(correct_predictions[self.indices_to_correct] == 0.)[0]
-		num_corr_true = len(self.indices_to_correct) - len(indices_to_corr_false)
-		new_losses_of_correct = num_corr_true + self.np.sum(1/(losses_of_correct[indices_to_corr_false] + 1))
-		##
+		if not self.use_ewc:
+			losses_of_correct = all_losses[self.indices_to_correct]
+			##
+			indices_to_corr_false = self.np.where(correct_predictions[self.indices_to_correct] == 0.)[0]
+			num_corr_true = len(self.indices_to_correct) - len(indices_to_corr_false)
+			new_losses_of_correct = num_corr_true + self.np.sum(1/(losses_of_correct[indices_to_corr_false] + 1))
+			##	
 
-		losses_of_wrong = all_losses[self.indices_to_wrong]
-		##
-		indices_to_wrong_false = self.np.where(correct_predictions[self.indices_to_wrong] == 0.)[0]
-		num_wrong_true = len(self.indices_to_wrong) - len(indices_to_wrong_false)
-		new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
-		##
-		combined_losses	= (new_losses_of_correct, new_losses_of_wrong)
+			losses_of_wrong = all_losses[self.indices_to_wrong]
+			##
+			indices_to_wrong_false = self.np.where(correct_predictions[self.indices_to_wrong] == 0.)[0]
+			num_wrong_true = len(self.indices_to_wrong) - len(indices_to_wrong_false)
+			new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
+			##
+			combined_losses	= (new_losses_of_correct, new_losses_of_wrong)	
 
-		return sess, (predictions, correct_predictions, combined_losses)
+			return sess, (predictions, correct_predictions, combined_losses)
+		else:### under construction
+			assert self.ewc_inst is not None, "should be called in de.eval"
+
+			ewc_loss_v = self.ewc_inst.ewc_loss(delta, per_label_losses)
+			return sess, (predictions, correct_predictions, ewc_loss_v)
 
 
 	def get_results_of_target(self, indices_to_target, empty_graph, plchldr_feed_dict):
@@ -429,7 +478,7 @@ class Searcher(object):
 			empty_graph = empty_graph, 
 			plchldr_feed_dict = plchldr_feed_dict)
 
-		t3= time.time()
+		t3 = time.time()
 
 		if num_of_patched == len(self.indices_to_wrong) and num_of_violated == 0:
 			print("In early stop checking:%d, %d" % (num_of_patched, num_of_violated))

@@ -27,6 +27,8 @@ parser.add_argument("-dest", default = ".", type = str)
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
 parser.add_argument("-female_lst_file", action = 'store', 
 	default = 'data/lfw_np/female_names_lfw.txt', type = str)
+parser.add_argument("-use_ewc", default = 0, type = int, help = "1 if using ewc extension else 0")
+
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
@@ -81,7 +83,8 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	path_to_keras_model = args.path_to_keras_model,
 	predef_indices_to_wrong = indices,
 	seed = args.seed,
-	patch_aggr = args.patch_aggr)
+	patch_aggr = args.patch_aggr,
+	use_ewc	= bool(args.use_ewc))
 		
 t2 = time.time()
 print ("Time for patching: {}".format(t2 - t1))

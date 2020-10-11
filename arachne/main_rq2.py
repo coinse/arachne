@@ -27,6 +27,7 @@ parser.add_argument("-iter_num", action = "store", default = 100, type = int)
 parser.add_argument("-target_indices_file", action = 'store', default = None)
 parser.add_argument("-dest", action = "store", default = ".")
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = int)
+parser.add_argument("-use_ewc", default = 0, type = int, help = "1 if using ewc extension else 0")
 
 args = parser.parse_args()
 
@@ -70,7 +71,8 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	path_to_keras_model = args.path_to_keras_model,
 	predef_indices_to_wrong = predef_indices_to_wrong, 
 	seed = args.seed, #)
-	patch_aggr = args.patch_aggr) #True)
+	patch_aggr = args.patch_aggr, #True)
+	use_ewc = bool(args.use_ewc))
 
 
 os.replace(patched_model_name.replace("None", "model") + ".json", 

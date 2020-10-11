@@ -78,7 +78,8 @@ def patch(
 	top_n = -1,
 	seed = 1,
 	only_loc = False,
-	patch_aggr = None):
+	patch_aggr = None,
+	use_ewc = False):
 	"""
 	only_loc = True:
 		Ret(list, list):
@@ -276,7 +277,12 @@ def patch(
 			which = which,
 			w_gather = False,
 			patch_aggr = patch_aggr, 
-			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
+			at_indices = None if which != 'lfw_vgg' else new_indices_to_target,
+			use_ewc = use_ewc)
+
+		## For EWC extension: adjust the importance of remebering the past behaviour ##
+		searcher.set_ewc_var_lambda(len(indices_to_correct)/len(indices_to_wrong)) # or 1
+		###############################################################################
 
 		places_to_fix = indices_to_places_to_fix
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)

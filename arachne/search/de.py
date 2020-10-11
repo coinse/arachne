@@ -28,7 +28,8 @@ class DE_searcher(Searcher):
 		is_empty_one = False,
 		w_gather = False,
 		patch_aggr = None,
-		at_indices = None):
+		at_indices = None,
+		use_ewc = False):
 
 		"""
 		"""
@@ -44,7 +45,8 @@ class DE_searcher(Searcher):
 				path_to_keras_model = path_to_keras_model,
 				is_empty_one = is_empty_one,
 				w_gather = w_gather,
-				at_indices = at_indices)
+				at_indices = at_indices,
+				use_ewc = use_ewc)
 
 		# fitness computation related initialisation
 		self.fitness = 0.0
@@ -234,6 +236,14 @@ class DE_searcher(Searcher):
 			self.sess = self.model_util.generate_session(graph = self.empty_graph)
 		else:
 			self.sess = sess
+
+		### For EWC extension ###
+		if self.use_ewc and self.ewc_inst is None:
+			self.ewc_inst = self.set_ewc_inst(
+				init_weight, 
+				var_lambda = None)
+		#########################
+
 		#print (toolbox.individual()) 
 		#print (type(toolbox.individual()))
 		pop = toolbox.population(n = pop_size)

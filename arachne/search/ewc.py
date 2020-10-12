@@ -73,6 +73,7 @@ class EWC_Loss(object):
 		mode = 0):
 		"""
 		"""
+		import tensorflow as tf
 		if mode == 0:
 			vs, _ = self.model_util.run(
 				['fisher_mat'],
@@ -89,7 +90,12 @@ class EWC_Loss(object):
 
 			ders_lst = []
 			for i in range(self.num_imgs):
-				idx_to_label = self.labels[i] - 1
+				try:
+					iter(self.labels[i])
+					idx_to_label = self.np.argmax(self.labels[i])
+				except TypeError:
+					idx_to_label = self.labels[i]
+				
 				ders_tensor = tf.gradients(tf.log(predc_tensor[i,idx_to_label]), weight_tensor)	
 
 				vs, _ = self.model_util.run(

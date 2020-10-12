@@ -281,7 +281,7 @@ def patch(
 			use_ewc = use_ewc)
 
 		## For EWC extension: adjust the importance of remebering the past behaviour ##
-		searcher.set_ewc_var_lambda(len(indices_to_correct)/len(indices_to_wrong)) # or 1
+		#searcher.set_ewc_var_lambda(len(indices_to_correct)/len(indices_to_selected_wrong)) # or 1
 		###############################################################################
 
 		places_to_fix = indices_to_places_to_fix
@@ -292,7 +292,8 @@ def patch(
 		patched_model_name = searcher.search(
 			places_to_fix,
 			sess = None,
-			name_key = name_key)
+			name_key = name_key,
+			var_lambda = len(indices_to_correct)/len(indices_to_selected_wrong)) # or 1
 	else:
 		print ("{} not supported yet".format(search_method))
 		import sys; sys.exit()

@@ -182,7 +182,8 @@ class DE_searcher(Searcher):
 		sess = None,
 		name_key = 'best', 
 		max_allowed_no_change = 10,
-		init_weight_value = None):
+		init_weight_value = None,
+		var_lambda = None):
 		"""
 		"""
 		import time
@@ -248,8 +249,8 @@ class DE_searcher(Searcher):
 		### For EWC extension ###
 		if self.use_ewc and self.ewc_inst is None:
 			self.ewc_inst = self.set_ewc_inst(
-				init_weight, 
-				var_lambda = None)
+				init_weight_value, 
+				var_lambda = var_lambda)
 		#########################
 
 		#print (toolbox.individual()) 

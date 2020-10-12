@@ -116,7 +116,7 @@ def compute_fisher_infomat(predcs, w, ys, num_input):
 	import tensorflow as tf
 	ders_lst = []
 	for i in range(num_input):
-		idx_to_y = ys[i] - 1
+		idx_to_y = ys[i]
 		ders = tf.gradients(tf.log(predcs[i,idx_to_y]), w) # [i] or i
 		ders_lst.append(ders)
 
@@ -179,7 +179,7 @@ def build_cpm_graph_only_the_last(featuresnp,
 		correct_predc = tf.equal(tf.argmax(predcs, 1), tf.argmax(labels, 1), name = "correct_predc")
 		acc_op = tf.reduce_mean(tf.cast(correct_predc, tf.float32), name = "acc")
 		#####
-		fisher_info_mat = compute_fisher_infomat(predcs, w3, tf.argmax(labels,1), featuresnp.shape[0])
+		#fisher_info_mat = compute_fisher_infomat(predcs, w3, tf.argmax(labels,1), featuresnp.shape[0])
 		#####
 
 	return graph
@@ -240,7 +240,7 @@ def build_fm_graph_only_the_last(featuresnp, num_label = 10, weight_shape = 100,
 		acc_op = tf.reduce_mean(tf.cast(correct_predc, tf.float32), name = "acc")
 
 		#####
-		fisher_info_mat = compute_fisher_infomat(predcs, w3, tf.argmax(labels,1), featuresnp.shape[0])
+		#fisher_info_mat = compute_fisher_infomat(predcs, w3, tf.argmax(labels,1), featuresnp.shape[0])
 		#####
 
 	return graph

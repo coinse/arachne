@@ -1,6 +1,7 @@
 """
 """
 import time
+
 class Searcher(object):
 	"""docstring for Searcher"""
 
@@ -267,7 +268,7 @@ class Searcher(object):
 		"""
 		assert self.use_ewc
 
-		import ewc
+		from search import ewc
 
 		var_lambda = len(self.indices_to_correct)/len(self.indices_to_wrong)
 
@@ -281,8 +282,8 @@ class Searcher(object):
 			self.curr_feed_dict,
 			self.sess,
 			weight_tensor_name = self.tensors['t_weight'],
-			var_lambda = 1,
-			mode = var_lambda)
+			var_lambda = var_lambda,
+			mode = 1)
 
 
 	def move(self, target_tensor_name, delta, new_model_name, 

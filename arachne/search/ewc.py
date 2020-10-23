@@ -67,18 +67,27 @@ class EWC_Loss(object):
 #		return fisher	
 	
 	def compute_fisher_emp(self, 
+		num_data,
 		empty_graph, 
-		curr_plchldr_feed_dict, 
+		_curr_plchldr_feed_dict, 
 		sess, 
 		mode = 0):
 		"""
 		"""
 		import tensorflow as tf
+
+		indices = list(range(self.num_imgs))
+
+		curr_plchldr_feed_dict = _curr_plchldr_feed_dict.copy()
+		indices_to_slice_vgg16_tensor = empty_graph.get_tensor_by_name('indices_to_slice:0')
+		curr_plchldr_feed_dict[indices_to_slice_vgg16_tensor] = indices
+
 		if mode == 0:
 			vs, _ = self.model_util.run(
 				['fisher_mat'],
 				None, 
 				None, 
+				input_tensor_name = None, 
 				sess = sess, 
 				empty_graph = empty_graph,
 				plchldr_feed_dict = curr_plchldr_feed_dict)	
@@ -88,28 +97,34 @@ class EWC_Loss(object):
 			predc_tensor = empty_graph.get_tensor_by_name("predc:0")
 			weight_tensor = empty_graph.get_tensor_by_name('{}:0'.format(self.weight_tensor_name))	
 
-			ders_lst = []
-			for i in range(self.num_imgs):
-				try:
-					iter(self.labels[i])
-					idx_to_label = self.np.argmax(self.labels[i])
-				except TypeError:
-					idx_to_label = self.labels[i]
-				
-				ders_tensor = tf.gradients(tf.log(predc_tensor[i,idx_to_label]), weight_tensor)	
+			#ders_lst = []
+			#for i in indices:
+			#	try:
+			#		iter(self.labels[i])
+			#		idx_to_label = self.np.argmax(self.labels[i])
+			#	except TypeError:
+			#		idx_to_label = self.labels[i]
+			# ders_tensor = tf.gradients(tf.log(predc_tensor[i,idx_to_label]), weight_tensor)	
+			try:
+				iter(self.labels[0])
+				indices_to_label = self.np.argmax(self.labels, axis = 1)	
+			except TypeError:
+				indices_to_label = self.labels
 
-				vs, _ = self.model_util.run(
-					[ders_tensor],
-					None, 
-					None, 
-					sess = sess, 
-					empty_graph = empty_graph,
-					plchldr_feed_dict = curr_plchldr_feed_dict)	
+			ders_tensor = tf.gradients(tf.log(predc_tensor[:,indices_to_label]), weight_tensor)	
+			vs, _ = self.model_util.run(
+				[ders_tensor],
+				None, 
+				None, 
+				input_tensor_name = None, 
+				sess = sess, 
+				empty_graph = empty_graph,
+				plchldr_feed_dict = curr_plchldr_feed_dict)	
 
-				ders_lst.append(vs)	
-
-			ders_lst = self.np.asarray(ders_lst)
-			self.fisher = self.np.mean(ders_lst ** 2, axis = 0)
+			#	ders_lst.append(vs)
+			ders_arr = vs[0]
+			#ders_lst = self.np.asarray(ders_lst)
+			self.fisher = self.np.mean(ders_arr ** 2, axis = 0)
 
 
 	def ewc_loss(self,

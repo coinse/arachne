@@ -79,8 +79,6 @@ class EWC_Loss(object):
 		indices = list(range(self.num_imgs))
 
 		curr_plchldr_feed_dict = _curr_plchldr_feed_dict.copy()
-		indices_to_slice_vgg16_tensor = empty_graph.get_tensor_by_name('indices_to_slice:0')
-		curr_plchldr_feed_dict[indices_to_slice_vgg16_tensor] = indices
 
 		if mode == 0:
 			vs, _ = self.model_util.run(
@@ -117,6 +115,7 @@ class EWC_Loss(object):
 				None, 
 				None, 
 				input_tensor_name = None, 
+				output_tensor_name = None,
 				sess = sess, 
 				empty_graph = empty_graph,
 				plchldr_feed_dict = curr_plchldr_feed_dict)	
@@ -124,7 +123,7 @@ class EWC_Loss(object):
 			#	ders_lst.append(vs)
 			ders_arr = vs[0]
 			#ders_lst = self.np.asarray(ders_lst)
-			self.fisher = self.np.mean(ders_arr ** 2, axis = 0)
+			self.fisher = self.np.mean(ders_arrm ** 2, axis = 0)
 
 
 	def ewc_loss(self,

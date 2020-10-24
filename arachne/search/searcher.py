@@ -198,8 +198,7 @@ class Searcher(object):
 		self.curr_feed_dict = feed_dict.copy()
 
 
-	def compute_initial_predictions(self, inputs = None, labels = None, num_label = None, 
-		base_indices_to_vgg16 = None):
+	def compute_initial_predictions(self, inputs = None, labels = None, num_label = None):
 		"""
 		"""
 		if inputs is None:
@@ -245,8 +244,7 @@ class Searcher(object):
 			initial_predictions = self.compute_initial_predictions(
 				inputs = self.inputs, 
 				labels = self.labels, 
-				num_label = self.num_label,
-				base_indices_to_vgg16 = None)
+				num_label = self.num_label)
 
 			self.initial_predictions = initial_predictions
 		else:

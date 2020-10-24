@@ -268,7 +268,8 @@ class Searcher(object):
 
 		from search import ewc
 
-		var_lambda = len(self.indices_to_correct)/len(self.indices_to_wrong)
+		if var_lambda is None:
+			var_lambda = len(self.indices_to_correct)/len(self.indices_to_wrong)
 
 		self.ewc_inst = ewc.EWC_Loss(
 			init_weight, 
@@ -342,7 +343,7 @@ class Searcher(object):
 		else:### under construction
 			assert self.ewc_inst is not None, "should be called in de.eval"
 
-			ewc_loss_v = self.ewc_inst.ewc_loss(delta, per_label_losses)
+			ewc_loss_v = self.ewc_inst.ewc_loss(delta, all_losses)
 			return sess, (predictions, correct_predictions, ewc_loss_v)
 
 

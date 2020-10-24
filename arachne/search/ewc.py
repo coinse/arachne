@@ -36,11 +36,12 @@ class EWC_Loss(object):
 
 		self.weight_tensor_name = weight_tensor_name
 		self.var_lambda = var_lambda
-
-		self.fisher = self.compute_fisher_emp(self.empty_graph, 
+		# set self.fisher
+		self.compute_fisher_emp(self.empty_graph, 
 			self.curr_plchldr_feed_dict, 
 			sess, 
 			mode = mode)
+		assert self.fisher is not None, "fisher should be computed"
 
 #	def compute_fisher(self, predictions):
 #		# computer Fisher information for each parameter
@@ -126,7 +127,6 @@ class EWC_Loss(object):
 		per_label_losses => will be given as this is called insider of searcher.move
 		"""	
 		assert per_label_losses is not None
-
 		loss_taskb = self.np.mean(per_label_losses[self.indices_to_taskb])
 		post_taska = self.var_lambda/2 * self.np.sum(
 			self.np.multiply(self.fisher, (new_weight - self.init_weight)**2))

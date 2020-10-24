@@ -100,7 +100,6 @@ class DE_searcher(Searcher):
 		# replace places_to_fix node with a matching part value
 		for i, place_to_fix in enumerate(places_to_fix):
 			new_weight_value[place_to_fix] = patch_candidate[i]
-
 		sess, (predictions, correct_predictions, loss_v) = self.move(
 			self.tensors['t_weight'], 
 			new_weight_value, 
@@ -248,7 +247,7 @@ class DE_searcher(Searcher):
 
 		### For EWC extension ###
 		if self.use_ewc and self.ewc_inst is None:
-			self.ewc_inst = self.set_ewc_inst(
+			self.set_ewc_inst(
 				init_weight_value, 
 				var_lambda = var_lambda)
 		#########################

@@ -293,7 +293,7 @@ def patch(
 			places_to_fix,
 			sess = None,
 			name_key = name_key,
-			var_lambda = len(indices_to_correct)/len(indices_to_selected_wrong)) # or 1
+			var_lambda = patch_aggr*len(indices_to_correct)/len(indices_to_selected_wrong)) # or 1
 	else:
 		print ("{} not supported yet".format(search_method))
 		import sys; sys.exit()

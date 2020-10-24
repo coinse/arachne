@@ -67,7 +67,6 @@ class EWC_Loss(object):
 #		return fisher	
 	
 	def compute_fisher_emp(self, 
-		num_data,
 		empty_graph, 
 		_curr_plchldr_feed_dict, 
 		sess, 
@@ -77,6 +76,9 @@ class EWC_Loss(object):
 		import tensorflow as tf
 
 		indices = list(range(self.num_imgs))
+		#
+		#for op in sess.graph.get_operations():
+		#	print (op.name)
 
 		curr_plchldr_feed_dict = _curr_plchldr_feed_dict.copy()
 
@@ -95,23 +97,16 @@ class EWC_Loss(object):
 			predc_tensor = empty_graph.get_tensor_by_name("predc:0")
 			weight_tensor = empty_graph.get_tensor_by_name('{}:0'.format(self.weight_tensor_name))	
 
-			#ders_lst = []
-			#for i in indices:
-			#	try:
-			#		iter(self.labels[i])
-			#		idx_to_label = self.np.argmax(self.labels[i])
-			#	except TypeError:
-			#		idx_to_label = self.labels[i]
-			# ders_tensor = tf.gradients(tf.log(predc_tensor[i,idx_to_label]), weight_tensor)	
 			try:
 				iter(self.labels[0])
-				indices_to_label = self.np.argmax(self.labels, axis = 1)	
+				indices_to_label = self.np.argmax(self.labels, axis = 1)
 			except TypeError:
 				indices_to_label = self.labels
 
-			ders_tensor = tf.gradients(tf.log(predc_tensor[:,indices_to_label]), weight_tensor)	
+			full_indices = self.np.asarray(list(zip(self.np.arange(len(self.labels)), indices_to_label)))
+			ders_tensor = tf.gradients(tf.reshape(tf.log(tf.gather_nd(predc_tensor, full_indices)), (-1,1)), weight_tensor)
 			vs, _ = self.model_util.run(
-				[ders_tensor],
+				ders_tensor,
 				None, 
 				None, 
 				input_tensor_name = None, 
@@ -119,11 +114,9 @@ class EWC_Loss(object):
 				sess = sess, 
 				empty_graph = empty_graph,
 				plchldr_feed_dict = curr_plchldr_feed_dict)	
-
-			#	ders_lst.append(vs)
+			
 			ders_arr = vs[0]
-			#ders_lst = self.np.asarray(ders_lst)
-			self.fisher = self.np.mean(ders_arrm ** 2, axis = 0)
+			self.fisher = ders_arr ** 2
 
 
 	def ewc_loss(self,

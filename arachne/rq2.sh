@@ -10,13 +10,13 @@ iter_num=100
 seed=0 # can be 0 .. 29
 patch_aggr=10
 
-use_ewc=0
+use_ewc=1
 
 if [ $which_data == 'fashion_mnist' ]
 then
 	indices_file="indices/fm/fashion_mnist.misclf.indices.csv"
-	python3 main_rq2.py -datadir $datadir -which simple_fm -which_data $which_data -tensor_name_file data/tensor_names/tensor.lastLayer.names -loc_method $loc -patch_target_key ${patch_target_key}.${seed} -path_to_keras_model data/models/fmnist_simple.h5 -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/fm/$loc -patch_aggr $patch_aggr -use_ewc ${use_ewc}
+	echo "python3.7 main_rq2.py -datadir $datadir -which simple_fm -which_data $which_data -tensor_name_file data/tensor_names/tensor.lastLayer.names -loc_method $loc -patch_target_key ${patch_target_key}.${seed} -path_to_keras_model data/models/fmnist_simple.h5 -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/fm/$loc -patch_aggr $patch_aggr -use_ewc ${use_ewc}"
 else
 	indices_file="indices/cm/cifar10.misclf.indices.csv"
-	python3 main_rq2.py -datadir $datadir -which simple_cm -which_data $which_data -tensor_name_file data/tensor_names/tensor.lastLayer.names -loc_method $loc -patch_target_key ${patch_target_key}.${seed} -path_to_keras_model data/models/cifar_simple_90p.h5 -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/cm/$loc -patch_aggr $patch_aggr -use_ewc ${use_ewc}
+	python3.7 main_rq2.py -datadir $datadir -which simple_cm -which_data $which_data -tensor_name_file data/tensor_names/tensor.lastLayer.names -loc_method $loc -patch_target_key ${patch_target_key}.${seed} -path_to_keras_model data/models/cifar_simple_90p.h5 -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest/cm/$loc -patch_aggr $patch_aggr -use_ewc ${use_ewc}
 fi

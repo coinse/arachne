@@ -26,7 +26,7 @@ parser.add_argument("-seed", action = "store", default = 1, type = int)
 parser.add_argument("-iter_num", action = "store", default = 100, type = int)
 parser.add_argument("-target_indices_file", action = 'store', default = None)
 parser.add_argument("-dest", action = "store", default = ".")
-parser.add_argument("-patch_aggr", action = 'store', default = None, type = int)
+parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
 parser.add_argument("-use_ewc", default = 0, type = int, help = "1 if using ewc extension else 0")
 
 args = parser.parse_args()

@@ -52,10 +52,12 @@ class DE_searcher(Searcher):
 		self.fitness = 0.0
 
 		if not self.use_ewc:
-			self.creator.create("FitnessMax", self.base.Fitness, weights = (1.0,)) # maximisation
+			print ("Maximisation")
+			self.creator.create("Fitness", self.base.Fitness, weights = (1.0,)) # maximisation
 		else:
-			self.creator.create("FitnessMax", self.base.Fitness, weights = (-1.0,)) # minimisation
-		self.creator.create("Individual", self.np.ndarray, fitness = self.creator.FitnessMax, model_name = None)
+			print ("Minimisation")
+			self.creator.create("Fitness", self.base.Fitness, weights = (-1.0,)) # minimisation
+		self.creator.create("Individual", self.np.ndarray, fitness = self.creator.Fitness, model_name = None)
 
 		# store the best performace seen so far
 		self.the_best_performance = None
@@ -311,12 +313,14 @@ class DE_searcher(Searcher):
 					places_to_fix, 
 					new_model_name)
 				
-				if y.fitness.values[0] >= ind.fitness.values[0]: # better
+				flag = 1 if not self.use_ewc else -1
+				if flag * y.fitness.values[0] >= flag * ind.fitness.values[0]:
+				#if y.fitness.values[0] >= ind.fitness.values[0]: # better
 					pop[pop_idx] = y # upddate
 					# set new model name
 					pop[pop_idx].model_name = new_model_name 
 					# update best
-					if best.fitness.values[0] < pop[pop_idx].fitness.values[0]:
+					if flag * best.fitness.values[0] < flag * pop[pop_idx].fitness.values[0]:
 						hof.update(pop)
 						best = hof[0]
 						#print ("New best one is set: {}, fitness: {}, model_name: {}".format(

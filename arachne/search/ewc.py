@@ -116,7 +116,8 @@ class EWC_Loss(object):
 				empty_graph = empty_graph,
 				plchldr_feed_dict = curr_plchldr_feed_dict)	
 			
-			ders_arr = vs[0]
+			ders_arr = 1/len(self.labels) * vs[0]			
+			print ("Ders", ders_arr.shape, len(self.labels))	
 			self.fisher = ders_arr ** 2
 
 
@@ -130,7 +131,8 @@ class EWC_Loss(object):
 		loss_taskb = self.np.mean(per_label_losses[self.indices_to_taskb])
 		post_taska = self.var_lambda/2 * self.np.sum(
 			self.np.multiply(self.fisher, (new_weight - self.init_weight)**2))
-
+		
+		print ("({}), Loss A and B: {} and {}".format(self.var_lambda, post_taska, loss_taskb))
 		loss = loss_taskb + post_taska
 
 		return loss

@@ -288,12 +288,16 @@ def patch(
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)
 		
 		name_key = str(0) if patch_target_key is None else str(patch_target_key)
-			
+		
+		var_lambda = len(indices_to_correct)/(len(indices_to_selected_wrong)*patch_aggr)
+		print ("Lambda is set as {} for corr ({}) and wrong ({})".format(
+			var_lambda,len(indices_to_correct),len(indices_to_selected_wrong)))
+	
 		patched_model_name = searcher.search(
 			places_to_fix,
 			sess = None,
 			name_key = name_key,
-			var_lambda = patch_aggr*len(indices_to_correct)/len(indices_to_selected_wrong)) # or 1
+			var_lambda = var_lambda) # or 1
 	else:
 		print ("{} not supported yet".format(search_method))
 		import sys; sys.exit()

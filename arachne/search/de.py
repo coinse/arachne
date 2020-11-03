@@ -256,7 +256,7 @@ class DE_searcher(Searcher):
 
 		#print (toolbox.individual()) 
 		#print (type(toolbox.individual()))
-		pop = toolbox.population(n = pop_size)
+		pop = toolbox.population(n = pop_size - 1)
 
 		#print ('===pop===')
 		#print ("\t Places to fix ({}): {}".format(
@@ -274,6 +274,21 @@ class DE_searcher(Searcher):
 				self.model_name) 
 			ind.model_name = None 
 
+		print ("init weight", init_weight_value.shape)
+		print (places_to_fix)
+		init_mdl = self.creator.Individual(init_weight_value[[i_v for i_v,_ in places_to_fix],[i_v for _,i_v in places_to_fix]])
+		init_mdl.fitness.values = toolbox.evaluate(
+			init_mdl,
+			init_weight_value,
+			places_to_fix,
+			self.model_name)
+		init_mdl.model_name = None
+		
+		#init_mdl = toolbox.individual(init_weight_value)
+		print ("init mdl", init_mdl)
+		print ("\tFitness:", init_mdl.fitness.values[0])
+			
+		pop += [init_mdl]
 		hof.update(pop)
 		best = hof[0]
 

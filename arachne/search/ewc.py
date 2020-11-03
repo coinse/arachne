@@ -116,9 +116,9 @@ class EWC_Loss(object):
 				empty_graph = empty_graph,
 				plchldr_feed_dict = curr_plchldr_feed_dict)	
 			
-			ders_arr = 1/len(self.labels) * vs[0]			
+			ders_arr = vs[0]			
 			print ("Ders", ders_arr.shape, len(self.labels))	
-			self.fisher = ders_arr ** 2
+			self.fisher = 1/len(self.labels) * ders_arr ** 2
 
 
 	def ewc_loss(self,

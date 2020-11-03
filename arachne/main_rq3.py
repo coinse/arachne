@@ -26,6 +26,7 @@ parser.add_argument("-target_indices_file", action = "store", default = None)
 parser.add_argument("-dest", default = ".", type = str)
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
 parser.add_argument("-use_ewc", default = 0, type = int, help = "1 if using ewc extension else 0")
+parser.add_argument("-n", default = 0, type = int, help = "top n frequent faults")
 
 args = parser.parse_args()
 
@@ -49,7 +50,7 @@ misclfds = data_util.get_misclf_indices(args.target_indices_file,
 num_entire_misclfs = np.sum([len(vs) for vs in misclfds.values()])
 
 sorted_keys = data_util.sort_keys_by_cnt(misclfds)
-top_n = args.seed # to target a unique type of misbehaviour per run
+top_n = args.n # to target a unique type of misbehaviour per run
 misclf_key = sorted_keys[top_n]
 
 indices = misclfds[misclf_key]

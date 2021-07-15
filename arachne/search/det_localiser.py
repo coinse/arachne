@@ -131,28 +131,29 @@ class Localiser(Base_Searcher):
 		# from front part		
 		#from_front =  self.prev_vector_value[:,pos[:,0]] * weight_value_to_use[pos[:,0],pos[:,1]]
 		from_front_arr = []
-		#i = 0
+		i = 0
 		from tqdm import tqdm
 		#t1 = time.time()
-		#for pos in tqdm(pos_arr):
-		#	from_front_raw = self.np.multiply(self.prev_vector_value, weight_value_to_use[:,pos[1]])
-		#	if i == 0:
-		#		print ("+", from_front_raw.shape, self.prev_vector_value.shape, weight_value_to_use[:,pos[1]].shape)
-		#		#print (self.prev_vector_value * weight_value_to_use[:,pos[1]])
-		#	from_front_abs = self.np.abs(from_front_raw)
-		#	normed_front = norm_scaler.fit_transform(from_front_abs)
-		#	#normed_front = from_front_abs	
-		#	#print ("N", normed_front.shape)
-		#	# retrive only our target
-		#	from_front = normed_front[:,pos[0]]
-		#	if i ==0:
-		#		print ("-", from_front.shape)
-		#		i+=1
-		#	
-		#	from_front_arr.append(self.np.mean(from_front))
-		#t2 = time.time()
-		#print ("Time", t2 - t1)
+		for pos in tqdm(pos_arr[:2]):
+			from_front_raw = self.np.multiply(self.prev_vector_value, weight_value_to_use[:,pos[1]])
+			if i == 0:
+				print ("+", from_front_raw.shape, self.prev_vector_value.shape, weight_value_to_use[:,pos[1]].shape)
+				#print (self.prev_vector_value * weight_value_to_use[:,pos[1]])
+			from_front_abs = self.np.abs(from_front_raw)
+			normed_front = norm_scaler.fit_transform(from_front_abs)
+			#normed_front = from_front_abs	
+			#print ("N", normed_front.shape)
+			# retrive only our target
+			from_front = normed_front[:,pos[0]]
+			if i ==0:
+				print ("-", from_front.shape)
+				i+=1
+			
+			from_front_arr.append(self.np.mean(from_front))
+		t2 = time.time()
+		print ("Time", t2 - t1)
 		##
+
 		import tensorflow as tf
 		curr_plchldr_feed_dict = self.curr_feed_dict.copy()
 		indices_to_slice_tensor = self.empty_graph.get_tensor_by_name('%s:0' % ("indices_to_slice"))
@@ -167,11 +168,20 @@ class Localiser(Base_Searcher):
 		print ("F", curr_plchldr_feed_dict.keys())
 		sess = None
 		temp_tensors = []
-		for pos in tqdm(pos_arr):
+		for pos in tqdm(pos_arr[:512]):
 			output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,pos[1]])# since we have to normalise, instead of pos[0], take all
 			output_tensor = tf.math.abs(output_tensor)
-			#print ("+", output_tensor)
-			output_tensor = tf.norm(output_tensor, ord = 1, axis = 1)
+			print ("-", output_tensor)
+			sum_tensor = tf.math.reduce_sum(output_tensor, axis = 1)
+			#print ("sum", sum_tensor)
+			output_tensor = tf.transpose(tf.div_no_nan(tf.transpose(output_tensor), sum_tensor))
+			print ("--", output_tensor)
+			output_tensor = output_tensor[:,pos[0]]
+			#output_tensor = tf.math.divide(output_tensor, sum_tensor)[:,pos[0]]
+			print ("+", output_tensor)
+			output_tensor = tf.math.reduce_mean(output_tensor, axis = 0)
+			#output_tensor = tf.linalg.norm(output_tensor, ord = 1, axis = 1)[0]
+			#print ("++", output_tensor)
 			temp_tensors.append(output_tensor)
 		
 		print ("start")
@@ -187,9 +197,17 @@ class Localiser(Base_Searcher):
 		#sess.close()
 		t2 = time.time()
 		print ("Time", t2 - t1)
+		print (len(outs))
+		#print(len(outs[0]))
+		#print(outs[0].shape)
 		outs = self.np.asarray(outs)
-		from_front = self.np.mean(outs, axis = 1) # compute an average for given inputs
+		print (outs.shape)
+		#from_front = self.np.mean(outs, axis = 1) # compute an average for given inputs
+		from_front = outs
+		#from_front = self.np.asarray(from_front_arr)
 		print ("Front", from_front.shape)
+		print ("\t", from_front[:20])
+		print ("\t", self.np.sum(from_front[:512]))
 		#import sys; sys.exit()
 		
 		# from behind part
@@ -240,10 +258,12 @@ class Localiser(Base_Searcher):
 		from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 		
 		print ("From behind", from_behind.shape)
+		print ("\t", from_behind)
 		
 		FIs = []
 		for pos in pos_arr:
 			FIs.append(from_front[pos[0]] * from_behind[pos[1]])
+			#FIs.append(from_front[pos[0]])
 		
 		print ("Max: {}, min:{}".format(self.np.max(FIs), self.np.min(FIs)))
 		return FIs
@@ -300,10 +320,15 @@ class Localiser(Base_Searcher):
 		assert curr_nodes_to_lookat is not None
 		# compute forward impact for the given nodes, i.e., nodes in curr_nodes_to_lookat 
 		forward_impact = {}
+		i = 0
+		print (curr_nodes_to_lookat[:20])
 		for index_to_node in curr_nodes_to_lookat:
 			a_forward_impact = self.compute_forward_impact(index_to_node)
+			if i < 20:
+				print ("+", a_forward_impact)
+				i+= 1
 			forward_impact[index_to_node] = a_forward_impact
-		
+			
 		### compute forwrad impact all
 		print ("Length of nodes", len(list(forward_impact.keys())))
 		print (len(curr_nodes_to_lookat))

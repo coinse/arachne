@@ -102,7 +102,7 @@ class Localiser(Base_Searcher):
 
 		return avg_sens
 
-	def compute_forward_impact_on_any_layer(self, pos_arr, weight_value = None):
+	def compute_forward_impact_on_any_layer(self, weight_value = None):
 		"""
 		can be applied to any FNN layer and also, attention NNs. 
 		But, on CNN ..? (think again)
@@ -116,45 +116,45 @@ class Localiser(Base_Searcher):
 		Here, we will compute th
 		"""
 		from sklearn.preprocessing import Normalizer
+		import tensorflow as tf
 		import time 
-		norm_scaler = Normalizer(norm = 'l1')
+
 		if weight_value is None:
 			weight_value_to_use = self.init_weight_value
 		else:
  			weight_value_to_use = weight_value
 		
-		print ("All targets", pos_arr.shape)
+		#print ("All targets", pos_arr.shape)
 		print ("weight", weight_value_to_use.shape)
 		print ("prev", self.prev_vector_value.shape)
-		print ("we", set(pos_arr[:,1]))
-		print ("\t", self.np.max(pos_arr[:,0]))
+		#print ("we", set(pos_arr[:,1]))
+		#print ("\t", self.np.max(pos_arr[:,0]))
 		# from front part		
 		#from_front =  self.prev_vector_value[:,pos[:,0]] * weight_value_to_use[pos[:,0],pos[:,1]]
 		from_front_arr = []
 		i = 0
-		from tqdm import tqdm
-		#t1 = time.time()
-		for pos in tqdm(pos_arr[:2]):
-			from_front_raw = self.np.multiply(self.prev_vector_value, weight_value_to_use[:,pos[1]])
-			if i == 0:
-				print ("+", from_front_raw.shape, self.prev_vector_value.shape, weight_value_to_use[:,pos[1]].shape)
-				#print (self.prev_vector_value * weight_value_to_use[:,pos[1]])
-			from_front_abs = self.np.abs(from_front_raw)
-			normed_front = norm_scaler.fit_transform(from_front_abs)
-			#normed_front = from_front_abs	
-			#print ("N", normed_front.shape)
-			# retrive only our target
-			from_front = normed_front[:,pos[0]]
-			if i ==0:
-				print ("-", from_front.shape)
-				i+=1
-			
-			from_front_arr.append(self.np.mean(from_front))
-		t2 = time.time()
-		print ("Time", t2 - t1)
+		#from tqdm import tqdm
+		##t1 = time.time()
+		#for pos in tqdm(pos_arr[:2]):
+		#	from_front_raw = self.np.multiply(self.prev_vector_value, weight_value_to_use[:,pos[1]])
+		#	if i == 0:
+		#		print ("+", from_front_raw.shape, self.prev_vector_value.shape, weight_value_to_use[:,pos[1]].shape)
+		#		#print (self.prev_vector_value * weight_value_to_use[:,pos[1]])
+		#	from_front_abs = self.np.abs(from_front_raw)
+		#	normed_front = norm_scaler.fit_transform(from_front_abs)
+		#	#normed_front = from_front_abs	
+		#	#print ("N", normed_front.shape)
+		#	# retrive only our target
+		#	from_front = normed_front[:,pos[0]]
+		#	if i ==0:
+		#		print ("-", from_front.shape)
+		#		i+=1
+		#	
+		#	from_front_arr.append(self.np.mean(from_front))
+		##t2 = time.time()
+		##print ("Time", t2 - t1)
 		##
 
-		import tensorflow as tf
 		curr_plchldr_feed_dict = self.curr_feed_dict.copy()
 		indices_to_slice_tensor = self.empty_graph.get_tensor_by_name('%s:0' % ("indices_to_slice"))
 		curr_plchldr_feed_dict[indices_to_slice_tensor] = list(range(len(self.labels)))
@@ -168,25 +168,46 @@ class Localiser(Base_Searcher):
 		print ("F", curr_plchldr_feed_dict.keys())
 		sess = None
 		temp_tensors = []
-		for pos in tqdm(pos_arr[:512]):
-			output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,pos[1]])# since we have to normalise, instead of pos[0], take all
+		#print ("target", pos_arr[:20])
+		#for pos in tqdm(pos_arr[:20]):
+		#	output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,pos[-1]])# since we have to normalise, instead of pos[0], take all
+		#	output_tensor = tf.math.abs(output_tensor)
+		#	print ("-", output_tensor)
+		#	sum_tensor = tf.math.reduce_sum(output_tensor, axis = -1) #
+		#	print ("sum", sum_tensor)
+		#	# norm
+		#	output_tensor = tf.transpose(tf.div_no_nan(tf.transpose(output_tensor), sum_tensor))
+		#	print ("--", output_tensor)
+		##	output_tensor = output_tensor[:,pos[0]]
+		##	#output_tensor = tf.math.divide(output_tensor, sum_tensor)[:,pos[0]]
+		##	print ("+", output_tensor)
+		##	output_tensor = tf.math.reduce_mean(output_tensor, axis = 0)
+		##	#output_tensor = tf.linalg.norm(output_tensor, ord = 1, axis = 1)[0]
+		##	#print ("++", output_tensor)
+		##	temp_tensors.append(output_tensor)
+		#	temp_tensors.append(sum_tensor)
+
+		####
+		for idx in range(weight_value_to_use.shape[-1]):
+			output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,idx])
 			output_tensor = tf.math.abs(output_tensor)
 			print ("-", output_tensor)
-			sum_tensor = tf.math.reduce_sum(output_tensor, axis = 1)
-			#print ("sum", sum_tensor)
+			sum_tensor = tf.math.reduce_sum(output_tensor, axis = -1) #
+			print ("sum", sum_tensor)
+			# norm
 			output_tensor = tf.transpose(tf.div_no_nan(tf.transpose(output_tensor), sum_tensor))
 			print ("--", output_tensor)
-			output_tensor = output_tensor[:,pos[0]]
-			#output_tensor = tf.math.divide(output_tensor, sum_tensor)[:,pos[0]]
-			print ("+", output_tensor)
-			output_tensor = tf.math.reduce_mean(output_tensor, axis = 0)
+			#output_tensor = output_tensor[:,pos[0]]
+			#print ("+", output_tensor)
+			output_tensor = tf.math.reduce_mean(output_tensor, axis = 0) # compute an average for given inputs
 			#output_tensor = tf.linalg.norm(output_tensor, ord = 1, axis = 1)[0]
-			#print ("++", output_tensor)
+			print ("++", output_tensor)
 			temp_tensors.append(output_tensor)
-		
+		####
+
 		print ("start")
 		print (temp_tensors[0])
-		t1 =time.time()
+		t1 = time.time()
 		outs, sess  = self.model_util.run(
 			temp_tensors,
 			self.inputs, 
@@ -200,14 +221,16 @@ class Localiser(Base_Searcher):
 		print (len(outs))
 		#print(len(outs[0]))
 		#print(outs[0].shape)
-		outs = self.np.asarray(outs)
+		outs = self.np.asarray(outs).T
 		print (outs.shape)
 		#from_front = self.np.mean(outs, axis = 1) # compute an average for given inputs
 		from_front = outs
 		#from_front = self.np.asarray(from_front_arr)
 		print ("Front", from_front.shape)
-		print ("\t", from_front[:20])
-		print ("\t", self.np.sum(from_front[:512]))
+		#print ("\t", from_front[0])
+		#print ("\t", from_front[1])
+		#print ("\t", self.np.sum(from_front[:,0]))
+		print ("\t", self.np.sum(from_front, axis = 0))
 		#import sys; sys.exit()
 		
 		# from behind part
@@ -254,17 +277,21 @@ class Localiser(Base_Searcher):
 		gradient = self.np.abs(gradient)
 		norm_gradient = Normalizer(norm = 'l1').fit_transform(gradient)
 		print ("after norm", norm_gradient.shape)
-		gradient_value_from_behind = self.np.mean(norm_gradient, axis = 0)
+		gradient_value_from_behind = self.np.mean(norm_gradient, axis = 0) # compute the average for given inputs
 		from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 		
 		print ("From behind", from_behind.shape)
 		print ("\t", from_behind)
-		
-		FIs = []
-		for pos in pos_arr:
-			FIs.append(from_front[pos[0]] * from_behind[pos[1]])
-			#FIs.append(from_front[pos[0]])
-		
+		print ("\t", self.np.sum(from_behind, axis = 0))
+	
+		#FIs = []
+		#for pos in pos_arr:
+		#	FIs.append(from_front[pos[0]] * from_behind[pos[1]])
+		#	#FIs.append(from_front[pos[0]])
+		##
+		FIs = self.np.multiply(from_front, from_behind)
+		print ("FI shape", FIs.shape)
+		##
 		print ("Max: {}, min:{}".format(self.np.max(FIs), self.np.min(FIs)))
 		return FIs
 		
@@ -332,7 +359,7 @@ class Localiser(Base_Searcher):
 		### compute forwrad impact all
 		print ("Length of nodes", len(list(forward_impact.keys())))
 		print (len(curr_nodes_to_lookat))
-		forward_impacts_2 = self.compute_forward_impact_on_any_layer(self.np.asarray(curr_nodes_to_lookat))
+		forward_impacts_2 = self.compute_forward_impact_on_any_layer().reshape(-1,) #self.np.asarray(curr_nodes_to_lookat))
 		forward_impacts_2 = {curr_nodes_to_lookat[i]:forward_impacts_2[i] for i in range(len(curr_nodes_to_lookat))}
 		
 		print ("compare", forward_impact[curr_nodes_to_lookat[0]], forward_impacts_2[curr_nodes_to_lookat[0]])

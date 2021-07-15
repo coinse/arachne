@@ -124,36 +124,8 @@ class Localiser(Base_Searcher):
 		else:
  			weight_value_to_use = weight_value
 		
-		#print ("All targets", pos_arr.shape)
-		print ("weight", weight_value_to_use.shape)
-		print ("prev", self.prev_vector_value.shape)
-		#print ("we", set(pos_arr[:,1]))
-		#print ("\t", self.np.max(pos_arr[:,0]))
-		# from front part		
-		#from_front =  self.prev_vector_value[:,pos[:,0]] * weight_value_to_use[pos[:,0],pos[:,1]]
-		from_front_arr = []
-		i = 0
-		#from tqdm import tqdm
-		##t1 = time.time()
-		#for pos in tqdm(pos_arr[:2]):
-		#	from_front_raw = self.np.multiply(self.prev_vector_value, weight_value_to_use[:,pos[1]])
-		#	if i == 0:
-		#		print ("+", from_front_raw.shape, self.prev_vector_value.shape, weight_value_to_use[:,pos[1]].shape)
-		#		#print (self.prev_vector_value * weight_value_to_use[:,pos[1]])
-		#	from_front_abs = self.np.abs(from_front_raw)
-		#	normed_front = norm_scaler.fit_transform(from_front_abs)
-		#	#normed_front = from_front_abs	
-		#	#print ("N", normed_front.shape)
-		#	# retrive only our target
-		#	from_front = normed_front[:,pos[0]]
-		#	if i ==0:
-		#		print ("-", from_front.shape)
-		#		i+=1
-		#	
-		#	from_front_arr.append(self.np.mean(from_front))
-		##t2 = time.time()
-		##print ("Time", t2 - t1)
-		##
+		#print ("weight", weight_value_to_use.shape)
+		#print ("prev", self.prev_vector_value.shape)
 
 		curr_plchldr_feed_dict = self.curr_feed_dict.copy()
 		indices_to_slice_tensor = self.empty_graph.get_tensor_by_name('%s:0' % ("indices_to_slice"))
@@ -162,46 +134,18 @@ class Localiser(Base_Searcher):
 		prev_tensor = self.empty_graph.get_tensor_by_name("{}:0".format(self.tensors['t_prev_v']))
 		weight_tensor = self.empty_graph.get_tensor_by_name("{}:0".format(self.tensors['t_weight']))
 
-		print (self.empty_graph.get_tensor_by_name("logits:0"))
-		print (prev_tensor)
-		print (weight_tensor)
-		print ("F", curr_plchldr_feed_dict.keys())
-		sess = None
+		#print (self.empty_graph.get_tensor_by_name("logits:0"))
+		#print (prev_tensor)
+		#print (weight_tensor)
+		#print ("F", curr_plchldr_feed_dict.keys())
 		temp_tensors = []
-		#print ("target", pos_arr[:20])
-		#for pos in tqdm(pos_arr[:20]):
-		#	output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,pos[-1]])# since we have to normalise, instead of pos[0], take all
-		#	output_tensor = tf.math.abs(output_tensor)
-		#	print ("-", output_tensor)
-		#	sum_tensor = tf.math.reduce_sum(output_tensor, axis = -1) #
-		#	print ("sum", sum_tensor)
-		#	# norm
-		#	output_tensor = tf.transpose(tf.div_no_nan(tf.transpose(output_tensor), sum_tensor))
-		#	print ("--", output_tensor)
-		##	output_tensor = output_tensor[:,pos[0]]
-		##	#output_tensor = tf.math.divide(output_tensor, sum_tensor)[:,pos[0]]
-		##	print ("+", output_tensor)
-		##	output_tensor = tf.math.reduce_mean(output_tensor, axis = 0)
-		##	#output_tensor = tf.linalg.norm(output_tensor, ord = 1, axis = 1)[0]
-		##	#print ("++", output_tensor)
-		##	temp_tensors.append(output_tensor)
-		#	temp_tensors.append(sum_tensor)
-
-		####
 		for idx in range(weight_value_to_use.shape[-1]):
 			output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,idx])
 			output_tensor = tf.math.abs(output_tensor)
-			print ("-", output_tensor)
 			sum_tensor = tf.math.reduce_sum(output_tensor, axis = -1) #
-			print ("sum", sum_tensor)
 			# norm
 			output_tensor = tf.transpose(tf.div_no_nan(tf.transpose(output_tensor), sum_tensor))
-			print ("--", output_tensor)
-			#output_tensor = output_tensor[:,pos[0]]
-			#print ("+", output_tensor)
 			output_tensor = tf.math.reduce_mean(output_tensor, axis = 0) # compute an average for given inputs
-			#output_tensor = tf.linalg.norm(output_tensor, ord = 1, axis = 1)[0]
-			print ("++", output_tensor)
 			temp_tensors.append(output_tensor)
 		####
 
@@ -215,21 +159,12 @@ class Localiser(Base_Searcher):
 			input_tensor_name = None, output_tensor_name = None,
 			empty_graph = self.empty_graph,
 			plchldr_feed_dict = curr_plchldr_feed_dict)
+		outs = self.np.asarray(outs).T
+		from_front = outs
 		#sess.close()
 		t2 = time.time()
 		print ("Time", t2 - t1)
-		print (len(outs))
-		#print(len(outs[0]))
-		#print(outs[0].shape)
-		outs = self.np.asarray(outs).T
-		print (outs.shape)
-		#from_front = self.np.mean(outs, axis = 1) # compute an average for given inputs
-		from_front = outs
-		#from_front = self.np.asarray(from_front_arr)
 		print ("Front", from_front.shape)
-		#print ("\t", from_front[0])
-		#print ("\t", from_front[1])
-		#print ("\t", self.np.sum(from_front[:,0]))
 		print ("\t", self.np.sum(from_front, axis = 0))
 		#import sys; sys.exit()
 		
@@ -247,17 +182,16 @@ class Localiser(Base_Searcher):
 		output_tensor = self.empty_graph.get_tensor_by_name('{}:0'.format(output_tensor_name))
 
 		# d(pred)/d(output)
-		print ("Inputs", len(self.inputs))
-		print ("target predc", pos_of_pred_labels.shape)
-		print ("\tex", pos_of_pred_labels[:5])
-		print (predc_tensor)
-		print (output_tensor)
-		print (pos_of_pred_labels[:,0].shape, pos_of_pred_labels[:,1].shape)
-		print (pos_of_pred_labels[:,0])
-		print (pos_of_pred_labels[:,1])
-		#for pos in pos_arr:
+		#print ("Inputs", len(self.inputs))
+		#print ("target predc", pos_of_pred_labels.shape)
+		#print ("\tex", pos_of_pred_labels[:5])
+		#print (predc_tensor)
+		#print (output_tensor)
+		#print (pos_of_pred_labels[:,0].shape, pos_of_pred_labels[:,1].shape)
+		#print (pos_of_pred_labels[:,0])
+		#print (pos_of_pred_labels[:,1])
 		tensor_grad = tf.gradients(
-			predc_tensor, #[:,pos_of_pred_labels[:,1]], 
+			predc_tensor, 
 			output_tensor,
 			name = 'output_grad')
 
@@ -284,11 +218,6 @@ class Localiser(Base_Searcher):
 		print ("\t", from_behind)
 		print ("\t", self.np.sum(from_behind, axis = 0))
 	
-		#FIs = []
-		#for pos in pos_arr:
-		#	FIs.append(from_front[pos[0]] * from_behind[pos[1]])
-		#	#FIs.append(from_front[pos[0]])
-		##
 		FIs = self.np.multiply(from_front, from_behind)
 		print ("FI shape", FIs.shape)
 		##
@@ -340,37 +269,34 @@ class Localiser(Base_Searcher):
 			key = index to a single weight node
 			value = gradient loss value of the weight node
 		"""
+		old = False
 		nodes_to_lookat, indices_to_cands_and_grads = from_where_to_fix_nw_down
 		curr_nodes_to_lookat = nodes_to_lookat
 		d_gradients = {k:v for k, v in indices_to_cands_and_grads} 
 
 		assert curr_nodes_to_lookat is not None
 		# compute forward impact for the given nodes, i.e., nodes in curr_nodes_to_lookat 
-		forward_impact = {}
-		i = 0
-		print (curr_nodes_to_lookat[:20])
-		for index_to_node in curr_nodes_to_lookat:
-			a_forward_impact = self.compute_forward_impact(index_to_node)
-			if i < 20:
-				print ("+", a_forward_impact)
-				i+= 1
-			forward_impact[index_to_node] = a_forward_impact
-			
-		### compute forwrad impact all
-		print ("Length of nodes", len(list(forward_impact.keys())))
-		print (len(curr_nodes_to_lookat))
-		forward_impacts_2 = self.compute_forward_impact_on_any_layer().reshape(-1,) #self.np.asarray(curr_nodes_to_lookat))
-		forward_impacts_2 = {curr_nodes_to_lookat[i]:forward_impacts_2[i] for i in range(len(curr_nodes_to_lookat))}
-		
-		print ("compare", forward_impact[curr_nodes_to_lookat[0]], forward_impacts_2[curr_nodes_to_lookat[0]])
-		#import sys; sys.exit()
-		### compute forwrad impact all end
-		#nodes_with_grads = list(d_gradients.keys()) # key = indices to target nodes, value = gradient
-		##
-		forward_impact = forward_impacts_2
+		if old:
+			forward_impact = {}
+			i = 0
+			print (curr_nodes_to_lookat[:20])
+			for index_to_node in curr_nodes_to_lookat:
+				a_forward_impact = self.compute_forward_impact(index_to_node)
+				if i < 20:
+					print ("+", a_forward_impact)
+					i+= 1
+				forward_impact[index_to_node] = a_forward_impact
+			### compute forwrad impact all
+			print ("Length of nodes", len(list(forward_impact.keys())))
+		else:	
+			#print (len(curr_nodes_to_lookat))
+			forward_impact = self.compute_forward_impact_on_any_layer() 
+			forward_impact = forward_impact.reshape(-1,)
+			assert len(curr_nodes_to_lookat) == forward_impact.shape[0], "{} vs {}".format(len(curr_nodes_to_lookat), forward_impact.shape[0])
+			forward_impact = {curr_nodes_to_lookat[i]:forward_impact[i] for i in range(len(curr_nodes_to_lookat))}
+			#forward_impact = {curr_nodes_to_lookat[i]:forward_impact[i] for i in range(forward_impact.shape[0])}
 		##
 		costs = self.np.asarray([[d_gradients[node], forward_impact[node]] for node in curr_nodes_to_lookat])
-
 		ret_lst = []
 		ret_front_lst = []
 		while len(curr_nodes_to_lookat) > 0:

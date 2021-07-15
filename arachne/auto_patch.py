@@ -221,6 +221,7 @@ def patch(
 		indices_to_places_to_fix, front_lst = where_to_fix_from_bl(
 			indices_to_selected_wrong,
 			X, y, num_label,
+			predictions, ## newly added to compute the forward impact
 			which,
 			empty_graph_for_fl, 
 			tensor_name_file, 

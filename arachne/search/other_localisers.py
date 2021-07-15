@@ -49,9 +49,10 @@ def where_to_fix_from_gl(
 		from scipy.stats import rankdata	
 
 		if top_n < 0 or top_n > gradient_value.shape[0] * gradient_value.shape[1]: 
-			top_n = gradient_value.shape[0] * gradient_value.shape[1]
+			#top_n = gradient_value.shape[0] * gradient_value.shape[1] # this means, taking all of them as the target
+			top_n = gradient_value.reshape(-1,).shape[0] # the number of total neural weights in the target weight var
 
-		if top_n < gradient_value.shape[0] * gradient_value.shape[1]:
+		if top_n < gradient_value.reshape(-1,).shape[0]: #gradient_value.shape[0] * gradient_value.shape[1]:
 			flatten_gradients = np.abs(gradient_value).reshape(-1,)
 			ranks_of_gradients = list(rankdata(-flatten_gradients, method = 'max')) # in decending order
 			top_ranks = np.sort(ranks_of_gradients)[:top_n]	

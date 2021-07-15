@@ -7,6 +7,7 @@ class Base_Searcher(object):
 	os = __import__('os')
 	importlib = __import__('importlib')
 	model_util = importlib.import_module('utils.model_util')
+	data_util = importlib.import_module('utils.data_util')
 	apricot_rel_util = importlib.import_module('utils.apricot_rel_util')
 	torch_rel_util = importlib.import_module('utils.torch_rel_util')
 
@@ -41,7 +42,8 @@ class Base_Searcher(object):
 		self.empty_graph = empty_graph
 
 		# initialise the names of the tensors used in Base_Searcher
-		self.tensors = self.set_target_tensor_names(tensor_name_file)
+		self.tensor_name_file = tensor_name_file
+		self.tensors = self.set_target_tensor_names(self.tensor_name_file)
 
 		if self.empty_graph is not None:
 			self.initialise_feed_dict()

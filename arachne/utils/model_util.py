@@ -199,7 +199,7 @@ def get_output_vector(
 			plchldr_feed_dict = curr_plchldr_feed_dict)
 
 		_ats = np.asarray(_ats)
-		_ats = _ats.reshape(_ats.shape[1:])
+		_ats = _ats.reshape(_ats.shape[1:]) # this actually
 
 		if ats is None:
 			ats = _ats

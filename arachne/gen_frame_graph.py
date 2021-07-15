@@ -5,21 +5,22 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 
-def build_keras_model_front_v2(path_to_keras_model):
+def build_keras_model_front_v2(path_to_keras_model, idx_to_target_w = -1):
 	"""
+	idx_to_target_w = to which layer (default = -1 (the last one)) - 1 
 	"""
 	from tensorflow.keras.models import load_model, Model
 
 	idx = 0
 	loaded_model = load_model(path_to_keras_model)
-	front_layers = loaded_model.layers[:-1]
+	front_layers = loaded_model.layers[:idx_to_target_w]
 
 	model = Model(inputs = front_layers[0].input, outputs = front_layers[-1].output)
 
 	return model, front_layers
 
 
-def build_torch_model_front_v2(path_to_torch_model):
+def build_torch_model_front_v2(path_to_torch_model, idx_to_target_w = -1):
 	"""
 	"""
 	import torch
@@ -30,7 +31,7 @@ def build_torch_model_front_v2(path_to_torch_model):
 	vgg_model.classifier[6] = nn.Linear(4096, 2)
 	model = vgg_model.load_state_dict(torch.load(path_to_keras_model))
 
-	model.classifier = model.classifier[:-1]
+	model.classifier = model.classifier[:idx_to_target_w]
 	model.cuda()
 	model.eval()
 
@@ -190,8 +191,10 @@ def build_fm_graph_only_the_last(featuresnp, num_label = 10, weight_shape = 100,
 			target_slice_0 = tf.constant(featuresnp, dtype = tf.float32, name = 'Gathered_0')
 			target_slice = tf.reshape(target_slice_0, [-1, target_slice_0.shape[-1]], name = "Gathered")
 
+		### from hereafter, the placeholder parts (modifiable part)
+		### add the same structure here 
 		# Logits Layer
-		fb3 = tf.placeholder(tf.float32, shape = [num_label], name = "fb3")
+		fb3 = tf.placeholder(tf.float32, shape = [num_label], name = "fb3") 
 		w3 = tf.placeholder(tf.float32, shape = [weight_shape, num_label], name = "fw3")
 		logits = tf.add(tf.matmul(target_slice, w3), fb3, name = 'logits')	
 
@@ -208,7 +211,7 @@ def build_fm_graph_only_the_last(featuresnp, num_label = 10, weight_shape = 100,
 		loss_op = tf.reduce_mean(per_label_loss, name = 'loss')	
 
 		doutput_dw_tensor_lst = []
-		for idx_to_slice in range(num_label):
+		for idx_to_slice in range(num_label): # compute for each label
 			partial_doutput_dw = tf.gradients(predcs[:,idx_to_slice], w3, name = 'partial_doutput_dw_{}'.format(idx_to_slice))
 			doutput_dw_tensor_lst.append(partial_doutput_dw)
 			

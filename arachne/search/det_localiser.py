@@ -15,7 +15,7 @@ class Localiser(Base_Searcher):
 		inputs, labels, 
 		num_label,
 		predictions, # newly added for FI for any layer
-		indices_to_target_layer, # newly added for F1 for any layer -> a list of target layer
+		#indices_to_target_layer, # newly added for F1 for any layer -> a list of target layer
 		tensor_name_file,
 		empty_graph = None, 
 		which = None, 
@@ -49,7 +49,7 @@ class Localiser(Base_Searcher):
 		self.init_weight_and_prev_input()
 		##
 		self.predictions = predictions
-		self.idx_to_target_layer = idx_to_target_layer
+		#self.idx_to_target_layer = idx_to_target_layer
 
 
 	def generate_empty_graph(self):
@@ -61,11 +61,12 @@ class Localiser(Base_Searcher):
 			path_to_keras_model = self.path_to_keras_model, 
 			w_gather = True)
 
-	#def 
 
 	def compute_prev_vector(self, feed_dict):
 		"""
 		"""
+		print ("Computeing prev")
+		print ("\t", feed_dict.keys())
 		self.prev_vector_value, sess  = self.model_util.get_output_vector(
 			self.num_label,
 			self.tensors['t_prev_v'], # 
@@ -95,7 +96,8 @@ class Localiser(Base_Searcher):
 			weight_value_to_use = self.init_weight_value
 		else:
 			weight_value_to_use = weight_value
-
+		
+		#print ("original", (self.np.abs(weight_value_to_use[pos] * self.prev_vector_value[:,pos[0]]).shape))
 		avg_sens = self.np.mean(self.np.abs(weight_value_to_use[pos] * self.prev_vector_value[:,pos[0]]))	
 
 		return avg_sens
@@ -114,33 +116,88 @@ class Localiser(Base_Searcher):
 		Here, we will compute th
 		"""
 		from sklearn.preprocessing import Normalizer
+		import time 
 		norm_scaler = Normalizer(norm = 'l1')
 		if weight_value is None:
 			weight_value_to_use = self.init_weight_value
 		else:
  			weight_value_to_use = weight_value
-
+		
+		print ("All targets", pos_arr.shape)
+		print ("weight", weight_value_to_use.shape)
+		print ("prev", self.prev_vector_value.shape)
+		print ("we", set(pos_arr[:,1]))
+		print ("\t", self.np.max(pos_arr[:,0]))
 		# from front part		
 		#from_front =  self.prev_vector_value[:,pos[:,0]] * weight_value_to_use[pos[:,0],pos[:,1]]
 		from_front_arr = []
-		for pos in pos_arr:
-			from_front_raw =  self.np.matmul(self.prev_vector_value, weight_value_to_use[:,pos[1]])
-			from_front_abs = self.np.abs(from_front_raw)
-			sum_front = self.np.sum(from_front_abs)
-			from_front = from_front_abs/sum_front
-			from_front_arr.append(from_front)
+		#i = 0
+		from tqdm import tqdm
+		#t1 = time.time()
+		#for pos in tqdm(pos_arr):
+		#	from_front_raw = self.np.multiply(self.prev_vector_value, weight_value_to_use[:,pos[1]])
+		#	if i == 0:
+		#		print ("+", from_front_raw.shape, self.prev_vector_value.shape, weight_value_to_use[:,pos[1]].shape)
+		#		#print (self.prev_vector_value * weight_value_to_use[:,pos[1]])
+		#	from_front_abs = self.np.abs(from_front_raw)
+		#	normed_front = norm_scaler.fit_transform(from_front_abs)
+		#	#normed_front = from_front_abs	
+		#	#print ("N", normed_front.shape)
+		#	# retrive only our target
+		#	from_front = normed_front[:,pos[0]]
+		#	if i ==0:
+		#		print ("-", from_front.shape)
+		#		i+=1
+		#	
+		#	from_front_arr.append(self.np.mean(from_front))
+		#t2 = time.time()
+		#print ("Time", t2 - t1)
+		##
+		import tensorflow as tf
+		curr_plchldr_feed_dict = self.curr_feed_dict.copy()
+		indices_to_slice_tensor = self.empty_graph.get_tensor_by_name('%s:0' % ("indices_to_slice"))
+		curr_plchldr_feed_dict[indices_to_slice_tensor] = list(range(len(self.labels)))
 
-		from_front_arr = self.np.asarray(from_front_arr)
-		print ("before mean:", from_front_arr.shape)
-		from_front_arr = self.np.mean(from_front_arr, axis = 0)
-		# print ("Normed front", from_front_arr.shape)
+		prev_tensor = self.empty_graph.get_tensor_by_name("{}:0".format(self.tensors['t_prev_v']))
+		weight_tensor = self.empty_graph.get_tensor_by_name("{}:0".format(self.tensors['t_weight']))
 
+		print (self.empty_graph.get_tensor_by_name("logits:0"))
+		print (prev_tensor)
+		print (weight_tensor)
+		print ("F", curr_plchldr_feed_dict.keys())
+		sess = None
+		temp_tensors = []
+		for pos in tqdm(pos_arr):
+			output_tensor = tf.math.multiply(prev_tensor, weight_tensor[:,pos[1]])# since we have to normalise, instead of pos[0], take all
+			output_tensor = tf.math.abs(output_tensor)
+			#print ("+", output_tensor)
+			output_tensor = tf.norm(output_tensor, ord = 1, axis = 1)
+			temp_tensors.append(output_tensor)
+		
+		print ("start")
+		print (temp_tensors[0])
+		t1 =time.time()
+		outs, sess  = self.model_util.run(
+			temp_tensors,
+			self.inputs, 
+			self.labels, 
+			input_tensor_name = None, output_tensor_name = None,
+			empty_graph = self.empty_graph,
+			plchldr_feed_dict = curr_plchldr_feed_dict)
+		#sess.close()
+		t2 = time.time()
+		print ("Time", t2 - t1)
+		outs = self.np.asarray(outs)
+		from_front = self.np.mean(outs, axis = 1) # compute an average for given inputs
+		print ("Front", from_front.shape)
+		#import sys; sys.exit()
+		
 		# from behind part
 		# get the gradient that has been computed before
 		# if all layers .. then e.g., output_{idx} for idx in range(num_layer)
 		# compute here, or add gradient computation tensor to each layer, and use get_output_vectore to just retrieve the tensor value
 		#output_tensor_name = "output_{}".format(...) # some output_{idx_to_target + 1}
-		output_tensor_name = "Gathered" # some output_{idx_to_target + 1}
+		output_tensor_name = "predc" # some output_{idx_to_target + 1}
 		# get the index of the final output
 		pos_of_pred_labels = self.np.asarray(
 			list(zip(self.np.arange(self.predictions.shape[0]), self.np.argmax(self.predictions, axis = 1))))
@@ -149,107 +206,48 @@ class Localiser(Base_Searcher):
 		output_tensor = self.empty_graph.get_tensor_by_name('{}:0'.format(output_tensor_name))
 
 		# d(pred)/d(output)
+		print ("Inputs", len(self.inputs))
+		print ("target predc", pos_of_pred_labels.shape)
+		print ("\tex", pos_of_pred_labels[:5])
+		print (predc_tensor)
+		print (output_tensor)
+		print (pos_of_pred_labels[:,0].shape, pos_of_pred_labels[:,1].shape)
+		print (pos_of_pred_labels[:,0])
+		print (pos_of_pred_labels[:,1])
+		#for pos in pos_arr:
 		tensor_grad = tf.gradients(
-			predc_tensor[pos_of_pred_labels[:,0],pos_of_pred_labels[:,1]], 
+			predc_tensor, #[:,pos_of_pred_labels[:,1]], 
 			output_tensor,
 			name = 'output_grad')
 
 		(gradient,), sess  = self.model_util.run(
 			tensor_grad,
 			self.inputs, 
-			self.labels, 
+			self.labels,
+			input_tensor_name = None, output_tensor_name = None,
+			sess = sess, 
 			empty_graph = self.empty_graph,
-			plchldr_feed_dict = self.curr_feed_dict)
+			plchldr_feed_dict = curr_plchldr_feed_dict)
 
 		sess.close()
 		# take (absolute & norm) & average => to maintain the ratio of the impact 
+		print ("tensor grad", tensor_grad)
+		print ("\t", gradient.shape)
 		gradient = self.np.abs(gradient)
 		norm_gradient = Normalizer(norm = 'l1').fit_transform(gradient)
+		print ("after norm", norm_gradient.shape)
 		gradient_value_from_behind = self.np.mean(norm_gradient, axis = 0)
-		from_behind_arr = gradient_value_from_behind # pos... what if pos is 3-d 
+		from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 		
-		print ("From behind", from_behind_arr.shape)
-		#
-		FI_arr = from_front_arr[:,pos[:,0]] * from_behind_arr[:,pos[:,1]]
-		print ("FI", FI_arr.shape)
-		return FI_arr
+		print ("From behind", from_behind.shape)
 		
-
-	## newly added to compute the forward impact of a neural weight on any layer
-	def compute_forward_impact_on_random_neuron(self, 
-		pos,
-		predicted,  
-		indices_to_wrong,
-		weight_value = None, 
-		chunk_size = 0):
-		"""
-		Compute a forward impact of a random neural weight,
-		or an array of foward impact on the random weight neuron specified by
-		the argument pos (position).
-
-		=> although, the ideal one will target all, here, only a specific weight value 
-			-> the one self.weight_value . self.idx_to_target_layer
-		Args:
-			pos: a position to a neural weight (list)
-				or an array of positions to specific nerual weights
-			predicted: idx to target label or indices to target labels
-		"""
-		#assert predicted is not None and len(predicted)/self.num_label == len(pos), "{} & Length: pos({}) vs predicted({})".format(
-		#	predicted,
-		#	len(pos),
-		#	len(predicted) if predicted is not None else -1)
-		#print ("Predictions", predicted)
-		#print (predicted.shape)
-		#print (pos)
+		FIs = []
+		for pos in pos_arr:
+			FIs.append(from_front[pos[0]] * from_behind[pos[1]])
 		
-		if weight_value is None:
-			weight_value = self.init_weight_value
-
-		if self.d_output_weight is None:
-			(self.d_output_weight,), sess = self.model_util.compute_gradient(
-				self.num_label,
-				"doutput_dw",
-				self.inputs, self.labels, keep_prob_val = 1.0,
-				input_tensor_name = "inputs", 
-				output_tensor_name = "labels", 
-				keep_prob_name = "keep_prob",
-				indices_to_slice_tensor_name = "indices_to_slice",
-				sess = None,
-				empty_graph = self.empty_graph,
-				plchldr_feed_dict = self.curr_feed_dict,
-				is_cifar10 = self.path_to_keras_model is not None,
-				base_indices_to_cifar10 = self.np.arange(len(indices_to_wrong)),
-				chunk_size = chunk_size)
-			sess.close()
-
-		# first compute grandient descent of a target nerual weight relative to the output (o_l = l = a classified label
-		predicted_labels = self.np.argmax(predicted, axis = 1)
-		print ("Predicted label", predicted_labels)
-		predicted_to_pair_with_pos = self.np.full(pos.shape[0], predicted_labels)#[0])
-		#print ("Predicted label extended to pair with pos", predicted_to_pair_with_pos.shape)
-		#predicted_to_pair_with_pos = np.zeros((predicted_labels.shape[0], pos.shape[0]))
-		#for i in range(predicted_to_pair_with_pos.shape[0]):
-		#	predicted_to_pair_with_pos[i] = predicted_labels
-		#predicted_to_pair_with_pos = predicted_to_pair_with_pos.reshape(-1,)
-
-		#print (weight_value.shape)
-		#print (self.prev_vector_value.shape)
-		values_of_target_weight = weight_value[pos[:,0], pos[:,1]]
-		#values_of_target_act = self.prev_vector_value[pos[:,0], pos[:,1]]
-			
-		#print (values_of_target_weight)
-		#print (values_of_target_act)
-		#print ("Two value", values_of_target_weight.shape, self.d_output_weight.shape, predicted_to_pair_with_pos.shape, pos.shape)
-		#print ("Two value", values_of_target_act.shape, self.d_output_weight.shape, predicted_to_pair_with_pos.shape, pos, pos.shape)
-
-		gds_of_target_weight_to_output = self.d_output_weight[predicted_to_pair_with_pos, pos[:,0], pos[:,1]]
-		#print (gds_of_target_weight_to_output)
-		#print (gds_of_target_weight_to_output.shape)
-		#print ("===============================================================")
-		#print (values_of_target_weight)
-		#print (values_of_target_weight.shape)
-		return self.np.abs(gds_of_target_weight_to_output * values_of_target_weight)
-
+		print ("Max: {}, min:{}".format(self.np.max(FIs), self.np.min(FIs)))
+		return FIs
+		
 
 	def init_weight_and_prev_input(self):
 		"""
@@ -307,14 +305,18 @@ class Localiser(Base_Searcher):
 			forward_impact[index_to_node] = a_forward_impact
 		
 		### compute forwrad impact all
-		forward_impacts = self.compute_forward_impact_on_any_layer(np.asarray(curr_nodes_to_lookat))
-		forward_impacts = {curr_nodes_to_lookat[i]:forward_impacts[i] for i in range(len(curr_nodes_to_lookat))}
+		print ("Length of nodes", len(list(forward_impact.keys())))
+		print (len(curr_nodes_to_lookat))
+		forward_impacts_2 = self.compute_forward_impact_on_any_layer(self.np.asarray(curr_nodes_to_lookat))
+		forward_impacts_2 = {curr_nodes_to_lookat[i]:forward_impacts_2[i] for i in range(len(curr_nodes_to_lookat))}
+		
+		print ("compare", forward_impact[curr_nodes_to_lookat[0]], forward_impacts_2[curr_nodes_to_lookat[0]])
+		#import sys; sys.exit()
 		### compute forwrad impact all end
-		nodes_with_grads = list(d_gradients.keys()) # key = indices to target nodes, value = gradient
-		t4_1 = time.time()
-		print (nodes_with_grads)
-		print (forward_impacts)
-		import sys; sys.exit()
+		#nodes_with_grads = list(d_gradients.keys()) # key = indices to target nodes, value = gradient
+		##
+		forward_impact = forward_impacts_2
+		##
 		costs = self.np.asarray([[d_gradients[node], forward_impact[node]] for node in curr_nodes_to_lookat])
 
 		ret_lst = []
@@ -341,7 +343,9 @@ class Localiser(Base_Searcher):
 			costs = self.np.delete(costs, is_efficient, 0)
 			if not pareto_ret_all: # go on or break
 				break
-				
+		
+		#print (ret_lst)	
+		#import sys; sys.exit()	
 		return ret_lst, ret_front_lst
 
 

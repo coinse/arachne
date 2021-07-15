@@ -13,6 +13,7 @@ from gen_frame_graph import generate_empty_graph
 def where_to_fix_from_bl(
 	indices_to_wrong,
 	input_data, output_data, num_label,
+	predictions, ## newly added
 	which,
 	empty_graph, 
 	tensor_name_file, 
@@ -37,12 +38,14 @@ def where_to_fix_from_bl(
 		path_to_keras_model = path_to_keras_model,
 		top_n = -1) # return all
 
+	print ("Input empty graph", empty_graph)
 	alocaliser = Localiser(
 		input_data[indices_to_wrong], 
 		output_data[indices_to_wrong],
 		num_label,
+		predictions, ## newly added
 		tensor_name_file,
-		empty_graph = empty_graph, 
+		empty_graph = None, #empty_graph, # will generate new empty graph for this
 		which = which, 
 		init_weight_value = None,
 		nodes_to_lookat = None,

@@ -40,6 +40,7 @@ class Base_Searcher(object):
 		self.num_label = num_label
 		self.which = which
 		self.empty_graph = empty_graph
+		print ("Set empty graph", self.empty_graph, empty_graph)
 
 		# initialise the names of the tensors used in Base_Searcher
 		self.tensor_name_file = tensor_name_file

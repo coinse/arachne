@@ -89,8 +89,8 @@ def compute_gradient_new(
 	num_label,
 	loss_tensor_name,
 	weight_tensor_name,
-	input_data, output_data, #keep_prob_val = 1.0,
-	input_tensor_name = "inputs", output_tensor_name = "labels", #keep_prob_name = "keep_prob",
+	input_data, output_data,
+	input_tensor_name = "inputs", output_tensor_name = "labels", 
 	indices_to_slice_tensor_name = "indices_to_slice",
 	sess = None,
 	empty_graph = None,
@@ -111,9 +111,7 @@ def compute_gradient_new(
 			else:
 				plchldr_feed_dict[indices_to_slice_vgg16_tensor] = base_indices_to_cifar10
 			input_tensor_name = None
-		else:
-			if indices_to_slice_vgg16_tensor in plchldr_feed_dict.keys():
-				del plchldr_feed_dict[indices_to_slice_vgg16_tensor]
+		
 		input_tensor_name = None
 	else:
 		input_tensor_name = 'inputs'

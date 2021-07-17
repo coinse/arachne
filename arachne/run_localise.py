@@ -89,11 +89,8 @@ def localise_offline(
 	num_label,
 	data,
 	tensor_name_file,
-	which = 'mnist',
-	loc_method = "localiser",
 	path_to_keras_model = None,
 	predef_indices_to_wrong = None,
-	top_n = -1,
 	seed = 1,
 	target_all = False):
 	"""
@@ -278,7 +275,8 @@ def localise_offline(
 				paddings = [0,0]
 			elif padding_type == 'same':
 				#P = ((S-1)*W-S+F)/2
-				paddings = [int(((strides[i]-1)*true_ws_shape[i]-strides[i]+kernel_shape[i])/2) for i in range(2)]
+				#paddings = [int(((strides[i]-1)*true_ws_shape[i]-strides[i]+kernel_shape[i])/2) for i in range(2)]
+				paddings = [0,0] # since, we are getting the padded input
 			else:
 				print ("padding type: {} not supported".format(padding_type))
 
@@ -384,9 +382,16 @@ def localise_offline(
 	costs_and_keys = [([idx_to_tl, local_i],c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[total_cands]['costs'])]
 	costs = [vs[1] for vs in costs_and_keys]
 
-	get_org_indx = lambda flatten_idx, cands: (flatten_idx/cands['shape'][0], flatten_idx%cands['shape'][0])
-	indices_to_nodes = [get_org_indx(vs[0][1], total_cands[vs[0][0]]) for vs in costs_and_keys]
-	curr_nodes_to_lookat = ... # define indices
+	def get_org_index(flatten_idx, cands):
+		"""
+		"""
+		org_index = []
+		for local_s in cands['shape']:
+			org_index.append(int(flatten_idx / local_s))
+			flatten_idx = flatten_idx % local_s
+		return org_index
+
+	indices_to_nodes = [get_org_index(vs[0][1],total_cands[vs[0][0]]) for vs in costs_and_keys]
 
 	#while len(curr_nodes_to_lookat) > 0:
 	_costs = costs.copy()
@@ -399,22 +404,8 @@ def localise_offline(
 		_costs = _costs[nondominated_point_mask]
 		next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1	
 
-	pareto_front = [tuple(v) for v in np.asarray(curr_nodes_to_lookat)[is_efficient]]
+	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
 	return pareto_front
-
-	### fix it
-	
-	##
-	#t2 = time.time()
-	#print ("Time taken for localisation: %f" % (t2 - t1))
-	#print (indices_to_places_to_fix)
-
-	#if loc_method == 'localiser':
-	#	return indices_to_places_to_fix, front_lst
-	#elif loc_method == 'gradient_loss':
-	#	return indices_to_places_to_fix, indices_and_grads
-	#else:
-	#	return indices_to_places_to_fix, None
 
 # if __name__ == "__main__":
 # 	import argparse

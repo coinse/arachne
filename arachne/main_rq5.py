@@ -8,6 +8,8 @@ import auto_patch
 import time
 import numpy as np
 import gc
+# temp
+import run_localise
 
 parser = argparse.ArgumentParser()
 
@@ -27,6 +29,8 @@ parser.add_argument("-dest", default = ".", type = str)
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
 parser.add_argument("-org_label", action = 'store', default = 3, type = int)
 parser.add_argument("-pred_label", action = 'store', default = 5, type = int)
+# temp
+parser.add_argument("-new_loc", type = int, default = 0)
 
 args = parser.parse_args()
 
@@ -70,19 +74,42 @@ print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
 #print ("The number of correct samples: {}".format(num_of_sampled_correct))
 
 t1 = time.time()
-patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
-	num_label,
-	test_data, 
-	args.tensor_name_file,
-	max_search_num = iter_num, 
-	search_method = 'DE',
-	which = args.which,
-	loc_method = "localiser",
-	patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
-	path_to_keras_model = args.path_to_keras_model,
-	predef_indices_to_wrong = indices,
-	seed = args.seed,
-	patch_aggr = args.patch_aggr)
+
+if bool(args.new_loc): # temp
+	output = run_localise.localise_offline(
+		num_label,
+		test_data,
+		args.tensor_name_file,
+		path_to_keras_model = args.path_to_keras_model,
+		predef_indices_to_wrong = indices,
+		seed = args.seed,
+		target_all = False)
+
+	print ("The size of the pareto front: {}".format(len(output)))	
+	print (output)
+	
+	import pandas as pd
+	output_df = pd.DataFrame({'layer':[vs[0] for vs in output], 'weight':[vs[1] for vs in output]})
+
+	dest = os.path.join(args.dest, "new_loc")
+	os.makedirs(dest, exist_ok= True)
+	destfile = os.path.join(dest, "rq1.{}.pkl".format(args.which_data))
+	output_df.to_pickle(output_df, destfile)
+
+else:
+	patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
+		num_label,
+		test_data, 
+		args.tensor_name_file,
+		max_search_num = iter_num, 
+		search_method = 'DE',
+		which = args.which,
+		loc_method = "localiser",
+		patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
+		path_to_keras_model = args.path_to_keras_model,
+		predef_indices_to_wrong = indices,
+		seed = args.seed,
+		patch_aggr = args.patch_aggr)
 		
 t2 = time.time()
 print ("Time for patching: {}".format(t2 - t1))

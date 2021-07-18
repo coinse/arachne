@@ -8,6 +8,8 @@ import auto_patch
 from main_eval import read_and_add_flag, combine_init_aft_predcs
 import json
 import numpy as np
+##
+import run_localise
 
 def get_brokens(combined_df):
 	"""
@@ -52,7 +54,8 @@ if __name__ == "__main__":
 	parser.add_argument("-path_to_keras_model", action = 'store', default = None)
 	parser.add_argument("-seed", action = "store", default = 1, type = int)
 	parser.add_argument("-dest", default = ".", type = str)
-
+	# temporary for localising over all
+	parser.add_argument("-new_loc", type = int, default = 0)
 
 	args = parser.parse_args()	
 
@@ -75,16 +78,37 @@ if __name__ == "__main__":
 	os.makedirs(dest, exist_ok = True)
 	path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
 
-	indices_to_places_to_fix, front_lst = auto_patch.patch(
-		args.num_label,
-		train_data,
-		args.tensor_name_file,
-		which = args.which,
-		loc_method = args.loc_method,
-		path_to_keras_model = args.path_to_keras_model,
-		predef_indices_to_wrong = indices_to_wrong,
-		seed = args.seed,
-		only_loc = True)	
+	if bool(args.new_loc): # temp
+		output = run_localise.localise_offline(
+			args.num_label,
+			train_data,
+			args.tensor_name_file,
+			path_to_keras_model = args.path_to_keras_model,
+			predef_indices_to_wrong = indices_to_wrong,
+			seed = args.seed,
+			target_all = False)
+
+		print ("The size of the pareto front: {}".format(len(output)))	
+		print (output)
+	
+		import pandas as pd
+		output_df = pd.DataFrame({'layer':[vs[0] for vs in output], 'weight':[vs[1] for vs in output]})
+
+		dest = os.path.join(args.dest, "new_loc")
+		os.makedirs(dest, exist_ok= True)
+		destfile = os.path.join(dest, "rq1.{}.pkl".format(args.which_data))
+		output_df.to_pickle(output_df, destfile)
+	else:
+		indices_to_places_to_fix, front_lst = auto_patch.patch(
+			args.num_label,
+			train_data,
+			args.tensor_name_file,
+			which = args.which,
+			loc_method = args.loc_method,
+			path_to_keras_model = args.path_to_keras_model,
+			predef_indices_to_wrong = indices_to_wrong,
+			seed = args.seed,
+			only_loc = True)	
 	
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
 	print ("\t".join([str(index) for index in indices_to_places_to_fix]))

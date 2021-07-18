@@ -418,7 +418,7 @@ def localise_offline(
 		for local_s in cands['shape']:
 			org_index.append(int(flatten_idx / local_s))
 			flatten_idx = flatten_idx % local_s
-		return org_index
+		return ",".join(org_index)
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], get_org_index(vs[0][1], total_cands[vs[0][0]])] for vs in costs_and_keys]

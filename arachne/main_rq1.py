@@ -86,7 +86,7 @@ if __name__ == "__main__":
 			path_to_keras_model = args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_wrong,
 			seed = args.seed,
-			target_all = False)
+			target_all = True)#False)
 
 		print ("The size of the pareto front: {}".format(len(output)))	
 		print (output)
@@ -97,7 +97,8 @@ if __name__ == "__main__":
 		dest = os.path.join(args.dest, "new_loc")
 		os.makedirs(dest, exist_ok= True)
 		destfile = os.path.join(dest, "rq1.{}.pkl".format(args.which_data))
-		output_df.to_pickle(output_df, destfile)
+		output_df.to_pickle(destfile)
+		import sys; sys.exit()
 	else:
 		indices_to_places_to_fix, front_lst = auto_patch.patch(
 			args.num_label,

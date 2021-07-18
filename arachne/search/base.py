@@ -14,7 +14,7 @@ class Base_Searcher(object):
 	which_tensors = [
 		't_prev_v', 't_weight', 't_bias', 
 		't_prediction','t_correct_prediction', 
-		't_lab_loss']
+		't_lab_loss', 't_layer']
 		
 	var_placeholders = {'cnn1':['fw3', 'fb3'],
 					'cnn2':['fw3', 'fb3'],

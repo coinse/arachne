@@ -8,6 +8,7 @@ import utils.data_util as data_util
 import time
 import tensorflow as tf
 from tensorflow.keras.models import load_model, Model
+from tqdm import tqdm
 
 def get_target_weights(model, path_to_keras_model, indices_to_target = None, target_all = True):
 	"""
@@ -17,16 +18,19 @@ def get_target_weights(model, path_to_keras_model, indices_to_target = None, tar
 
 	# target only the layer with its class type in this list, but if target_all, then return all trainables
 	targeting_clname_pattns = ['Dense*', 'Conv*'] if not target_all else None
-	is_target = lambda clname,targets: any([bool(re.match(t,clname)) for t in targets]) or (targets is None)
+	is_target = lambda clname,targets: (targets is None) or any([bool(re.match(t,clname)) for t in targets])
 	if target_all:
 		indices_to_target = None
-
+		
 	if model is None:
 		assert path_to_keras_model is not None
 		model = load_model(path_to_keras_model, compile=False)
 
 	target_weights = {} # key = layer index, value: [weight value, layer name]
 	if indices_to_target:
+		num_layers = len(model.layers)
+		indices_to_target = [idx if idx >= 0 else num_layers + idx for idx in indices_to_target]
+
 		for i, layer in enumerate(model.layers):
 			if i in indices_to_target:
 				ws = layer.get_weights()
@@ -41,7 +45,7 @@ def get_target_weights(model, path_to_keras_model, indices_to_target = None, tar
 				if len(ws): # has weight
 					#target_weights[i] = ws[0]
 					target_weights[i] = [ws[0], type(layer).__name__]
-					
+
 	return target_weights
 
 def is_FC(lname):
@@ -58,7 +62,7 @@ def is_C2D(lname):
 	pattns = ['Conv2D']
 	return any([bool(re.match(t,lname)) for t in pattns])
 
-def compute_gradient_to_output(model, target, X):
+def compute_gradient_to_output(model, target, X, norm_and_mean = False):
 	"""
 	compute gradients normalisesd and averaged for a given input X
 	"""
@@ -66,24 +70,23 @@ def compute_gradient_to_output(model, target, X):
 	from sklearn.preprocessing import Normalizer
 	norm_scaler = Normalizer(norm = "l1")
 
-	sess = K.get_session()
 	tensor_grad = tf.gradients(
 		model.output, 
 		target,
 		name = 'output_grad')
 
-	gradient = sess.run(tensor_grad, feed_dict={model.input: X})[0]
-	sess.close()
-
+	gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X})[0]
 	print ("tensor grad", tensor_grad)
 	print ("\t", gradient.shape)
 
 	gradient = np.abs(gradient)
-	reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
-	norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
-	mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
-	ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
-	
+	if norm_and_mean:
+		reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
+		norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
+		mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
+		ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
+	else:
+		ret_gradient = gradient
 	return ret_gradient 
 			
 def localise_offline(
@@ -122,6 +125,9 @@ def localise_offline(
 	# index to target layer: e.g., 0 = the first hidden layer
 	if not target_all:
 		indices_to_target_layers = np.int32(data_util.read_tensor_name(tensor_name_file)['t_layer'])
+		from collections.abc import Iterable
+		if not isinstance(indices_to_target_layers, Iterable):
+			indices_to_target_layers = [indices_to_target_layers]
 	else:
 		indices_to_target_layers = None
 	# get ranges
@@ -131,7 +137,7 @@ def localise_offline(
 	#for idx_to_tl in indices_to_target_layers:
 	#	target_weights[idx_to_tl] = [kernel_and_bias_pairs[idx_to_tl]]
 
-	model = load_model(path_to_keras_model)
+	model = load_model(path_to_keras_model, compile = False)
 	target_weights = get_target_weights(model,
 		path_to_keras_model, 
 		indices_to_target = indices_to_target_layers, 
@@ -144,7 +150,10 @@ def localise_offline(
 	# compute prediction & corr_predictions
 	predictions = model.predict(data_X)
 	correct_predictions = np.argmax(predictions, axis = 1)
-
+	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
+	#print ("Corr", correct_predictions[:10], correct_predictions.shape)
+	#print (data_y[:10])
+	#import sys; sys.exit()
 	# ##########
 	# empty_graph = generate_empty_graph(which, 
 	# 	data_X, 
@@ -223,10 +232,9 @@ def localise_offline(
 	t0 = time.time()
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
-		total_cands.append([])
 		t_w, lname = vs
 		############ FI ############
-		t_model = Model(inputs = model.input, output = model.layers[idx_to_tl - 1].output)
+		t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
 		prev_output = t_model.predict(X)
 		layer_config = model.layers[idx_to_tl].get_config() 
 
@@ -248,7 +256,8 @@ def localise_offline(
 			# work for Dense. but, for the others?
 			from_front = np.asarray(from_front)
 			from_front = from_front.T
-			print ('From front'. from_front.shape)
+			print ('From front', from_front.shape)
+			print (np.sum(from_front, axis = 0))
 			# behind
 			# sess = K.get_session()
 			# tensor_grad = tf.gradients(
@@ -265,13 +274,16 @@ def localise_offline(
 			# mean_gradient = np.mean(norm_gradient, axis = 0)
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl], X)
-			print ("From behind", from_behind.shape) 
+			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl].output, X, norm_and_mean = True)
+			print ("From behind", from_behind.shape)
+			print ("\t FR", from_front[10:20])
+			print ("\t BH" , from_behind)
 			FIs = from_front * from_behind
 			############ FI end #########
 
 			# Gradient
-			grad_scndcr = compute_gradient_to_output(model, model.layers[idx_to_tl].weights[0], X)	
+			grad_scndcr = compute_gradient_to_output(model, model.layers[idx_to_tl].weights[0], X)
+			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif is_C2D(lname):
 			kernel_shape = t_w.shape[:2]  # kernel == filter
@@ -296,8 +308,8 @@ def localise_offline(
 			input_shape = prev_output.shape[2:] # the last two (front two are # of inputs and # of kernels (Channel_in))
 
 			# (W1−F+2P)/S+1, W1 = input volumne , F = kernel, P = padding
-			n_mv_0 = (input_shape[0] - kernel_shape[0] + 2 * paddings[0])/strides[0] + 1 # H_out
-			n_mv_1 = (input_shape[1] - kernel_shape[1] + 2 * paddings[1])/strides[1] + 1 # W_out
+			n_mv_0 = int((input_shape[0] - kernel_shape[0] + 2 * paddings[0])/strides[0] + 1) # H_out
+			n_mv_1 = int((input_shape[1] - kernel_shape[1] + 2 * paddings[1])/strides[1] + 1) # W_out
 			# indices_to_each_w = {}
 			# for i in range(kernel_shape[0]): # t_w.shape[0]
 			# 	for j in range(kernel_shape[1]): # t_w.shape[1]
@@ -338,8 +350,9 @@ def localise_offline(
 			#from_front = np.zeros((n_output_channel, n_mv_0, n_mv_1))
 			from_front = []
 			# move axis for easier computation
+			print ("range", n_output_channel, n_mv_0, n_mv_1) # currenlty taking too long -> change to compute on gpu
 			tr_prev_output = np.moveaxis(prev_output, [0,1,2,3], [0,3,1,2])
-			for idx_ol in range(n_output_channel): # t_w.shape[-1]
+			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
 				for i in range(n_mv_0): # H
 					indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
 					for j in range(n_mv_1): # W
@@ -354,7 +367,8 @@ def localise_offline(
 						output = output/sum_output # normalise -> [# input, F1, F2, Channel_in]
 						output = np.mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
 						if k == 0:
-							print ('mean', output.shpe, "should be", (kernel_shape[0],kernel_shape[1],prev_output.shape[1]))
+							print ('mean', output.shape, "should be", (kernel_shape[0],kernel_shape[1],prev_output.shape[1]))
+							k += 1
 						#from_front[(idx_ol, i, j)] = output # output -> []
 						from_front.append(output)
 
@@ -383,7 +397,7 @@ def localise_offline(
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 			# the same shape with output -> [Channel_output, H_out (n_mv_0), W_out (n_mv_1)]
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl], X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
+			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl], X, norm_and_mean = True) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
 			print ("From behind", from_behind.shape)
 			from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
 			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
@@ -401,6 +415,7 @@ def localise_offline(
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
 		####
 		pairs = np.asarray([FIs.flatten(), grad_scndcr.flatten()]).T
+		print ("Pairs", pairs.shape)
 		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
 	
 	t3 = time.time()
@@ -408,9 +423,11 @@ def localise_offline(
 
 	# compute pareto front
 	indices_to_tl = list(total_cands.keys())
-	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[total_cands]['costs'])]
-	costs = [vs[1] for vs in costs_and_keys]
+	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
+	costs = np.asarray([vs[1] for vs in costs_and_keys])
 
+	#print ("Indices", indices_to_tl)
+	#print (total_cands)
 	def get_org_index(flatten_idx, cands):
 		"""
 		"""
@@ -418,10 +435,12 @@ def localise_offline(
 		for local_s in cands['shape']:
 			org_index.append(int(flatten_idx / local_s))
 			flatten_idx = flatten_idx % local_s
-		return ",".join(org_index)
+		return ",".join([str(i) for i in org_index])
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], get_org_index(vs[0][1], total_cands[vs[0][0]])] for vs in costs_and_keys]
+
+	print ("Cost", costs[:20], indices_to_nodes[:20]) 
 
 	t4 = time.time()
 	#while len(curr_nodes_to_lookat) > 0:

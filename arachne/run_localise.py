@@ -62,7 +62,7 @@ def is_C2D(lname):
 	pattns = ['Conv2D']
 	return any([bool(re.match(t,lname)) for t in pattns])
 
-def compute_gradient_to_output(model, target, X, norm_and_mean = False):
+def compute_gradient_to_output(model, target, X):
 	"""
 	compute gradients normalisesd and averaged for a given input X
 	"""
@@ -80,15 +80,46 @@ def compute_gradient_to_output(model, target, X, norm_and_mean = False):
 	print ("\t", gradient.shape)
 
 	gradient = np.abs(gradient)
-	if norm_and_mean:
-		reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
-		norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
-		mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
-		ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
-	else:
-		ret_gradient = gradient
+	print ("Gradient", gradient)
+	reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
+	norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
+	print ("Norm", norm_gradient)
+	print (type(norm_gradient))
+	print (norm_gradient.shape)
+	mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
+	print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
+	ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
+
 	return ret_gradient 
 			
+def compute_gradient_to_loss(model, target, X, y):
+	"""
+	compute gradients for the loss
+	"""
+	import tensorflow.keras.backend as K
+	
+	num_label = int(model.output.shape[-1])
+	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
+
+	loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
+		logits = model.output, 
+		labels = y_tensor, 
+		name = "per_label_loss") 
+	
+	tensor_grad = tf.gradients(
+		loss_tensor,
+		target, 
+		name = 'loss_grad')
+	
+	gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X, y_tensor: y})[0]
+	print ("tensor grad to loss", tensor_grad)
+	print ("\t", gradient.shape)
+	
+	gradient = np.abs(gradient)
+	#print ("Gradient", gradient)
+	return gradient
+	
+
 def localise_offline(
 	num_label,
 	data,
@@ -230,12 +261,16 @@ def localise_offline(
 
 	print ('Total {} layers are targeted'.format(len(target_weights)))
 	t0 = time.time()
+	## slice inputs
+	target_X = X[indices_to_selected_wrong]
+	target_y = y[indices_to_selected_wrong]
+	##
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
 		t_w, lname = vs
 		############ FI ############
 		t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-		prev_output = t_model.predict(X)
+		prev_output = t_model.predict(target_X)
 		layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
@@ -274,15 +309,16 @@ def localise_offline(
 			# mean_gradient = np.mean(norm_gradient, axis = 0)
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl].output, X, norm_and_mean = True)
+			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl].output, target_X)
 			print ("From behind", from_behind.shape)
 			print ("\t FR", from_front[10:20])
 			print ("\t BH" , from_behind)
 			FIs = from_front * from_behind
+			print ("Max: {}, min:{}".format(np.max(FIs), np.min(FIs)))
 			############ FI end #########
 
 			# Gradient
-			grad_scndcr = compute_gradient_to_output(model, model.layers[idx_to_tl].weights[0], X)
+			grad_scndcr = compute_gradient_to_loss(model, model.layers[idx_to_tl].weights[0], target_X, target_y)
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif is_C2D(lname):
@@ -397,7 +433,7 @@ def localise_offline(
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 			# the same shape with output -> [Channel_output, H_out (n_mv_0), W_out (n_mv_1)]
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl], X, norm_and_mean = True) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
+			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl], target_X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
 			print ("From behind", from_behind.shape)
 			from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
 			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
@@ -405,7 +441,7 @@ def localise_offline(
 
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
-			grad_scndcr = compute_gradient_to_output(model, model.layers[idx_to_tl].weights[0], X)
+			grad_scndcr = compute_gradient_to_loss(model, model.layers[idx_to_tl].weights[0], target_X, target_y)
 			# ##		
 		else:
 			print ("Currenlty not supported: {}. (shoulde be filtered before)".format(lname))		
@@ -414,7 +450,7 @@ def localise_offline(
 		t2 = time.time()
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
 		####
-		pairs = np.asarray([FIs.flatten(), grad_scndcr.flatten()]).T
+		pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
 		print ("Pairs", pairs.shape)
 		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
 	
@@ -432,14 +468,16 @@ def localise_offline(
 		"""
 		"""
 		org_index = []
-		for local_s in cands['shape']:
-			org_index.append(int(flatten_idx / local_s))
-			flatten_idx = flatten_idx % local_s
+		curr_flatten_idx = flatten_idx	
+		for local_s in np.asarray(cands['shape'])[::-1]:
+			org_index.append(int(curr_flatten_idx / local_s))
+			curr_flatten_idx = curr_flatten_idx % local_s
+		org_index[-1] = curr_flatten_idx
 		return ",".join([str(i) for i in org_index])
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], get_org_index(vs[0][1], total_cands[vs[0][0]])] for vs in costs_and_keys]
-
+	
 	print ("Cost", costs[:20], indices_to_nodes[:20]) 
 
 	t4 = time.time()

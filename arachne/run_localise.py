@@ -18,17 +18,17 @@ def get_target_weights(model, path_to_keras_model, indices_to_target = None, tar
 	import re
 
 	# target only the layer with its class type in this list, but if target_all, then return all trainables
-	targeting_clname_pattns = ['Dense*', 'Conv*'] if not target_all else None
+	targeting_clname_pattns = ['Dense*', 'Conv*'] #if not target_all else None
 	is_target = lambda clname,targets: (targets is None) or any([bool(re.match(t,clname)) for t in targets])
-	if target_all:
-		indices_to_target = None
+	#if target_all: # some, like BatchNormalization has trainable weights. Not sure how to filter that out. so, comment out for the temporary use
+	#	indices_to_target = None
 		
 	if model is None:
 		assert path_to_keras_model is not None
 		model = load_model(path_to_keras_model, compile=False)
 
 	target_weights = {} # key = layer index, value: [weight value, layer name]
-	if indices_to_target:
+	if indices_to_target is not None:
 		num_layers = len(model.layers)
 		indices_to_target = [idx if idx >= 0 else num_layers + idx for idx in indices_to_target]
 
@@ -63,12 +63,15 @@ def is_C2D(lname):
 	pattns = ['Conv2D']
 	return any([bool(re.match(t,lname)) for t in pattns])
 
-def compute_gradient_to_output(model, target, X):
+def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X):
 	"""
 	compute gradients normalisesd and averaged for a given input X
 	"""
 	from sklearn.preprocessing import Normalizer
 	norm_scaler = Normalizer(norm = "l1")
+	
+	model = load_model(path_to_keras_model, compile = False)
+	target = model.layers[idx_to_target_layer].output
 
 	tensor_grad = tf.gradients(
 		model.output, 
@@ -87,16 +90,21 @@ def compute_gradient_to_output(model, target, X):
 	#print (type(norm_gradient))
 	print (norm_gradient.shape)
 	mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
-	print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
+	#print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
 	ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
 
+	#K.clear_session()
+	#s = tf.InteractiveSession()
+	#K.set_session(s)
+	reset_keras([tensor_grad])
 	return ret_gradient 
 			
-def compute_gradient_to_loss(model, target, X, y):
+def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y):
 	"""
 	compute gradients for the loss
 	"""
-	
+	model = load_model(path_to_keras_model, compile = False)
+	target = model.layers[idx_to_target_layer].weights[0]
 	num_label = int(model.output.shape[-1])
 	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
 
@@ -116,8 +124,36 @@ def compute_gradient_to_loss(model, target, X, y):
 	
 	gradient = np.abs(gradient)
 	#print ("Gradient", gradient)
+	#K.clear_session()
+	#s = tf.InteractiveSession()
+	#K.set_session(s)
+	reset_keras([gradient, loss_tensor, y_tensor])
 	return gradient
 	
+def reset_keras(delete_list = None):
+	if delete_list is None:
+		K.clear_session()
+		s = tf.InteractiveSession()
+		K.set_session(s)
+	else:
+		import gc
+		#sess = K.get_session()
+		K.clear_session()
+		#sess.close()
+		sess = K.get_session()
+		try:
+			for d in delete_list:
+				del d
+		except:
+			pass
+
+		print(gc.collect()) # if it's done something you should see a number being outputted
+
+		# use the same config as you used to create the session
+		config = tf.ConfigProto()
+		config.gpu_options.per_process_gpu_memory_fraction = 1
+		config.gpu_options.visible_device_list = "0"
+		K.set_session(tf.Session(config=config))
 
 def localise_offline(
 	num_label,
@@ -158,7 +194,7 @@ def localise_offline(
 		from collections.abc import Iterable
 		if not isinstance(indices_to_target_layers, Iterable):
 			indices_to_target_layers = [indices_to_target_layers]
-	else:
+	else: # target all, but only those that statisfy the predefined layer conditions
 		indices_to_target_layers = None
 	# get ranges
 	# min_idx_to_tl = np.min(indices_to_target_layers); max_idx_to_tl = np.max(indices_to_target_layers)
@@ -173,6 +209,7 @@ def localise_offline(
 		indices_to_target = indices_to_target_layers, 
 		target_all = target_all) # if target_all == True, then indices_to_target will be ignored
 
+	print ('Total {} layers are targeted'.format(target_weights.keys()))
 	#### HOW CAN WE KNOW WHICH LAYER IS PREDICTION LAYER and WEIGHT LAYER? => assumes they are given;;;
 	# if not, then ... well everything becomes complicated
 	# identify using print (l['name'], l['class_name']) ..? d['layers'] -> mdl.get_config()
@@ -263,44 +300,58 @@ def localise_offline(
 	## slice inputs
 	target_X = X[indices_to_selected_wrong]
 	target_y = y[indices_to_selected_wrong]
+
 	##
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
 		t_w, lname = vs
-		t_w_tensor = model.layers[idx_to_tl].weights[0]
+		print ("targeting layer {} ({})".format(idx_to_tl, lname))
+		#t_w_tensor = model.layers[idx_to_tl].weights[0]
 		############ FI ############
-		t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-		#prev_output = t_model.predict(target_X)
-		prev_output = t_model.output
+		model = load_model(path_to_keras_model, compile = False)
+		prev_output = model.layers[idx_to_tl - 1].output
 		layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
 		if is_FC(lname):
-			#from_front = []
-			from_front_tensors = []
-			for idx in range(t_w.shape[-1]):
+			from_front = []
+			#model = load_model(path_to_keras_model, compile = False)
+			#t_w_tensor = model.layers[idx_to_tl].weights[0]
+			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+			prev_output = t_model.predict(target_X)
+			#reset_keras([t_model])
+			#prev_output = model.layers[idx_to_tl - 1].output	
+			##
+			#from_front_tensors = []
+			for idx in tqdm(range(t_w.shape[-1])):
 				assert int(prev_output.shape[-1]) == t_w.shape[0], "{} vs {}".format(
 					int(prev_output.shape[-1]), t_w.shape[0])
 					
-				#output = np.multiply(prev_output, t_w[:,idx]) # -> shape = prev_output.shape
-				output = tf.math.multiply(prev_output, t_w_tensor[:,idx]) # shape = prev_output.shape
-				#output = np.abs(output)
-				output = tf.math.abs(output)
-				#output = norm_scaler.fit_transform(output) # -> shape = prev_output.shape (normalisation on )
-				t_sum = tf.math.reduce_sum(output, axis = -1) 
-				output = tf.transpose(tf.div_no_nan(tf.transpose(output), t_sum))
-				#output = np.mean(output, axis = 0) # -> shape = (reshaped_t_w.shape[-1],)
-				output = tf.math.reduce_mean(output, axis = 0) #  
+				output = np.multiply(prev_output, t_w[:,idx]) # -> shape = prev_output.shape
+				#output = tf.math.multiply(prev_output, t_w_tensor[:,idx]) # shape = prev_output.shape
+				output = np.abs(output)
+				#output = tf.math.abs(output)
+				output = norm_scaler.fit_transform(output) # -> shape = prev_output.shape (normalisation on )
+				#t_sum = tf.math.reduce_sum(output, axis = -1) 
+				#output = tf.transpose(tf.div_no_nan(tf.transpose(output), t_sum))
+				output = np.mean(output, axis = 0) # -> shape = (reshaped_t_w.shape[-1],)
+				#output = tf.math.reduce_mean(output, axis = 0) #  
 				#temp_tensors.append(output_tensor)
-				from_front_tensors.append(output) # 
+				#from_front_tensors.append(output) #
+				from_front.append(output) 
 			
-			outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
-			from_front = np.asarray(outputs).T
+			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
+			#print ("This?")
+			##K.clear_session()
+			##s = tf.InteractiveSession()
+			##K.set_session(s)
+			#reset_keras(from_front_tensors)
+			#from_front = np.asarray(outputs).T
 			# work for Dense. but, for the others?
-			#from_front = np.asarray(from_front)
-			#from_front = from_front.T
+			from_front = np.asarray(from_front)
+			from_front = from_front.T
 			print ('From front', from_front.shape)
-			print (np.sum(from_front, axis = 0))
+			#print (np.sum(from_front, axis = 0))
 			# behind
 			# sess = K.get_session()
 			# tensor_grad = tf.gradients(
@@ -317,16 +368,16 @@ def localise_offline(
 			# mean_gradient = np.mean(norm_gradient, axis = 0)
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl].output, target_X)
+			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X)
 			print ("From behind", from_behind.shape)
-			print ("\t FR", from_front[10:20])
-			print ("\t BH" , from_behind)
+			#print ("\t FR", from_front[:10])
+			#print ("\t BH" , from_behind[:10])
 			FIs = from_front * from_behind
 			print ("Max: {}, min:{}".format(np.max(FIs), np.min(FIs)))
 			############ FI end #########
 
 			# Gradient
-			grad_scndcr = compute_gradient_to_loss(model, model.layers[idx_to_tl].weights[0], target_X, target_y)
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif is_C2D(lname):
@@ -398,11 +449,24 @@ def localise_offline(
 			# move axis for easier computation
 			print ("range", n_output_channel, n_mv_0, n_mv_1) # currenlty taking too long -> change to compute on gpu
 			#tr_prev_output = np.moveaxis(prev_output, [0,1,2,3], [0,3,1,2])
-			tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
-			
-			sess = K.get_session()
+			#tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
+		
 			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
+				#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
 				l_from_front_tensors = []
+				t0 = time.time()
+				t1 = time.time()
+				# due to clear_session()
+				model = load_model(path_to_keras_model, compile = False)
+				t2 = time.time()
+				print ("Time for loading a model: {}".format(t2 - t1))
+				#t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+				prev_output = model.layers[idx_to_tl - 1].output
+				tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
+				#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
+				#t_w_tensor = model.layers[idx_to_tl].weights[0]
+
+				t1 = time.time()	
 				for i in range(n_mv_0): # H
 					indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
 					for j in range(n_mv_1): # W
@@ -410,7 +474,6 @@ def localise_offline(
 						#curr_prev_output = tr_prev_output[:,indices_to_k1,:,:][:,:,indices_to_k2,:]
 						curr_prev_output = tr_prev_output[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:][:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]	
 						#print (curr_prev_output)
-						#import sys; sys.exit()
 						output = curr_prev_output * t_w[:,:,:,idx_ol]
 						#output = np.abs(output)
 						output = tf.math.abs(output)
@@ -431,14 +494,18 @@ def localise_offline(
 							k += 1
 						#from_front[(idx_ol, i, j)] = output # output -> []
 						#output_v = K.get_session().run(output, feed_dict = {model.input: target_X})[0]
-						#from_front.append(output)#_v)
+						#from_#front.append(output)#_v)
 						l_from_front_tensors.append(output)
 				
+				t2 = time.time()
+				print ("Time for generating tensors: {}".format(t2 - t1))
 				t1 = time.time()
 				outputs = K.get_session().run(l_from_front_tensors, feed_dict = {model.input: target_X})
+				reset_keras([l_from_front_tensors] + [model])
 				#outputs = sess.run(l_from_front_tensors, feed_dict = {model.input: target_X})
 				t2 = time.time()
 				print ("Time for computing: {}".format(t2 - t1))
+				print ("Total time: {}".format(t2 - t0))
 				from_front.extend(outputs)
 			
 			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
@@ -468,7 +535,8 @@ def localise_offline(
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 			# the same shape with output -> [Channel_output, H_out (n_mv_0), W_out (n_mv_1)]
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl].output, target_X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
+			#
+			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
 			print ("From behind", from_behind.shape)
 			#from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
 			
@@ -481,7 +549,7 @@ def localise_offline(
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
-			grad_scndcr = compute_gradient_to_loss(model, model.layers[idx_to_tl].weights[0], target_X, target_y)
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
 			# ##		
 		else:
 			print ("Currenlty not supported: {}. (shoulde be filtered before)".format(lname))		
@@ -493,6 +561,8 @@ def localise_offline(
 		pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
 		print ("Pairs", pairs.shape)
 		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
+		#sess = K.get_session()
+		#sess.close()
 	
 	t3 = time.time()
 	print ("Time for computing total costs: {}".format(t3 - t0))
@@ -501,8 +571,10 @@ def localise_offline(
 	indices_to_tl = list(total_cands.keys())
 	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
-
-	#print ("Indices", indices_to_tl)
+	print (costs_and_keys[0])
+	print (costs[0])
+	print (costs[:10], costs[-10:])
+	print ("Indices", indices_to_tl)
 	#print (total_cands)
 	def get_org_index(flatten_idx, cands):
 		"""
@@ -517,7 +589,8 @@ def localise_offline(
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], get_org_index(vs[0][1], total_cands[vs[0][0]])] for vs in costs_and_keys]
-	
+	print (indices_to_nodes[0], indices_to_nodes[-1])
+	print (len(costs), len(indices_to_nodes), len(costs_and_keys))
 	print ("Cost", costs[:20], indices_to_nodes[:20]) 
 
 	t4 = time.time()

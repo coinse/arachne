@@ -80,11 +80,11 @@ def compute_gradient_to_output(model, target, X):
 	print ("\t", gradient.shape)
 
 	gradient = np.abs(gradient)
-	print ("Gradient", gradient)
+	#print ("Gradient", gradient)
 	reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
 	norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
-	print ("Norm", norm_gradient)
-	print (type(norm_gradient))
+	#print ("Norm", norm_gradient)
+	#print (type(norm_gradient))
 	print (norm_gradient.shape)
 	mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
 	print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
@@ -345,11 +345,13 @@ def localise_offline(
 				print ("padding type: {} not supported".format(padding_type))
 				paddings = [0,0]
 
-			num_kernels = prev_output.shape[1] # Channel_in
+			#num_kernels = prev_output.shape[1] # Channel_in
+			num_kernels = int(prev_output.shape[1]) # Channel_in
 			assert num_kernels == t_w.shape[2], "{} vs {}".format(num_kernels, t_w.shape[2])
 
 			# H x W				
-			input_shape = prev_output.shape[2:] # the last two (front two are # of inputs and # of kernels (Channel_in))
+			#input_shape = prev_output.shape[2:] # the last two (front two are # of inputs and # of kernels (Channel_in))
+			input_shape = [int(v) for v in prev_output.shape[2:]] # the last two (front two are # of inputs and # of kernels (Channel_in))
 
 			# (W1−F+2P)/S+1, W1 = input volumne , F = kernel, P = padding
 			n_mv_0 = int((input_shape[0] - kernel_shape[0] + 2 * paddings[0])/strides[0] + 1) # H_out
@@ -391,35 +393,60 @@ def localise_offline(
 			# 			k += 1
 			# 		from_front[-1].append(output)
 			# 	###
-			#from_front = np.zeros((n_output_channel, n_mv_0, n_mv_1))
 			from_front = []
+			#from_front_tensors = []
 			# move axis for easier computation
 			print ("range", n_output_channel, n_mv_0, n_mv_1) # currenlty taking too long -> change to compute on gpu
-			tr_prev_output = np.moveaxis(prev_output, [0,1,2,3], [0,3,1,2])
+			#tr_prev_output = np.moveaxis(prev_output, [0,1,2,3], [0,3,1,2])
+			tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
+			
+			sess = K.get_session()
 			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
+				l_from_front_tensors = []
 				for i in range(n_mv_0): # H
 					indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
 					for j in range(n_mv_1): # W
-						indices_to_k2 = np.arange(j*strides[1], j*strides[1]+kernel_shape[1], 1)	
-						curr_prev_output = tr_prev_output[:,indices_to_k1,:,:][:,:,indices_to_k2,:]
+						indices_to_k2 = np.arange(j*strides[1], j*strides[1]+kernel_shape[1], 1)
+						#curr_prev_output = tr_prev_output[:,indices_to_k1,:,:][:,:,indices_to_k2,:]
+						curr_prev_output = tr_prev_output[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:][:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]	
+						#print (curr_prev_output)
+						#import sys; sys.exit()
 						output = curr_prev_output * t_w[:,:,:,idx_ol]
-						output = np.abs(output)
+						#output = np.abs(output)
+						output = tf.math.abs(output)
+						#print (output)
+						#print (output.shape)
 						if k == 0:
-							print ("output", output.shape)
+							#print ("output", output.shape)
+							print ("output", [int(v) for v in output.shape[1:]])
 						
-						sum_output = np.sum(output) # since they are all added to compute a single output tensor
-						output = output/sum_output # normalise -> [# input, F1, F2, Channel_in]
-						output = np.mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
+						#sum_output = np.sum(output) # since they are all added to compute a single output tensor
+						sum_output = tf.math.reduce_sum(output) # since they are all added to compute a single output tensor
+						#output = output/sum_output # normalise -> [# input, F1, F2, Channel_in]
+						output = tf.div_no_nan(output, sum_output) # normalise -> [# input, F1, F2, Channel_in]
+						#output = np.mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
+						output = tf.math.reduce_mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
 						if k == 0:
-							print ('mean', output.shape, "should be", (kernel_shape[0],kernel_shape[1],prev_output.shape[1]))
+							print ('mean', [int(v) for v in output.shape[1:]], "should be", (kernel_shape[0],kernel_shape[1],prev_output.shape[1]))
 							k += 1
 						#from_front[(idx_ol, i, j)] = output # output -> []
-						from_front.append(output)
-
+						#output_v = K.get_session().run(output, feed_dict = {model.input: target_X})[0]
+						#from_front.append(output)#_v)
+						l_from_front_tensors.append(output)
+				
+				t1 = time.time()
+				outputs = K.get_session().run(l_from_front_tensors, feed_dict = {model.input: target_X})
+				#outputs = sess.run(l_from_front_tensors, feed_dict = {model.input: target_X})
+				t2 = time.time()
+				print ("Time for computing: {}".format(t2 - t1))
+				from_front.extend(outputs)
+			
+			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
+			#from_front = np.asarray(outputs)	
 			from_front = np.asarray(from_front)
 			print ("From front", from_front.shape) # [Channel_out * n_mv_0 * n_mv_1, F1, F2, Channel_in]
 			from_front = from_front.reshape(
-				(n_output_channel,n_mv_0,n_mv_1,kernel_shape[0],kernel_shape[1],prev_output[1]))
+				(n_output_channel,n_mv_0,n_mv_1,kernel_shape[0],kernel_shape[1],int(prev_output.shape[1])))
 			print ("reshaped", from_front.shape)
 			from_front = np.moveaxis(from_front, [0,1,2], [3,4,5])
 			print ("axis moved", from_front.shape) # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
@@ -441,12 +468,17 @@ def localise_offline(
 			# gradient_value_from_behind = mean_gradient.reshape(gradient.shape[1:])
 			# from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 			# the same shape with output -> [Channel_output, H_out (n_mv_0), W_out (n_mv_1)]
-			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl], target_X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
+			from_behind = compute_gradient_to_output(model, model.layers[idx_to_tl].output, target_X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
 			print ("From behind", from_behind.shape)
-			from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
+			#from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
+			
+			t1 = time.time()
 			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
+			t2 = time.time()
+			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
 			FIs = np.mean(np.mean(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
-
+			t3 = time.time()
+			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
 			grad_scndcr = compute_gradient_to_loss(model, model.layers[idx_to_tl].weights[0], target_X, target_y)

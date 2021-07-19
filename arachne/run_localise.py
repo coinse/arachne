@@ -8,6 +8,7 @@ import utils.data_util as data_util
 import time
 import tensorflow as tf
 from tensorflow.keras.models import load_model, Model
+import tensorflow.keras.backend as K
 from tqdm import tqdm
 
 def get_target_weights(model, path_to_keras_model, indices_to_target = None, target_all = True):
@@ -66,7 +67,6 @@ def compute_gradient_to_output(model, target, X):
 	"""
 	compute gradients normalisesd and averaged for a given input X
 	"""
-	import tensorflow.keras.backend as K
 	from sklearn.preprocessing import Normalizer
 	norm_scaler = Normalizer(norm = "l1")
 
@@ -96,7 +96,6 @@ def compute_gradient_to_loss(model, target, X, y):
 	"""
 	compute gradients for the loss
 	"""
-	import tensorflow.keras.backend as K
 	
 	num_label = int(model.output.shape[-1])
 	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
@@ -268,29 +267,38 @@ def localise_offline(
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
 		t_w, lname = vs
+		t_w_tensor = model.layers[idx_to_tl].weights[0]
 		############ FI ############
 		t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-		prev_output = t_model.predict(target_X)
+		#prev_output = t_model.predict(target_X)
+		prev_output = t_model.output
 		layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
 		if is_FC(lname):
-			from_front = []
+			#from_front = []
+			from_front_tensors = []
 			for idx in range(t_w.shape[-1]):
-				assert prev_output.shape[-1] == t_w.shape[0], "{} vs {}".format(
-					prev_output.shape[-1], t_w.shape[0])
-
-				output = np.multiply(prev_output, t_w[:,idx]) # -> shape = prev_output.shape
-				output = np.abs(output)
-				output = norm_scaler.fit_transform(output) # -> shape = prev_output.shape (normalisation on )
-				#output_tensor = tf.math.reduce_mean(output_tensor, axis = 0) # compute an average for given inputs
-				output = np.mean(output, axis = 0) # -> shape = (reshaped_t_w.shape[-1],)
+				assert int(prev_output.shape[-1]) == t_w.shape[0], "{} vs {}".format(
+					int(prev_output.shape[-1]), t_w.shape[0])
+					
+				#output = np.multiply(prev_output, t_w[:,idx]) # -> shape = prev_output.shape
+				output = tf.math.multiply(prev_output, t_w_tensor[:,idx]) # shape = prev_output.shape
+				#output = np.abs(output)
+				output = tf.math.abs(output)
+				#output = norm_scaler.fit_transform(output) # -> shape = prev_output.shape (normalisation on )
+				t_sum = tf.math.reduce_sum(output, axis = -1) 
+				output = tf.transpose(tf.div_no_nan(tf.transpose(output), t_sum))
+				#output = np.mean(output, axis = 0) # -> shape = (reshaped_t_w.shape[-1],)
+				output = tf.math.reduce_mean(output, axis = 0) #  
 				#temp_tensors.append(output_tensor)
-				from_front.append(output) # 
-
+				from_front_tensors.append(output) # 
+			
+			outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
+			from_front = np.asarray(outputs).T
 			# work for Dense. but, for the others?
-			from_front = np.asarray(from_front)
-			from_front = from_front.T
+			#from_front = np.asarray(from_front)
+			#from_front = from_front.T
 			print ('From front', from_front.shape)
 			print (np.sum(from_front, axis = 0))
 			# behind

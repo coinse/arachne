@@ -301,6 +301,7 @@ def localise_offline(
 	target_X = X[indices_to_selected_wrong]
 	target_y = y[indices_to_selected_wrong]
 
+	loc_start_time = time.time()
 	##
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
@@ -575,6 +576,7 @@ def localise_offline(
 	print (costs[0])
 	print (costs[:10], costs[-10:])
 	print ("Indices", indices_to_tl)
+	print ("the number of total cands: {}".format(len(costs)))
 	#print (total_cands)
 	def get_org_index(flatten_idx, cands):
 		"""
@@ -608,6 +610,8 @@ def localise_offline(
 	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
 	t5 = time.time()
 	print ("Time for computing the pareto front: {}".format(t5 - t4))
+	loc_end_time = time.time()
+	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
 	return pareto_front
 
 # if __name__ == "__main__":

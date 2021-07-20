@@ -86,8 +86,12 @@ if __name__ == "__main__":
 			path_to_keras_model = args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_wrong,
 			seed = args.seed,
-			target_all = True)#False)
-
+			target_all = True)
+			
+		#import time
+		#print ("start sleeping")
+		#time.sleep(10)
+		#import sys; sys.exit()
 		print ("The size of the pareto front: {}".format(len(output)))	
 		print (output)
 	

@@ -100,10 +100,10 @@ class Searcher(object):
 		Generate an empyt graph frame for current searcher
 		"""
 		from tensorflow.keras.models import load_model, Model
-		idx_to_first_tl = self.np.min(self.indices_to_target_layers)
+		#idx_to_first_tl = self.np.min(self.indices_to_target_layers)
 		mdl = load_model(self.path_to_keras_model)
-		self.mdl = Model(inputs = mdl.inputs, outputs = mdl.layers[idx_to_first_tl-1].output)
-		
+		#self.mdl = Model(inputs = mdl.inputs, outputs = mdl.layers[idx_to_first_tl-1].output)
+		self.mdl = mdl
 
 	def set_target_weights(self):
 		"""

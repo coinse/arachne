@@ -102,7 +102,6 @@ class DE_searcher(Searcher):
 				deltas[idx_to_tl] = self.init_weights[idx_to_tl]
 			# since our op is set
 			deltas[idx_to_tl][tuple(inner_indices)] = patch_candidate[i]
-		
 		###################
 
 		# sess, (predictions, correct_predictions, loss_v) = self.move(
@@ -229,7 +228,7 @@ class DE_searcher(Searcher):
 		print (bounds)
 		print (len(bounds))
 		# set search parameters
-		pop_size = 5 #100 
+		pop_size = 100 
 		toolbox = self.base.Toolbox()
 
 		def sample_from_noraml(loc = mean_value, scale = std_value):
@@ -268,6 +267,7 @@ class DE_searcher(Searcher):
 		hof = self.tools.HallOfFame(1, similar = self.np.array_equal)
 
 		# update fitness
+		print ("Places to fix", places_to_fix)
 		for ind in pop:
 			ind.fitness.values = toolbox.evaluate(ind, places_to_fix)
 				#ind,

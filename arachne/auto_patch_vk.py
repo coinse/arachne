@@ -266,6 +266,10 @@ def patch(
 	############################################################################
 	################################ PATCH #####################################
 	############################################################################
+	if indices_to_target_layers is None:
+		indices_to_target_layers = list(target_weights.keys())
+	print ("Target layers", indices_to_target_layers)
+
 	if search_method == 'DE':
 		# searcher = de.DE_searcher(
 		# 	X, y,
@@ -286,6 +290,7 @@ def patch(
 			X, y,
 			indices_to_correct, [],
 			num_label,
+			indices_to_target_layers,
 			mutation = (0.5, 1), 
 			recombination = 0.7,
 			max_search_num = max_search_num,

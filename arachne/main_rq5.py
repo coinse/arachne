@@ -4,7 +4,7 @@ RQ5 script
 import argparse
 import os, sys
 import utils.data_util as data_util
-import auto_patch
+import auto_patch_vk as auto_patch
 import time
 import numpy as np
 import gc
@@ -31,6 +31,7 @@ parser.add_argument("-org_label", action = 'store', default = 3, type = int)
 parser.add_argument("-pred_label", action = 'store', default = 5, type = int)
 # temp
 parser.add_argument("-new_loc", type = int, default = 0)
+parser.add_argument("-loc_file", type = str, default = None)
 
 args = parser.parse_args()
 
@@ -102,19 +103,34 @@ if bool(args.new_loc): # temp
 
 	import sys; sys.exit()
 else:
+	# patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
+	# 	num_label,
+	# 	test_data, 
+	# 	args.tensor_name_file,
+	# 	max_search_num = iter_num, 
+	# 	search_method = 'DE',
+	# 	which = args.which,
+	# 	loc_method = "localiser",
+	# 	patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
+	# 	path_to_keras_model = args.path_to_keras_model,
+	# 	predef_indices_to_wrong = indices,
+	# 	seed = args.seed,
+	# 	patch_aggr = args.patch_aggr)
 	patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 		num_label,
 		test_data, 
 		args.tensor_name_file,
 		max_search_num = iter_num, 
-		search_method = 'DE',
+		search_method = "DE",
 		which = args.which,
 		loc_method = "localiser",
 		patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
 		path_to_keras_model = args.path_to_keras_model,
 		predef_indices_to_wrong = indices,
 		seed = args.seed,
-		patch_aggr = args.patch_aggr)
+		patch_aggr = args.patch_aggr, 
+		target_all = False,
+		loc_file = args.loc_file)
 		
 t2 = time.time()
 print ("Time for patching: {}".format(t2 - t1))

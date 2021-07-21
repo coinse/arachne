@@ -545,7 +545,8 @@ def localise_offline(
 			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
 			t2 = time.time()
 			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
-			FIs = np.mean(np.mean(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
+			#FIs = np.mean(np.mean(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
+			FIs = np.sum(np.sum(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
 			t3 = time.time()
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
@@ -612,7 +613,7 @@ def localise_offline(
 	print ("Time for computing the pareto front: {}".format(t5 - t4))
 	loc_end_time = time.time()
 	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
-	return pareto_front
+	return pareto_front, costs_and_keys
 
 # if __name__ == "__main__":
 # 	import argparse

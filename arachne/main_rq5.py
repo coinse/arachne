@@ -76,7 +76,7 @@ print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
 t1 = time.time()
 
 if bool(args.new_loc): # temp
-	output = run_localise.localise_offline(
+	output, costs_and_keys = run_localise.localise_offline(
 		num_label,
 		test_data,
 		args.tensor_name_file,
@@ -95,6 +95,11 @@ if bool(args.new_loc): # temp
 	destfile = os.path.join(dest, "rq5.{}.pkl".format(args.which_data))
 	print ("dest file: {}".format(destfile))
 	output_df.to_pickle(destfile)
+	
+	import pickle
+	with open(os.path.join(dest, "rq5.all_cost.{}.pkl".format(args.which_data)), 'wb') as f:
+		pickle.dump(costs_and_keys, f)
+
 	import sys; sys.exit()
 else:
 	patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(

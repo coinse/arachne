@@ -123,7 +123,19 @@ def patch(
 		kernel_and_bias_pairs = apricot_rel_util.get_weights(path_to_keras_model)
 	else:
 		kernel_and_bias_pairs = torch_rel_util.get_weights(path_to_keras_model)
-
+	
+	##
+	from tensorflow.keras.models import load_model, Model
+	mdl = load_model(path_to_keras_model)
+	#mdl,_ = build_keras_model_front_v2(path_to_keras_model, idx_to_target_w = -1)
+	outputs = mdl.predict(data_X)
+	print (outputs.shape)
+	print (outputs[0])
+	print (np.argmax(outputs, axis = 1)[:20])
+	##	
+	#print ("kerenel", [[v[0].shape, v[1].shape] for v in kernel_and_bias_pairs])
+	#print (kernel_and_bias_pairs[-1][0])
+	#import sys; sys.exit()
 	init_plchldr_feed_dict = {'fw3:0':np.float32(kernel_and_bias_pairs[-1][0]), 'fb3:0':kernel_and_bias_pairs[-1][1]}
 
 	from utils.data_util import split_into_wrong_and_correct
@@ -140,6 +152,8 @@ def patch(
 	#
 	sess.close()
 	t2 = time.time()
+	#print ("Corr", correct_predictions[:10], correct_predictions.shape)
+	#import sys; sys.exit()
 	indices_to_target = split_into_wrong_and_correct(correct_predictions)
 	entire_indices_to_wrong = indices_to_target['wrong']
 

@@ -209,15 +209,24 @@ class Localiser(Base_Searcher):
 		print ("tensor grad", tensor_grad)
 		print ("\t", gradient.shape)
 		gradient = self.np.abs(gradient)
-		norm_gradient = Normalizer(norm = 'l1').fit_transform(gradient)
+		print ("Gradients", gradient)
+		import numpy 
+		norm_gradient = numpy.float32(Normalizer(norm = 'l1').fit_transform(gradient))
 		print ("after norm", norm_gradient.shape)
-		gradient_value_from_behind = self.np.mean(norm_gradient, axis = 0) # compute the average for given inputs
+		print ("Norm", norm_gradient)
+		print (norm_gradient.shape)
+		print (type(norm_gradient), norm_gradient.dtype)
+		gradient_value_from_behind = numpy.mean(norm_gradient, axis = 0) # compute the average for given inputs
+		print ("Mean", gradient_value_from_behind, type(gradient_value_from_behind), gradient_value_from_behind.dtype)
 		from_behind = gradient_value_from_behind # pos... what if pos is 3-d 
 		
 		print ("From behind", from_behind.shape)
 		print ("\t", from_behind)
 		print ("\t", self.np.sum(from_behind, axis = 0))
-	
+		
+		print()
+		print ("\t FR", from_front[10:20])
+		print ("\t BH", from_behind)	
 		FIs = self.np.multiply(from_front, from_behind)
 		print ("FI shape", FIs.shape)
 		##
@@ -297,6 +306,7 @@ class Localiser(Base_Searcher):
 			#forward_impact = {curr_nodes_to_lookat[i]:forward_impact[i] for i in range(forward_impact.shape[0])}
 		##
 		costs = self.np.asarray([[d_gradients[node], forward_impact[node]] for node in curr_nodes_to_lookat])
+		print ("Cost", costs[:20], curr_nodes_to_lookat[:20])
 		ret_lst = []
 		ret_front_lst = []
 		while len(curr_nodes_to_lookat) > 0:

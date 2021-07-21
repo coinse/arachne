@@ -224,6 +224,17 @@ def patch(
 				indices_to_selected_wrong,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
+			print ("Places to fix", indices_to_places_to_fix)
+			#import sys; sys.exit()
+			import pickle
+			import pandas as pd
+			import os
+			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
+			loc_dest = os.path.join("new_loc/cnn2")
+			os.makedirs(loc_dest, exist_ok= True)
+			destfile = os.path.join(loc_dest, "rq5.{}.pkl".format(patch_target_key))
+			with open(os.path.join(loc_dest, "rq5.all_cost.{}.pkl".format(patch_target_key)), 'wb') as f:
+				pickle.dump(front_lst, f)
 		else: # since I dont' want to localise again
 			import pandas as pd
 			df = pd.read_pickle(loc_file)
@@ -294,7 +305,7 @@ def patch(
 			mutation = (0.5, 1), 
 			recombination = 0.7,
 			max_search_num = max_search_num,
-			initial_predictions = predictions,
+			initial_predictions = None, #predictions,
 			path_to_keras_model = path_to_keras_model,
 			patch_aggr = patch_aggr,
 			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
@@ -303,7 +314,8 @@ def patch(
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)
 		
 		name_key = str(0) if patch_target_key is None else str(patch_target_key)
-			
+		
+		print ('Indices', indices_to_target_layers)	
 		#patched_model_name = searcher.search(
 		#	places_to_fix,
 		#	sess = None,

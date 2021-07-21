@@ -101,8 +101,8 @@ class DE_searcher(Searcher):
 			if idx_to_tl not in deltas.keys():
 				deltas[idx_to_tl] = self.init_weights[idx_to_tl]
 			# since our op is set
-			deltas[idx_to_tl] = patch_candidate[i]
-			
+			deltas[idx_to_tl][tuple(inner_indices)] = patch_candidate[i]
+		
 		###################
 
 		# sess, (predictions, correct_predictions, loss_v) = self.move(
@@ -170,8 +170,8 @@ class DE_searcher(Searcher):
 		max_v = self.np.max(init_weight_value)
 		max_v = max_v * 2 if max_v > 0 else max_v / 2
 
-		bounds = [(min_v, max_v)]
-
+		#bounds = [(min_v, max_v)]
+		bounds = (min_v, max_v)
 		return bounds
 
 	
@@ -225,9 +225,11 @@ class DE_searcher(Searcher):
 			#max_value = self.np.max(_init_weight)
 			bounds.append(self.set_bounds(_init_weight)) # for clipping
 		##
-
+		print ("Bounds are set")
+		print (bounds)
+		print (len(bounds))
 		# set search parameters
-		pop_size = 100 
+		pop_size = 5 #100 
 		toolbox = self.base.Toolbox()
 
 		def sample_from_noraml(loc = mean_value, scale = std_value):
@@ -349,11 +351,11 @@ class DE_searcher(Searcher):
 			# update for best value to check for early stop #########
 			#########################################################
 			deltas = {} # this is deltas for set update op
-			for i, (idx_to_tl ,_) in enumerate(places_to_fix):
+			for i, (idx_to_tl, inner_indices) in enumerate(places_to_fix):
 				if idx_to_tl not in deltas.keys():
 					deltas[idx_to_tl] = self.init_weights[idx_to_tl]
 				# since our op is set
-				deltas[idx_to_tl] = best[i]
+				deltas[idx_to_tl][tuple(inner_indices)] = best[i]
 			self.move(deltas, update_op = 'set')
 				
 			is_early_stop_possible, num_of_patched = self.check_early_stop(best.fitness.values[0], model_name = best.model_name)
@@ -397,21 +399,23 @@ class DE_searcher(Searcher):
 			# self.move(new_weight_value, update_op = 'set')
 
 			deltas = {} # this is deltas for set update op
-			for i, (idx_to_tl ,_) in enumerate(places_to_fix):
+			for i, (idx_to_tl, inner_indices) in enumerate(places_to_fix):
 				if idx_to_tl not in deltas.keys():
 					deltas[idx_to_tl] = self.init_weights[idx_to_tl]
 				# since our op is set
-				deltas[idx_to_tl] = best[i]
+				deltas[idx_to_tl][tuple(inner_indices)] = best[i]
 			self.move(deltas, update_op = 'set')
 
 			#import json 
 			#with open(save_path.replace("None","model") + ".json", 'w') as f:
 			#	#f.write(json.dumps({'weight':new_weight_value.tolist()}))	
 			#	f.write(json.dumps({'weight':deltas.tolist()}))
-			import pandas as pd
-			deltas_df = pd.DataFrame(deltas)
-			deltas_df.to_pickle(save_path.replace("None","model")+".pkl")
-
+			import pickle
+			#deltas_df = pd.DataFrame({idx_to_tl:vs for idx_to_tl,vs in deltas.items()})
+			#deltas_df.to_pickle(save_path.replace("None","model")+".pkl")
+			print(save_path.replace("None","model")+".pkl")
+			with open(save_path.replace("None","model")+".pkl", 'wb') as f:
+				pickle.dump(deltas, f)
 			# update self.curr_feed_dict (for processing wrongly classified inputs & outputs)
 			# target_tensor = self.model_util.get_tensor(
 			# 	self.tensors['t_weight'], 

@@ -84,7 +84,7 @@ if bool(args.new_loc): # temp
 		path_to_keras_model = args.path_to_keras_model,
 		predef_indices_to_wrong = indices,
 		seed = args.seed,
-		target_all = True)
+		target_all = False)
 
 	print ("The size of the pareto front: {}".format(len(output)))	
 	print (output)
@@ -136,7 +136,7 @@ t2 = time.time()
 print ("Time for patching: {}".format(t2 - t1))
 print ("patched_model_name", patched_model_name)	
 
-os.rename(patched_model_name + ".json", os.path.join(args.dest, os.path.basename(patched_model_name) + ".json"))
+#os.rename(patched_model_name + ".json", os.path.join(args.dest, os.path.basename(patched_model_name) + ".json"))
 
 gc.collect()
 

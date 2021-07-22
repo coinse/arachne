@@ -81,7 +81,7 @@ class Searcher(object):
 		# initialise the names of the tensors used in Searcher
 		#if not is_empty_one: 
 		#self.initialise_feed_dict() 
-		self.set_initial_predictions(initial_predictions)
+		self.set_initial_predictions()# initial_predictions)
 		self.maximum_fitness = 0.0 # the maximum fitness value	
 		# set search relate parameters
 		self.max_search_num = max_search_num	
@@ -100,10 +100,11 @@ class Searcher(object):
 		Generate an empyt graph frame for current searcher
 		"""
 		from tensorflow.keras.models import load_model, Model
-		idx_to_first_tl = self.np.min(self.indices_to_target_layers)
+		#idx_to_first_tl = self.np.min(self.indices_to_target_layers)
 		mdl = load_model(self.path_to_keras_model)
-		self.mdl = Model(inputs = mdl.inputs, outputs = mdl.layers[idx_to_first_tl-1].output)
-		
+		#self.mdl = Model(inputs = mdl.inputs, outputs = mdl.layers[idx_to_first_tl-1].output)
+		self.mdl = mdl
+		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
 
 	def set_target_weights(self):
 		"""
@@ -286,14 +287,14 @@ class Searcher(object):
 		######################################
 		######## Update model ################
 		######################################
-		for idx_to_tl in self.indices_to_target_layers: 
+		for idx_to_tl in self.indices_to_target_layers:
 			w_org, b = self.mdl.layers[idx_to_tl].get_weights() # get current weights
 			if update_op == 'add':
-				self.mdl.layers[idx_to_tl].set_weights(w_org + deltas[idx_to_tl], b)
+				self.mdl.layers[idx_to_tl].set_weights([w_org + deltas[idx_to_tl], b])
 			elif update_op == 'sub':
-				self.mdl.layers[idx_to_tl].set_weights(w_org - deltas[idx_to_tl], b)
+				self.mdl.layers[idx_to_tl].set_weights([w_org - deltas[idx_to_tl], b])
 			else: # set
-				self.mdl.layers[idx_to_tl].set_weights(deltas[idx_to_tl], b)
+				self.mdl.layers[idx_to_tl].set_weights([deltas[idx_to_tl], b])
 
 		# ## can this part be more simpler? or can this changed to keras version (can)
 		# sess, (predictions, correct_predictions, all_losses) = self.model_util.predict(
@@ -315,7 +316,12 @@ class Searcher(object):
 		with tf.Session() as sess:
 			pred_probs = tf.math.softmax(predictions) # softmax
 			loss_op = tf.keras.metrics.categorical_crossentropy(labels, pred_probs)
-			losses_of_all = sess.run(loss_op)[0]
+			#print ("out", pred_probs.shape, pred_probs[0])
+			#print (labels[0], len(labels))
+			#print ("session output\n\t", sess.run(loss_op))
+			losses_of_all = sess.run(loss_op)
+		#print ("Loss", losses_of_all.shape)
+		#print (np.max(self.indices_to_correct))
 		losses_of_correct = losses_of_all[self.indices_to_correct]
 		
 		##

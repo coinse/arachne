@@ -224,10 +224,25 @@ def patch(
 				indices_to_selected_wrong,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
-		else: # since I dont' want to localise again
+			print ("Places to fix", indices_to_places_to_fix)
+			#import sys; sys.exit()
+			import pickle
 			import pandas as pd
-			df = pd.read_pickle(loc_file)
-			indices_to_places_to_fix = [[int(vs[0]), [int(v) for v in vs[1].split(",")]] for vs in df.values]
+			import os
+			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
+			loc_dest = os.path.join("new_loc/cnn2")
+			os.makedirs(loc_dest, exist_ok= True)
+			destfile = os.path.join(loc_dest, "rq5.{}.pkl".format(patch_target_key))
+			output_df.to_pickle(destfile)
+
+			with open(os.path.join(loc_dest, "rq5.all_cost.{}.pkl".format(patch_target_key)), 'wb') as f:
+				pickle.dump(front_lst, f)
+		else: # since I dont' want to localise again
+			indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
+			#import pandas as pd
+			#df = pd.read_pickle(loc_file)
+			#indices_to_places_to_fix = [[int(vs[0]), [int(v) for v in vs[1].split(",")]] for vs in df.values]
+			
 
 	else: # randomly select
 		# if not only_loc:
@@ -266,6 +281,10 @@ def patch(
 	############################################################################
 	################################ PATCH #####################################
 	############################################################################
+	# patch target layers
+	indices_to_ptarget_layers = sorted(list(set([idx_to_tl for idx_to_tl,_ in indices_to_places_to_fix])))
+	print ("Patch target layers", indices_to_ptarget_layers)
+
 	if search_method == 'DE':
 		# searcher = de.DE_searcher(
 		# 	X, y,
@@ -286,10 +305,11 @@ def patch(
 			X, y,
 			indices_to_correct, [],
 			num_label,
+			indices_to_ptarget_layers,
 			mutation = (0.5, 1), 
 			recombination = 0.7,
 			max_search_num = max_search_num,
-			initial_predictions = predictions,
+			initial_predictions = None, #predictions,
 			path_to_keras_model = path_to_keras_model,
 			patch_aggr = patch_aggr,
 			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
@@ -298,7 +318,7 @@ def patch(
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)
 		
 		name_key = str(0) if patch_target_key is None else str(patch_target_key)
-			
+		
 		#patched_model_name = searcher.search(
 		#	places_to_fix,
 		#	sess = None,

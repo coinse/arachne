@@ -586,19 +586,9 @@ def localise_offline(
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	#print (total_cands)
-	def get_org_index(flatten_idx, cands):
-		"""
-		"""
-		org_index = []
-		curr_flatten_idx = flatten_idx	
-		for local_s in np.asarray(cands['shape'])[::-1]:
-			org_index.append(int(curr_flatten_idx / local_s))
-			curr_flatten_idx = curr_flatten_idx % local_s
-		org_index[-1] = curr_flatten_idx
-		return ",".join([str(i) for i in org_index])
 
 	# a list of [index to the target layer, index to a neural weight]
-	indices_to_nodes = [[vs[0][0], get_org_index(vs[0][1], total_cands[vs[0][0]])] for vs in costs_and_keys]
+	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], total_cands[vs[0][0]]['shape'])] for vs in costs_and_keys]
 	print (indices_to_nodes[0], indices_to_nodes[-1])
 	print (len(costs), len(indices_to_nodes), len(costs_and_keys))
 	print ("Cost", costs[:20], indices_to_nodes[:20]) 
@@ -616,7 +606,7 @@ def localise_offline(
 		next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1	
 
 	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
-	pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
+	#pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
 	##
 	t5 = time.time()
 	print ("Time for computing the pareto front: {}".format(t5 - t4))
@@ -844,19 +834,9 @@ def localise_offline_v2(
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	#print (total_cands)
-	def get_org_index(flatten_idx, cands):
-		"""
-		"""
-		org_index = []
-		curr_flatten_idx = flatten_idx	
-		for local_s in np.asarray(cands['shape'])[::-1]:
-			org_index.append(int(curr_flatten_idx / local_s))
-			curr_flatten_idx = curr_flatten_idx % local_s
-		org_index[-1] = curr_flatten_idx
-		return ",".join([str(i) for i in org_index])
 
 	# a list of [index to the target layer, index to a neural weight]
-	indices_to_nodes = [[vs[0][0], get_org_index(vs[0][1], total_cands[vs[0][0]])] for vs in costs_and_keys]
+	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], total_cands[vs[0][0]]['shape'])] for vs in costs_and_keys]
 	print (indices_to_nodes[0], indices_to_nodes[-1])
 	print (len(costs), len(indices_to_nodes), len(costs_and_keys))
 	print ("Cost", costs[:20], indices_to_nodes[:20]) 
@@ -874,7 +854,7 @@ def localise_offline_v2(
 		next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1	
 
 	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
-	pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
+	#pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
 	##
 	t5 = time.time()
 	print ("Time for computing the pareto front: {}".format(t5 - t4))

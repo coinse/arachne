@@ -452,6 +452,11 @@ def localise_offline(
 			#tr_prev_output = np.moveaxis(prev_output, [0,1,2,3], [0,3,1,2])
 			#tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
 		
+
+			## THINK ABOUT CHANGE THIS TO USE A PLACEHOLDER, AND THEREBY, GENERATING THE GRAPH ONLY THE ONCE 
+			## WHICH REMOVE THE OVERHAEAD AND COMPLEXITY FROM GENERATING OPERATIONS AGAIN AND AGAIN AND 
+			## CLAER THEM TO REDUCE THE TIME 
+			## --> THEN THEN QUESTION WOULD BE WHICH TENSOR WOULD BE THE STARTING 
 			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
 				#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
 				l_from_front_tensors = []
@@ -466,7 +471,7 @@ def localise_offline(
 				tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
 				#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
 				#t_w_tensor = model.layers[idx_to_tl].weights[0]
-
+				
 				t1 = time.time()	
 				for i in range(n_mv_0): # H
 					indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
@@ -508,6 +513,8 @@ def localise_offline(
 				print ("Time for computing: {}".format(t2 - t1))
 				print ("Total time: {}".format(t2 - t0))
 				from_front.extend(outputs)
+			###############################################################################################################
+			###############################################################################################################
 			
 			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
 			#from_front = np.asarray(outputs)	

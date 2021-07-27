@@ -70,6 +70,37 @@ class DE_searcher(Searcher):
 		self.patch_aggr = patch_aggr
 
 
+	def reset_keras(self, delete_list = None):
+		import tensorflow as tf
+		import tensorflow.keras.backend as K
+		
+		if delete_list is None:
+			K.clear_session()
+			s = tf.InteractiveSession()
+			K.set_session(s)
+		else:
+			import gc
+			#sess = K.get_session()
+			K.clear_session()
+			#sess.close()
+			sess = K.get_session()
+			try:
+				for d in delete_list:
+					del d
+			except:
+				pass
+
+		print(gc.collect()) # if it's done something you should see a number being outputted
+
+		# use the same config as you used to create the session
+		config = tf.ConfigProto()
+		config.gpu_options.per_process_gpu_memory_fraction = 1
+		config.gpu_options.visible_device_list = "0"
+		K.set_session(tf.Session(config=config))
+		
+		# load model agai
+		self.set_base_model()
+
 	# ######### This will be our fitness function ##################3
 	# def eval(self, 
 	# 	patch_candidate, 
@@ -173,7 +204,7 @@ class DE_searcher(Searcher):
 		bounds = (min_v, max_v)
 		return bounds
 
-	
+
 	# def search(self,
 	# 	places_to_fix,
 	# 	pop_size_times = 5,
@@ -287,6 +318,12 @@ class DE_searcher(Searcher):
 		# search start
 		import time
 		for iter_idx in range(self.max_search_num):
+			t_t1 = time.time()
+			self.reset_keras([])
+			t_t2 = time.time()
+			print ('Time for reset: {}'.format(t_t2 - t_t1))
+			iter_start_time = time.time()
+
 			MU = self.random.uniform(self.mutation[0], self.mutation[1])
 			#print ("Iteration (mu = {}): {} -> {} ({})".format(
 			#	MU, iter_idx, best.fitness.values[0], best.fitness))
@@ -375,8 +412,9 @@ class DE_searcher(Searcher):
 				break
 
 			curr_time = time.time()
+			local_run_time = curr_time - iter_start_time
 			run_time = curr_time - search_start_time
-			print ("Time for a single iter: {}".format(run_time))
+			print ("Time for a single iter: {}, ({})".format(run_time, local_run_time))
 				
 		#save_path = self.model_name_format.format(self.max_search_num, name_key)#"best")
 		save_path = self.model_name_format.format(name_key)

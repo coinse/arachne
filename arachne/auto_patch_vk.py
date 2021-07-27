@@ -232,16 +232,16 @@ def patch(
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
 			loc_dest = os.path.join("new_loc/cnn2")
 			os.makedirs(loc_dest, exist_ok= True)
-			destfile = os.path.join(loc_dest, "rq5.{}.pkl".format(patch_target_key))
+			destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
 
-			with open(os.path.join(loc_dest, "rq5.all_cost.{}.pkl".format(patch_target_key)), 'wb') as f:
+			with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 				pickle.dump(front_lst, f)
 		else: # since I dont' want to localise again
-			indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
-			#import pandas as pd
-			#df = pd.read_pickle(loc_file)
-			#indices_to_places_to_fix = [[int(vs[0]), [int(v) for v in vs[1].split(",")]] for vs in df.values]
+			#indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
+			import pandas as pd
+			df = pd.read_pickle(loc_file)
+			indices_to_places_to_fix = [[int(vs[0]), [int(v) for v in vs[1].split(",")]] for vs in df.values]
 			
 
 	else: # randomly select

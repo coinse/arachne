@@ -287,15 +287,21 @@ class Searcher(object):
 		######################################
 		######## Update model ################
 		######################################
+		import time
+		t1 = time.time()
 		for idx_to_tl in self.indices_to_target_layers:
+			_t0 = time.time()
 			w_org, b = self.mdl.layers[idx_to_tl].get_weights() # get current weights
+			_t1 = time.time()
+			#print ("++", _t1 - _t0)
 			if update_op == 'add':
 				self.mdl.layers[idx_to_tl].set_weights([w_org + deltas[idx_to_tl], b])
 			elif update_op == 'sub':
 				self.mdl.layers[idx_to_tl].set_weights([w_org - deltas[idx_to_tl], b])
 			else: # set
 				self.mdl.layers[idx_to_tl].set_weights([deltas[idx_to_tl], b])
-
+		t2 = time.time()
+		#print ("Time for updating model weights: {}".format(t2 - t1))
 		# ## can this part be more simpler? or can this changed to keras version (can)
 		# sess, (predictions, correct_predictions, all_losses) = self.model_util.predict(
 		# 	inputs, labels, self.num_label,
@@ -309,17 +315,26 @@ class Searcher(object):
 		# 	compute_loss = True)
 		# ###
 		# losses_of_correct = all_losses[self.indices_to_correct]
-
+		t1 =time.time()	
 		predictions = self.mdl.predict(inputs)
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		t2 =time.time()
+		#print ('Time for pred: {}'.format(t2 - t1))
+		t1 = time.time()
 		with tf.Session() as sess:
+			#predictions = self.mdl.predict(inputs)
+			#correct_predictions = self.np.argmax(predictions, axis = 1)
+			#correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+
 			pred_probs = tf.math.softmax(predictions) # softmax
 			loss_op = tf.keras.metrics.categorical_crossentropy(labels, pred_probs)
 			#print ("out", pred_probs.shape, pred_probs[0])
 			#print (labels[0], len(labels))
 			#print ("session output\n\t", sess.run(loss_op))
 			losses_of_all = sess.run(loss_op)
+		t2 = time.time()
+		#print ("Time for sess: {}".format(t2 - t1))
 		#print ("Loss", losses_of_all.shape)
 		#print (np.max(self.indices_to_correct))
 		losses_of_correct = losses_of_all[self.indices_to_correct]

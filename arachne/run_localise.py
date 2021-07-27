@@ -627,18 +627,19 @@ def generate_FI_tensor_cnn(t_w_v, prev_output_v):
 	#curr_prev_output = tr_prev_output[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:][:,:,j*strides[1]:j*strides +kernel_shape[1],:]
 	#curr_prev_output_as_input_t = tf.placeholder(tf.float32, [None, t_w_v.shape[-2], kernel_shape[0], kernel_shape[1]]) 
 
-	prev_output = tf.constant(prev_output_v, dtype = tf.float32)
-	tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
+	t_w_t = tf.constant(t_w_v, dtype = tf.float32)
+	prev_output = tf.constant(prev_output_v, dtype = tf.float32) # 
+	tr_prev_output = tf.transpose(prev_output, [0,2,3,1]) # to here, take 0.015 ...? meaning the problem exist on front ..?
 	
 	# this would be for gathering
 	indices_to_k1 = tf.placeholder(tf.int32, shape = (None,)) 
 	indices_to_k2 = tf.placeholder(tf.int32, shape = (None,))
 	curr_prev_output_slice = tf.gather(tr_prev_output, indices_to_k1, axis = 1)
 	# curr_prev_output_slice = prev_output[:,indices_to_k1]
-	curr_prev_output_slice = tf.gather(curr_prev_output_slice, indices_to_k2, axis = 2)
+	curr_prev_output_slice = tf.gather(curr_prev_output_slice, indices_to_k2, axis = 2) # take almost 0.018 to this
 
 	idx_to_out_channel = tf.placeholder(tf.int32, shape =())
-	curr_t_w_as_input_t = t_w_v[:,:,:,idx_to_out_channel]
+	curr_t_w_as_input_t = t_w_t[:,:,:,idx_to_out_channel]
 
 	output = curr_prev_output_slice * curr_t_w_as_input_t # output = curr_prev_output * t_w[:,:,:,idx_ol]
 	output = tf.math.abs(output)
@@ -646,7 +647,35 @@ def generate_FI_tensor_cnn(t_w_v, prev_output_v):
 	output = tf.div_no_nan(output, sum_output)
 	output = tf.math.reduce_mean(output, axis = 0)
 
-	return {'output':output, 'indices_to_k1':indices_to_k1, 'indices_to_k2':indices_to_k2, 'idx_to_out_channel':idx_to_out_channel}
+	return {'output':output, 'temp':prev_output, 'indices_to_k1':indices_to_k1, 'indices_to_k2':indices_to_k2, 'idx_to_out_channel':idx_to_out_channel}
+
+def generate_FI_tensor_cnn_v2(t_w_v):
+	"""
+	kernel == filter
+	"""
+	#t_w_t = tf.constant(t_w_v, dtype = tf.float32)
+	t_w_t = tf.placeholder(tf.float32, shape = (t_w_v.shape[0], t_w_v.shape[1], t_w_v.shape[2]))
+	#prev_output = tf.constant(prev_output_v, dtype = tf.float32) # 
+	#tr_prev_output = tf.transpose(prev_output, [0,2,3,1]) # to here, take 0.015 ...? meaning the problem exist on front ..?
+	
+	# this would be for gathering
+	#indices_to_k1 = tf.placeholder(tf.int32, shape = (None,)
+	#indices_to_k2 = tf.placeholder(tf.int32, shape = (None,))
+	#curr_prev_output_slice = tf.gather(tr_prev_output, indices_to_k1, axis = 1)
+	# curr_prev_output_slice = prev_output[:,indices_to_k1]
+	#curr_prev_output_slice = tf.gather(curr_prev_output_slice, indices_to_k2, axis = 2) # take almost 0.018 to this
+	curr_prev_output_slice = tf.placeholder(tf.float32, shape = (None, t_w_v.shape[0], t_w_v.shape[1], t_w_v.shape[2]))
+	
+	idx_to_out_channel = tf.placeholder(tf.int32, shape =())
+	#curr_t_w_as_input_t = t_w_t[:,:,:,idx_to_out_channel]
+
+	output = curr_prev_output_slice * t_w_t #curr_t_w_as_input_t # output = curr_prev_output * t_w[:,:,:,idx_ol]
+	output = tf.math.abs(output)
+	sum_output = tf.math.reduce_sum(output)
+	output = tf.div_no_nan(output, sum_output)
+	output = tf.math.reduce_mean(output, axis = 0)
+
+	return {'output':output, 'curr_prev_output_slice':curr_prev_output_slice, 't_w_t':t_w_t, 'idx_to_out_channel':idx_to_out_channel}
 
 
 def localise_offline_v2(
@@ -820,21 +849,23 @@ def localise_offline_v2(
 			###############
 			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
 			prev_output_v = t_model.predict(target_X)
-			tensors_for_FI = generate_FI_tensor_cnn(t_w, prev_output_v)
-
+			tr_prev_output_v = np.moveaxis(prev_output_v, [1,2,3],[3,1,2])
+			#tensors_for_FI = generate_FI_tensor_cnn(t_w, prev_output_v)
+			tensors_for_FI = generate_FI_tensor_cnn_v2(t_w)
+			
 			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
 				for i in range(n_mv_0): # H
 					for j in range(n_mv_1): # W
-						indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
-						indices_to_k2 = np.arange(j*strides[1], j*strides[1]+kernel_shape[1], 1)
-						with tf.Session() as sess:
-							output = sess.run(tensors_for_FI['output'], 
-								feed_dict = {
-									tensors_for_FI['indices_to_k1']:indices_to_k1, 
-									tensors_for_FI['indices_to_k2']:indices_to_k2, 
-									tensors_for_FI['idx_to_out_channel']:idx_ol})
+						curr_prev_output_slice = tr_prev_output_v[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:]
+						curr_prev_output_slice = curr_prev_output_slice[:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]
+						
+						output = curr_prev_output_slice * t_w[:,:,:,idx_ol] 
+						output = np.abs(output)
+						sum_output = np.nan_to_num(np.sum(output), posinf = 0.)
+						output = output/sum_output
+						output = np.mean(output, axis = 0) 
+						
 						from_front.append(output)
-			
 			##############
 			
 			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})

@@ -614,6 +614,41 @@ def localise_offline(
 	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
 	return pareto_front, costs_and_keys
 
+def generate_FI_tensor_cnn(t_w_v, prev_output_v):
+	"""
+	kernel == filter
+	"""
+	#t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+	#prev_output_v = t_model.predict(X)
+
+	# prev_output shape = [# of inputs, Channel_in, H, W]
+	#tr_prev_output = tf.transpose(prev_output, [0,2,3,1])  # [# of inputs. H, W, Channel_in]
+	# shape of curr_prev_output: [:,kernel_shape[0],kerne_shape[1],Channel_in]
+	#curr_prev_output = tr_prev_output[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:][:,:,j*strides[1]:j*strides +kernel_shape[1],:]
+	#curr_prev_output_as_input_t = tf.placeholder(tf.float32, [None, t_w_v.shape[-2], kernel_shape[0], kernel_shape[1]]) 
+
+	prev_output = tf.constant(prev_output_v, dtype = tf.float32)
+	tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
+	
+	# this would be for gathering
+	indices_to_k1 = tf.placeholder(tf.int32, shape = (None,)) 
+	indices_to_k2 = tf.placeholder(tf.int32, shape = (None,))
+	curr_prev_output_slice = tf.gather(tr_prev_output, indices_to_k1, axis = 1)
+	# curr_prev_output_slice = prev_output[:,indices_to_k1]
+	curr_prev_output_slice = tf.gather(curr_prev_output_slice, indices_to_k2, axis = 2)
+
+	idx_to_out_channel = tf.placeholder(tf.int32, shape =())
+	curr_t_w_as_input_t = t_w_v[:,:,:,idx_to_out_channel]
+
+	output = curr_prev_output_slice * curr_t_w_as_input_t # output = curr_prev_output * t_w[:,:,:,idx_ol]
+	output = tf.math.abs(output)
+	sum_output = tf.math.reduce_sum(output)
+	output = tf.div_no_nan(output, sum_output)
+	output = tf.math.reduce_mean(output, axis = 0)
+
+	return {'output':output, 'indices_to_k1':indices_to_k1, 'indices_to_k2':indices_to_k2, 'idx_to_out_channel':idx_to_out_channel}
+
+
 def localise_offline_v2(
 	X, y,
 	indices_to_selected_wrong,
@@ -725,62 +760,82 @@ def localise_offline_v2(
 			# move axis for easier computation
 			print ("range", n_output_channel, n_mv_0, n_mv_1) # currenlty taking too long -> change to compute on gpu
 		
-			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
-				#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
-				l_from_front_tensors = []
-				t0 = time.time()
-				t1 = time.time()
-				# due to clear_session()
-				model = load_model(path_to_keras_model, compile = False)
-				t2 = time.time()
-				print ("Time for loading a model: {}".format(t2 - t1))
-				#t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-				prev_output = model.layers[idx_to_tl - 1].output
-				tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
-				#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
-				#t_w_tensor = model.layers[idx_to_tl].weights[0]
+			# for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
+			# 	#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
+			# 	l_from_front_tensors = []
+			# 	t0 = time.time()
+			# 	t1 = time.time()
+			# 	# due to clear_session()
+			# 	model = load_model(path_to_keras_model, compile = False)
+			# 	t2 = time.time()
+			# 	print ("Time for loading a model: {}".format(t2 - t1))
+			# 	#t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+			# 	prev_output = model.layers[idx_to_tl - 1].output
+			# 	tr_prev_output = tf.transpose(prev_output, [0,2,3,1])
+			# 	#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
+			# 	#t_w_tensor = model.layers[idx_to_tl].weights[0]
 
-				t1 = time.time()	
-				for i in range(n_mv_0): # H
-					indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
-					for j in range(n_mv_1): # W
-						indices_to_k2 = np.arange(j*strides[1], j*strides[1]+kernel_shape[1], 1)
-						#curr_prev_output = tr_prev_output[:,indices_to_k1,:,:][:,:,indices_to_k2,:]
-						curr_prev_output = tr_prev_output[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:][:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]	
-						#print (curr_prev_output)
-						output = curr_prev_output * t_w[:,:,:,idx_ol]
-						#output = np.abs(output)
-						output = tf.math.abs(output)
-						#print (output)
-						#print (output.shape)
-						if k == 0:
-							#print ("output", output.shape)
-							print ("output", [int(v) for v in output.shape[1:]])
+			# 	t1 = time.time()	
+			# 	for i in range(n_mv_0): # H
+			# 		indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
+			# 		for j in range(n_mv_1): # W
+			# 			indices_to_k2 = np.arange(j*strides[1], j*strides[1]+kernel_shape[1], 1)
+			# 			#curr_prev_output = tr_prev_output[:,indices_to_k1,:,:][:,:,indices_to_k2,:]
+			# 			curr_prev_output = tr_prev_output[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:][:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]	
+			# 			#print (curr_prev_output)
+			# 			output = curr_prev_output * t_w[:,:,:,idx_ol]
+			# 			#output = np.abs(output)
+			# 			output = tf.math.abs(output)
+			# 			#print (output)
+			# 			#print (output.shape)
+			# 			if k == 0:
+			# 				#print ("output", output.shape)
+			# 				print ("output", [int(v) for v in output.shape[1:]])
 						
-						#sum_output = np.sum(output) # since they are all added to compute a single output tensor
-						sum_output = tf.math.reduce_sum(output) # since they are all added to compute a single output tensor
-						#output = output/sum_output # normalise -> [# input, F1, F2, Channel_in]
-						output = tf.div_no_nan(output, sum_output) # normalise -> [# input, F1, F2, Channel_in]
-						#output = np.mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
-						output = tf.math.reduce_mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
-						if k == 0:
-							print ('mean', [int(v) for v in output.shape[1:]], "should be", (kernel_shape[0],kernel_shape[1],prev_output.shape[1]))
-							k += 1
-						#from_front[(idx_ol, i, j)] = output # output -> []
-						#output_v = K.get_session().run(output, feed_dict = {model.input: target_X})[0]
-						#from_#front.append(output)#_v)
-						l_from_front_tensors.append(output)
+			# 			#sum_output = np.sum(output) # since they are all added to compute a single output tensor
+			# 			sum_output = tf.math.reduce_sum(output) # since they are all added to compute a single output tensor
+			# 			#output = output/sum_output # normalise -> [# input, F1, F2, Channel_in]
+			# 			output = tf.div_no_nan(output, sum_output) # normalise -> [# input, F1, F2, Channel_in]
+			# 			#output = np.mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
+			# 			output = tf.math.reduce_mean(output, axis = 0) # sum over a given input set # [F1, F2, Channel_in]
+			# 			if k == 0:
+			# 				print ('mean', [int(v) for v in output.shape[1:]], "should be", (kernel_shape[0],kernel_shape[1],prev_output.shape[1]))
+			# 				k += 1
+			# 			#from_front[(idx_ol, i, j)] = output # output -> []
+			# 			#output_v = K.get_session().run(output, feed_dict = {model.input: target_X})[0]
+			# 			#from_#front.append(output)#_v)
+			# 			l_from_front_tensors.append(output)
 				
-				t2 = time.time()
-				print ("Time for generating tensors: {}".format(t2 - t1))
-				t1 = time.time()
-				outputs = K.get_session().run(l_from_front_tensors, feed_dict = {model.input: target_X})
-				reset_keras([l_from_front_tensors] + [model])
-				#outputs = sess.run(l_from_front_tensors, feed_dict = {model.input: target_X})
-				t2 = time.time()
-				print ("Time for computing: {}".format(t2 - t1))
-				print ("Total time: {}".format(t2 - t0))
-				from_front.extend(outputs)
+			# 	t2 = time.time()
+			# 	print ("Time for generating tensors: {}".format(t2 - t1))
+			# 	t1 = time.time()
+			# 	outputs = K.get_session().run(l_from_front_tensors, feed_dict = {model.input: target_X})
+			# 	reset_keras([l_from_front_tensors] + [model])
+			# 	#outputs = sess.run(l_from_front_tensors, feed_dict = {model.input: target_X})
+			# 	t2 = time.time()
+			# 	print ("Time for computing: {}".format(t2 - t1))
+			# 	print ("Total time: {}".format(t2 - t0))
+			# 	from_front.extend(outputs)
+			
+			###############
+			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+			prev_output_v = t_model.predict(target_X)
+			tensors_for_FI = generate_FI_tensor_cnn(t_w, prev_output_v)
+
+			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
+				for i in range(n_mv_0): # H
+					for j in range(n_mv_1): # W
+						indices_to_k1 = np.arange(i*strides[0], i*strides[0]+kernel_shape[0], 1)
+						indices_to_k2 = np.arange(j*strides[1], j*strides[1]+kernel_shape[1], 1)
+						with tf.Session() as sess:
+							output = sess.run(tensors_for_FI['output'], 
+								feed_dict = {
+									tensors_for_FI['indices_to_k1']:indices_to_k1, 
+									tensors_for_FI['indices_to_k2']:indices_to_k2, 
+									tensors_for_FI['idx_to_out_channel']:idx_ol})
+						from_front.append(output)
+			
+			##############
 			
 			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
 			#from_front = np.asarray(outputs)	

@@ -84,7 +84,7 @@ if bool(args.new_loc): # temp
 		path_to_keras_model = args.path_to_keras_model,
 		predef_indices_to_wrong = indices,
 		seed = args.seed,
-		target_all = False)
+		target_all = True)
 
 	print ("The size of the pareto front: {}".format(len(output)))	
 	print (output)
@@ -129,7 +129,7 @@ else:
 		predef_indices_to_wrong = indices,
 		seed = args.seed,
 		patch_aggr = args.patch_aggr, 
-		target_all = False,
+		target_all = True,
 		loc_file = args.loc_file)
 		
 t2 = time.time()

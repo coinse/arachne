@@ -84,8 +84,10 @@ def build_k_frame_model(mdl, X, indices_to_tls):
 							strides = list(layer.get_config()['strides'])*2, 
 							padding = layer.get_config()['padding'].upper(), 
 							data_format = 'NCHW',  
+							#data_format = 'NHWC',
 							name = layer_name)
 					
+					x = tf.nn.bias_add(x, t_b, data_format = 'NCHW')	
 					t_ws.append(t_w)
 			else:
 				msg = "{}th layer {}({}) is not our target".format(idx_to_l, layer_name, l_class_name)

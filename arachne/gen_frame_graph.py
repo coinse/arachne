@@ -4,6 +4,57 @@ empty graph (tf.Graph) generation script
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
+def build_tf_model(model, X, indices_to_target_layers):
+	"""
+	"""
+	import numpy as np
+	import tensorflow.keras.backend as K
+	from tensorflow.keras.models import load_model, Model
+	from run_localise import is_FC, is_C2D
+
+	targeting_clname_pattns = ['Dense*', 'Conv*'] #if not target_all else None
+	is_target = lambda clname, targets: (targets is None) or any([bool(re.match(t,clname)) for t in targets])
+
+	idx_min_tl = np.min(indices_to_target_layers)
+
+	t_model = Model(inputs = model.input, outputs = model.layers[idx_min_tl].output)
+	output_of_front = t_model.predict(X)
+
+	#tf.constant(output_of_front)	
+	for idx_to_l, layer in enumerate(t_model.layers):
+		org_idx_to_l = idx_to_l + idx_min_tl
+		layer_config = layer.get_config()
+		l_class_name = type(layer).__name__
+
+		if org_idx_to_l in indices_to_target_layers:
+			# use placeholder
+			#a = K.placeholder(shape=(None,), dtype='int32')
+			if is_target(l_class_name, targeting_clname_pattns): # is our target
+				if is_FC(l_class_name):
+					# ... Linear s....
+					pass
+				else:
+					assert is_C2D(l_class_name), "{}".format(l_class_name)
+			else:
+				msg = "{}th layer {} is not our target".format(org_idx_to_l, l_class_name)
+				assert False, msg
+				# ... 
+				
+
+			pass
+		else: # currently supporting only conv2d and dense
+			# generate the same layer from config.... 
+			if is_target(l_class_name, targeting_clname_pattns): # is our target
+				if is_FC(l_class_name):
+					# ... Linear s....
+					pass
+				else:
+					assert is_C2D(l_class_name), "{}".format(l_class_name)
+			else:
+				msg = "{}th layer {} is not our target".format(org_idx_to_l, l_class_name)
+				assert False, msg
+	pass
+
 
 def build_keras_model_front_v2(path_to_keras_model, idx_to_target_w = -1):
 	"""

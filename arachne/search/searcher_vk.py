@@ -106,6 +106,12 @@ class Searcher(object):
 		self.mdl = mdl
 		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
 
+		###
+		from gen_frame_graph import build_k_frame_model
+		# fn, t_ws (for weights), ys (for labels) 
+		self.k_fn_mdl, _, _  = build_k_frame_model(self.mdl, self.inputs, self.indices_to_target_layers)
+	
+
 	def set_target_weights(self):
 		"""
 		"""
@@ -257,7 +263,7 @@ class Searcher(object):
 
 	#def move(self, target_tensor_name, delta, new_model_name, 
 	#	update_op = 'add', values_dict = None):
-	def move(self, deltas, update_op = 'set'):
+	def move_v1(self, deltas, update_op = 'set'):
 		"""
 		"""
 		import tensorflow as tf
@@ -389,7 +395,83 @@ class Searcher(object):
 		return (correctly_classified, correctly_classified / num_of_total_target)
 
 
-	def get_number_of_patched(self): #, 
+	def move_v2(self, deltas, update_op = 'set'):
+		"""
+		"""
+		import tensorflow as tf
+		#t0 = time.time()
+		inputs = self.inputs
+		labels = self.labels
+
+		import time
+		t1 = time.time()
+		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
+		predictions, losses_of_all = self.k_fn_mdl(deltas_as_lst + [labels])
+		#
+		correct_predictions = self.np.argmax(predictions, axis = 1)
+		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		t2 =time.time()
+		print ("Time for move: {}".format(t2 - t1))
+		#print ("Time for sess: {}".format(t2 - t1))
+		#print ("Loss", losses_of_all.shape)
+		#print (np.max(self.indices_to_correct))
+
+		losses_of_correct = losses_of_all[self.indices_to_correct]
+		##
+		indices_to_corr_false = self.np.where(correct_predictions[self.indices_to_correct] == 0.)[0]
+		num_corr_true = len(self.indices_to_correct) - len(indices_to_corr_false)
+		new_losses_of_correct = num_corr_true + self.np.sum(1/(losses_of_correct[indices_to_corr_false] + 1))
+		##
+
+		losses_of_wrong = losses_of_all[self.indices_to_wrong]
+		##
+		indices_to_wrong_false = self.np.where(correct_predictions[self.indices_to_wrong] == 0.)[0]
+		num_wrong_true = len(self.indices_to_wrong) - len(indices_to_wrong_false)
+		new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
+		##
+		combined_losses	= (new_losses_of_correct, new_losses_of_wrong)
+
+		return predictions, correct_predictions, combined_losses
+		#return sess, (predictions, correct_predictions, combined_losses)
+		
+
+	def get_results_of_target(self, deltas, indices_to_target):
+		"""
+		Return the results of the target (can be accessed by indices_to_target)
+			-> results are compute for currnet self.mdl
+		Ret (int, float):
+			int: the number of patched
+			float: percentage of the number of patched)
+		"""
+		# sess, (_, correct_predictions) = self.model_util.predict(
+		# 	self.inputs, self.labels, self.num_label,
+		# 	predict_tensor_name = None,
+		# 	corr_predict_tensor_name = self.tensors['t_correct_prediction'],
+		# 	indices_to_slice_tensor_name = 'indices_to_slice' if self.w_gather else None,
+		# 	sess = self.sess, 
+		# 	empty_graph =  empty_graph,
+		# 	plchldr_feed_dict = plchldr_feed_dict,
+		# 	use_pretr_front = self.path_to_keras_model is not None,
+		# 	compute_loss = False)
+
+		#predictions = self.mdl.predict(self.inputs)
+		## v2
+		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
+		predictions, _ = self.k_fn_mdl(deltas_as_lst + [self.labels])
+		##
+		correct_predictions = self.np.argmax(predictions, axis = 1)
+		correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)
+		
+		target_corr_predcs = correct_predictions[indices_to_target]
+
+		num_of_total_target = len(target_corr_predcs)
+		assert num_of_total_target == len(indices_to_target), "%d vs %d" % (num_of_total_target, len(indices_to_target))
+		correctly_classified = self.np.sum(target_corr_predcs)
+
+		return (correctly_classified, correctly_classified / num_of_total_target)
+
+
+	def get_number_of_patched(self, deltas): #, 
 		#empty_graph = None, plchldr_feed_dict = None):
 		"""
 		Return a number of patched initially wrongly classified outputs 
@@ -405,6 +487,7 @@ class Searcher(object):
 		# 	plchldr_feed_dict = self.curr_feed_dict
 
 		correctly_classified, perc_correctly_classifed = self.get_results_of_target(
+			deltas, 
 			self.indices_to_wrong) 
 			#sess, 
 			#empty_graph, 
@@ -413,7 +496,7 @@ class Searcher(object):
 		return (correctly_classified, perc_correctly_classifed)
 
 
-	def get_number_of_violated(self): #sess = None, 
+	def get_number_of_violated(self, deltas): #sess = None, 
 		#empty_graph = None, plchldr_feed_dict = None):
 		"""
 		Return a number of patched initially correctly classified outputs 
@@ -430,6 +513,7 @@ class Searcher(object):
 
 		target_indices = self.indices_to_correct
 		correctly_classified, perc_correctly_classifed = self.get_results_of_target(
+			deltas,
 			target_indices) 
 			#sess, 
 			#empty_graph, 
@@ -458,7 +542,8 @@ class Searcher(object):
 	# 	new_weight_value, 
 	# 	fitness_value, 
 	# 	model_name = None, sess = None, empty_graph = None):
-	def check_early_stop(self, fitness_value, model_name = None):
+	#def check_early_stop(self, fitness_value, model_name = None):
+	def check_early_stop(self, fitness_value, new_weights, model_name = None):
 		"""
 		Check whether early stop is possible or not
 		=> compute for currnent self.mdl (actually, the model is set with the best value before calling this)
@@ -482,11 +567,11 @@ class Searcher(object):
 		# else:
 		# 	plchldr_feed_dict = None
 
-		num_of_patched, perc_num_of_patched = self.get_number_of_patched()
+		num_of_patched, perc_num_of_patched = self.get_number_of_patched(new_weights)
 			#empty_graph = empty_graph, 
 			#plchldr_feed_dict = plchldr_feed_dict)
 
-		num_of_violated, perc_num_of_violated = self.get_number_of_violated()
+		num_of_violated, perc_num_of_violated = self.get_number_of_violated(new_weights)
 			#empty_graph = empty_graph, 
 			#plchldr_feed_dict = plchldr_feed_dict)
 
@@ -500,17 +585,17 @@ class Searcher(object):
 			return False, num_of_patched
 
 
-	def summarise_results(self):
+	def summarise_results(self, deltas):
 		"""
 		Print out the current result of model_name
 		=> compute for currnent self.mdl
 		"""
 		print ("***Patching results***\n")
 
-		num_of_patched, perc_num_of_patched = self.get_number_of_patched()
+		num_of_patched, perc_num_of_patched = self.get_number_of_patched(deltas)
 			#empty_graph = self.empty_graph)
 
-		num_of_violated, perc_num_of_violated = self.get_number_of_violated()
+		num_of_violated, perc_num_of_violated = self.get_number_of_violated(deltas)
 			#empty_graph = self.empty_graph)
 
 		print ("\tFor initially wrongly classified:%d -> %d(%f)" % (len(self.indices_to_wrong), \

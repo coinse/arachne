@@ -141,7 +141,7 @@ class DE_searcher(Searcher):
 		# 	new_model_name, 
 		# 	update_op = 'set') 
 		#predictions, correct_predictions, loss_v = self.move(new_weight_value, update_op = 'set') 
-		predictions, correct_predictions, loss_v = self.move(deltas, update_op = 'set')
+		predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
 
 		assert predictions is not None
 		assert correct_predictions is not None
@@ -393,13 +393,15 @@ class DE_searcher(Searcher):
 					deltas[idx_to_tl] = self.init_weights[idx_to_tl]
 				# since our op is set
 				deltas[idx_to_tl][tuple(inner_indices)] = best[i]
-			self.move(deltas, update_op = 'set')
+			#self.move(deltas, update_op = 'set') ### v1
 				
-			is_early_stop_possible, num_of_patched = self.check_early_stop(best.fitness.values[0], model_name = best.model_name)
-				#new_weight_value, 
-				#best.fitness.values[0], 
-				#model_name = best.model_name,  
-				#empty_graph = self.empty_graph)
+			# is_early_stop_possible, num_of_patched = self.check_early_stop(best.fitness.values[0], model_name = best.model_name) ### v1
+			# 	#new_weight_value, 
+			# 	#best.fitness.values[0], 
+			# 	#model_name = best.model_name,  
+			# 	#empty_graph = self.empty_graph)
+			is_early_stop_possible, num_of_patched = self.check_early_stop(
+				best.fitness.values[0], deltas, model_name = best.model_name)
 
 			print ("Is early stop possible?: {}".format(is_early_stop_possible))
 			prev_best = best
@@ -442,7 +444,7 @@ class DE_searcher(Searcher):
 					deltas[idx_to_tl] = self.init_weights[idx_to_tl]
 				# since our op is set
 				deltas[idx_to_tl][tuple(inner_indices)] = best[i]
-			self.move(deltas, update_op = 'set')
+			#self.move(deltas, update_op = 'set') ### v1
 
 			#import json 
 			#with open(save_path.replace("None","model") + ".json", 'w') as f:
@@ -461,7 +463,8 @@ class DE_searcher(Searcher):
 			#assert target_tensor in self.curr_feed_dict.keys(), "Target tensor %s should already exists" % (target_tensor_name)
 			#self.curr_feed_dict[target_tensor] = new_weight_value
 			## summarise the results for the best candidates (best)
-			self.summarise_results()
+			#self.summarise_results() # v1
+			self.summarise_results(deltas) # v2
 		
 		#if self.sess is not None:
 		#	self.sess.close()

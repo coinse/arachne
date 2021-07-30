@@ -187,26 +187,21 @@ def patch(
 
 	#t1 = time.time()
 	if loc_method == 'gradient_loss': # here, top n is not the number of inpouts, arather it is the number of neural weights to fix
-		# if not only_loc: # for RQ2 
-		# 	top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
-		# else:
-		# 	top_n = -1
-		#
-		# weight_tensor_name = read_tensor_name(tensor_name_file)['t_weight']
-		# loss_tensor_name = read_tensor_name(tensor_name_file)['t_lab_loss']
-		#
-		# indices_to_places_to_fix, indices_and_grads = other_localisers.where_to_fix_from_gl(
-		# 	indices_to_selected_wrong, 
-		# 	loss_tensor_name,
-		# 	weight_tensor_name,
-		# 	num_label,
-		# 	X, y,
-		# 	empty_graph = empty_graph_for_fl,
-		# 	path_to_keras_model = path_to_keras_model,
-		# 	plchldr_feed_dict = init_plchldr_feed_dict,
-		# 	top_n = top_n)
-		print ("Should fix it")
-		import sys; sys.exit()
+		if not only_loc: # for RQ2 
+			#### should fix this 
+			top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
+		else:
+			# retrieve all
+			top_n = -1
+
+		indices_w_costs = run_localise.localise_by_gradient(
+				X, y,
+				indices_to_selected_wrong,
+				target_weights,
+				path_to_keras_model = path_to_keras_model)
+		
+		# retrieve only the indices
+		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
 	elif loc_method == 'localiser':
 		# indices_to_places_to_fix, front_lst = where_to_fix_from_bl(
 		# 	indices_to_selected_wrong,
@@ -244,17 +239,13 @@ def patch(
 			print (df)
 			indices_to_places_to_fix = df.values
 	else: # randomly select
-		# if not only_loc:
-		# 	num_random_sample = top_n 
-		# else:
-		# 	num_random_sample = -1
-		#
-		# indices_to_places_to_fix = other_localisers.where_to_fix_from_random(
-		# 	tensor_name_file,
-		# 	num_random_sample,
-		# 	empty_graph = empty_graph_for_fl)
-		print ("Should fix it")
-		import sys; sys.exit()
+		if not only_loc:
+		 	num_random_sample = top_n 
+		else:
+		 	num_random_sample = -1
+
+		indices_to_places_to_fix = run_localise.localise_by_random_selection(
+			num_random_sample, target_weights)	 
 
 	#t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))

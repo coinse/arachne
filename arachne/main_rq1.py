@@ -4,7 +4,7 @@ RQ1 script
 import os, sys
 import pandas as pd
 import utils.data_util as data_util
-import auto_patch
+import auto_patch_vk as auto_patch
 from main_eval import read_and_add_flag, combine_init_aft_predcs
 import json
 import numpy as np
@@ -104,16 +104,20 @@ if __name__ == "__main__":
 		output_df.to_pickle(destfile)
 		import sys; sys.exit()
 	else:
-		indices_to_places_to_fix, front_lst = auto_patch.patch(
-			args.num_label,
-			train_data,
+		indices_to_places_to_fix, entire_k_and_cost = auto_patch.patch(
+			num_label,
+			train_data, 
 			args.tensor_name_file,
 			which = args.which,
 			loc_method = args.loc_method,
 			path_to_keras_model = args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_wrong,
 			seed = args.seed,
-			only_loc = True)	
+			target_all = bool(args.target_all),
+			only_loc = True)
+			#loc_file = args.loc_file)
+		
+
 	
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
 	print ("\t".join([str(index) for index in indices_to_places_to_fix]))

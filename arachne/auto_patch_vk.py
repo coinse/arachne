@@ -257,10 +257,10 @@ def patch(
 			return indices_to_places_to_fix, front_lst
 		elif loc_method == 'gradient_loss':
 			#return indices_to_places_to_fix, indices_and_grads
-			return None, None
+			return indices_to_places_to_fix, indices_w_costs
 		else:
 			#return indices_to_places_to_fix, None
-			return None, None
+			return indices_to_places_to_fix, None
 
 	# reset seed and start searching
 	random.seed(seed + 1) 

@@ -326,7 +326,8 @@ class Searcher(object):
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
 		t2 =time.time()
-		#print ('Time for pred: {}'.format(t2 - t1))
+		print (correct_predictions.shape, self.np.sum(correct_predictions))
+		print ('Time for pred: {}'.format(t2 - t1))
 		t1 = time.time()
 		with tf.Session() as sess:
 			#predictions = self.mdl.predict(inputs)
@@ -410,8 +411,9 @@ class Searcher(object):
 		#
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		#print (correct_predictions.shape, self.np.sum(correct_predictions))
 		t2 =time.time()
-		print ("Time for move: {}".format(t2 - t1))
+		#print ("Time for move: {}".format(t2 - t1))
 		#print ("Time for sess: {}".format(t2 - t1))
 		#print ("Loss", losses_of_all.shape)
 		#print (np.max(self.indices_to_correct))

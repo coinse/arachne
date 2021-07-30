@@ -99,7 +99,7 @@ class DE_searcher(Searcher):
 		K.set_session(tf.Session(config=config))
 		
 		# load model agai
-		self.set_base_model()
+		#self.set_base_model()
 
 	# ######### This will be our fitness function ##################3
 	# def eval(self, 
@@ -140,7 +140,8 @@ class DE_searcher(Searcher):
 		# 	new_weight_value, 
 		# 	new_model_name, 
 		# 	update_op = 'set') 
-		#predictions, correct_predictions, loss_v = self.move(new_weight_value, update_op = 'set') 
+		#predictions, correct_predictions, loss_v = self.move_v1(deltas, update_op = 'set') 
+		#print (deltas[idx_to_tl])
 		predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
 
 		assert predictions is not None
@@ -148,6 +149,7 @@ class DE_searcher(Searcher):
 		num_violated, num_patched = self.get_num_patched_and_broken(
 			predictions) 
 
+		
 		losses_of_correct, losses_of_target = loss_v
 		if self.patch_aggr is None:
 			final_fitness = losses_of_correct + losses_of_target
@@ -306,22 +308,22 @@ class DE_searcher(Searcher):
 				#places_to_fix) 
 				#self.model_name) 
 			ind.model_name = None 
-
+	
 		hof.update(pop)
 		best = hof[0]
 
 		record = stats.compile(pop)
 		logbook.record(gen = 0, evals = len(pop), **record)
 		print (logbook)
-
+		#import sys; sys.exit()
 		search_start_time = time.time()
 		# search start
 		import time
 		for iter_idx in range(self.max_search_num):
-			t_t1 = time.time()
-			self.reset_keras([])
-			t_t2 = time.time()
-			print ('Time for reset: {}'.format(t_t2 - t_t1))
+			#t_t1 = time.time()
+			#self.reset_keras([])
+			#t_t2 = time.time()
+			#print ('Time for reset: {}'.format(t_t2 - t_t1))
 			iter_start_time = time.time()
 
 			MU = self.random.uniform(self.mutation[0], self.mutation[1])
@@ -420,7 +422,7 @@ class DE_searcher(Searcher):
 				
 		#save_path = self.model_name_format.format(self.max_search_num, name_key)#"best")
 		save_path = self.model_name_format.format(name_key)
-		best.model_name = save_path
+		best.model_name = save_path ##
 
 		# with these two cases, the new model has not been saved
 		#if self.empty_graph is not None:
@@ -453,8 +455,9 @@ class DE_searcher(Searcher):
 			import pickle
 			#deltas_df = pd.DataFrame({idx_to_tl:vs for idx_to_tl,vs in deltas.items()})
 			#deltas_df.to_pickle(save_path.replace("None","model")+".pkl")
-			print(save_path.replace("None","model")+".pkl")
-			with open(save_path.replace("None","model")+".pkl", 'wb') as f:
+			save_path = save_path.replace("None","model")+".pkl"
+			print("The model is initially saved here: {}".format(save_path))
+			with open(save_path, 'wb') as f:
 				pickle.dump(deltas, f)
 			# update self.curr_feed_dict (for processing wrongly classified inputs & outputs)
 			# target_tensor = self.model_util.get_tensor(
@@ -469,7 +472,7 @@ class DE_searcher(Searcher):
 		#if self.sess is not None:
 		#	self.sess.close()
 
-		return best.model_name
+		return best.model_name, save_path
 
 
 

@@ -7,9 +7,9 @@ import utils.apricot_rel_util as apricot_rel_util
 import utils.torch_rel_util as torch_rel_util 
 import utils.data_util as data_util
 import time
+import os
 import search.other_localisers as other_localisers
 from gen_frame_graph import generate_empty_graph
-
 
 # def where_to_fix_from_bl(
 # 	indices_to_wrong,
@@ -218,7 +218,8 @@ def patch(
 		# 	init_plchldr_feed_dict = init_plchldr_feed_dict,
 		# 	path_to_keras_model = path_to_keras_model,
 		# 	pareto_ret_all = only_loc)
-		if loc_file is None:
+		print (os.path.exists(loc_file))
+		if loc_file is None or not (os.path.exists(loc_file)):
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v2(
 				X, y,
 				indices_to_selected_wrong,
@@ -228,9 +229,8 @@ def patch(
 			#import sys; sys.exit()
 			import pickle
 			import pandas as pd
-			import os
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join("new_loc/cnn2")
+			loc_dest = os.path.join("new_loc/{}".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
@@ -241,9 +241,8 @@ def patch(
 			#indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
 			import pandas as pd
 			df = pd.read_pickle(loc_file)
-			indices_to_places_to_fix = [[int(vs[0]), [int(v) for v in vs[1].split(",")]] for vs in df.values]
-			
-
+			print (df)
+			indices_to_places_to_fix = df.values
 	else: # randomly select
 		# if not only_loc:
 		# 	num_random_sample = top_n 
@@ -323,7 +322,7 @@ def patch(
 		#	places_to_fix,
 		#	sess = None,
 		#	name_key = name_key)
-		patched_model_name = searcher.search(places_to_fix, name_key = name_key)
+		patched_model_name, saved_path = searcher.search(places_to_fix, name_key = name_key)
 
 	else:
 		print ("{} not supported yet".format(search_method))
@@ -332,7 +331,8 @@ def patch(
 	t2 = time.time()
 	print ("Time taken for pure patching: %f" % (t2 - t1))
 	
-	return patched_model_name, indices_to_selected_wrong, indices_patched
+	#return patched_model_name, indices_to_selected_wrong, indices_patched
+	return saved_path, indices_to_selected_wrong, indices_patched
 
 
 

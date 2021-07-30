@@ -32,7 +32,8 @@ parser.add_argument("-pred_label", action = 'store', default = 5, type = int)
 # temp
 parser.add_argument("-new_loc", type = int, default = 0)
 parser.add_argument("-loc_file", type = str, default = None)
-
+parser.add_argument("-target_all", type= int, default = 1)
+parser.add_argument("-loc_method", type = str, default = 'localiser')
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
@@ -123,13 +124,13 @@ else:
 		max_search_num = iter_num, 
 		search_method = "DE",
 		which = args.which,
-		loc_method = "localiser",
+		loc_method = args.loc_method, #"localiser",
 		patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
 		path_to_keras_model = args.path_to_keras_model,
 		predef_indices_to_wrong = indices,
 		seed = args.seed,
 		patch_aggr = args.patch_aggr, 
-		target_all = True,
+		target_all = bool(args.target_all),
 		loc_file = args.loc_file)
 		
 t2 = time.time()
@@ -137,6 +138,7 @@ print ("Time for patching: {}".format(t2 - t1))
 print ("patched_model_name", patched_model_name)	
 
 #os.rename(patched_model_name + ".json", os.path.join(args.dest, os.path.basename(patched_model_name) + ".json"))
+os.rename(patched_model_name, os.path.join(args.dest, os.path.basename(patched_model_name)))
 
 gc.collect()
 

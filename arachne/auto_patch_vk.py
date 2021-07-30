@@ -240,17 +240,18 @@ def patch(
 			indices_to_places_to_fix = df.values
 	else: # randomly select
 		if not only_loc:
-		 	num_random_sample = top_n 
+			top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
+			num_random_sample = top_n 
 		else:
-		 	num_random_sample = -1
+			num_random_sample = -1
 
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-	#t2 = time.time()
+	t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))
 	#print (indices_to_places_to_fix)
-
+	#import sys; sys.exit()
 	if only_loc:
 		if loc_method == 'localiser':
 			return indices_to_places_to_fix, front_lst

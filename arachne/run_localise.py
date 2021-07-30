@@ -985,19 +985,19 @@ def localise_by_gradient(
 
 	# compute pareto front
 	indices_to_tl = list(total_cands.keys())
-	costs_and_keys = [([idx_to_tl, np.unravel_index(local_i, vs['shape'])], vs['cost']) 
+	costs_and_keys = [([idx_to_tl, np.unravel_index(local_i, total_cands[idx_to_tl]['shape'])], c) 
 		for idx_to_tl in indices_to_tl 
-		for local_i,vs in enumerate(total_cands[idx_to_tl])]
+		for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
 	
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
-	print (costs_and_keys[0])
-	print (costs[0])
-	print (costs[:10], costs[-10:])
+	#print (costs_and_keys[0])
+	#print (costs[0])
+	#print (costs[:10], costs[-10:])
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	#print (total_cands)
 
-	sorted_costs_and_keys = sorted(costs_and_keys, lambda vs:vs[1], reverse = True)
+	sorted_costs_and_keys = sorted(costs_and_keys, key = lambda vs:vs[1], reverse = True)
 	loc_end_time = time.time()
 	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
 
@@ -1010,14 +1010,16 @@ def localise_by_random_selection(number_of_place_to_fix, target_weights):
 	"""
 	
 	total_indices = []
-	for vs in target_weights.values():
+	for idx_to_tl, vs in target_weights.items():
 		t_w, _ = vs
-		total_indices.extend(list(np.ndindex(t_w.shape)))
+		l_indices = list(np.ndindex(t_w.shape))
+		total_indices.extend(list(zip([idx_to_tl] * len(l_indices), l_indices)))
 	
 	if number_of_place_to_fix > 0 and number_of_place_to_fix < len(total_indices):
 		selected_indices = np.random.choice(np.arange(len(total_indices)), number_of_place_to_fix, replace = False)
 		indices_to_places_to_fix = [total_indices[idx] for idx in selected_indices]
 	else:
 		indices_to_places_to_fix = total_indices
-
+	
+	
 	return indices_to_places_to_fix

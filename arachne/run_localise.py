@@ -568,7 +568,7 @@ def localise_offline(
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
 		####
 		pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
-		print ("Pairs", pairs.shape)
+		#print ("Pairs", pairs.shape)
 		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
 		#sess = K.get_session()
 		#sess.close()
@@ -580,18 +580,18 @@ def localise_offline(
 	indices_to_tl = list(total_cands.keys())
 	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
-	print (costs_and_keys[0])
-	print (costs[0])
-	print (costs[:10], costs[-10:])
+	#print (costs_and_keys[0])
+	#print (costs[0])
+	#print (costs[:10], costs[-10:])
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	#print (total_cands)
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], total_cands[vs[0][0]]['shape'])] for vs in costs_and_keys]
-	print (indices_to_nodes[0], indices_to_nodes[-1])
-	print (len(costs), len(indices_to_nodes), len(costs_and_keys))
-	print ("Cost", costs[:20], indices_to_nodes[:20]) 
+	#print (indices_to_nodes[0], indices_to_nodes[-1])
+	#print (len(costs), len(indices_to_nodes), len(costs_and_keys))
+	#print ("Cost", costs[:20], indices_to_nodes[:20]) 
 
 	t4 = time.time()
 	#while len(curr_nodes_to_lookat) > 0:
@@ -902,7 +902,7 @@ def localise_offline_v2(
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
 		####
 		pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
-		print ("Pairs", pairs.shape)
+		#print ("Pairs", pairs.shape)
 		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
 		#sess = K.get_session()
 		#sess.close()
@@ -914,18 +914,18 @@ def localise_offline_v2(
 	indices_to_tl = list(total_cands.keys())
 	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
-	print (costs_and_keys[0])
-	print (costs[0])
-	print (costs[:10], costs[-10:])
+	#print (costs_and_keys[0])
+	#print (costs[0])
+	#print (costs[:10], costs[-10:])
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	#print (total_cands)
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], total_cands[vs[0][0]]['shape'])] for vs in costs_and_keys]
-	print (indices_to_nodes[0], indices_to_nodes[-1])
-	print (len(costs), len(indices_to_nodes), len(costs_and_keys))
-	print ("Cost", costs[:20], indices_to_nodes[:20]) 
+	#print (indices_to_nodes[0], indices_to_nodes[-1])
+	#print (len(costs), len(indices_to_nodes), len(costs_and_keys))
+	#print ("Cost", costs[:20], indices_to_nodes[:20]) 
 
 	t4 = time.time()
 	#while len(curr_nodes_to_lookat) > 0:

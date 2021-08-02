@@ -43,38 +43,63 @@ def gen_and_train_model(train_X, train_y, test_X, test_y, destfile,
 	# model.add(tf.keras.layers.Dropout(0.4))
 	# model.add(tf.keras.layers.Dense(43, activation='softmax'))
 
-	mdl = tf.keras.models.Sequential()
-	input_shape = (48, 48, 3)
-	act = 'relu' # tanh
-
+	#mdl = tf.keras.models.Sequential()
+	act = 'relu'
+	
+	# input layer
+	input_shape = (3, 48, 48) #(48, 48, 3)
+	#inputs = tf.keras.layers.InputLayer(input_shape = input_shape)
+	inputs = tf.keras.Input(shape = input_shape)
+	#mdl.add(Input)
+	
 	# 7x7 or 3x3, 100
-	mdl.add(tf.keras.layers.Conv2D(100, (3,3), 
-		activation=act, padding = 'valid', input_shape = input_shape))
-	mdl.add(tf.keras.layers.BatchNormalization(axis = 1))
-	mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2)))
+	#mdl.add(tf.keras.layers.Conv2D(100, (3,3), activation=act, padding = 'valid', data_format = 'channels_first', input_shape = input_shape))
+	#mdl.add(tf.keras.layers.BatchNormalization(axis = 1)) # 1 when channels_last, -1 and channels first then 1
+	#mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first'))
+	#
+	outputs = tf.keras.layers.Conv2D(100, (3,3), activation=act, padding = 'valid', data_format = 'channels_first')(inputs)
+	outputs = tf.keras.layers.BatchNormalization(axis = 1)(outputs)
+	outputs = tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first')(outputs) 	
+
 	#mdl.add(tf.keras.layers.Dropout(0.2))
 
 	# 4x4 or 4x4, 150
-	mdl.add(tf.keras.layers.Conv2D(150, (4,4), activation=act, padding = 'valid'))
-	mdl.add(tf.keras.layers.BatchNormalization(axis = -1))
-	mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2)))
+	#mdl.add(tf.keras.layers.Conv2D(150, (4,4), activation=act, padding = 'valid', data_format = 'channels_first'))
+	#mdl.add(tf.keras.layers.BatchNormalization(axis = 1))
+	#mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first'))
 	#mdl.add(tf.keras.layers.Dropout(0.2))
+	#
+	outputs = tf.keras.layers.Conv2D(150, (4,4), activation=act, padding = 'valid', data_format = 'channels_first')(outputs)
+	outputs = tf.keras.layers.BatchNormalization(axis = 1)(outputs)
+	outputs = tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first')(outputs)
 
 	# 4x4 or 3x3, 250
-	mdl.add(tf.keras.layers.Conv2D(250, (3,3), activation=act, padding = 'valid'))
-	mdl.add(tf.keras.layers.BatchNormalization(axis = -1))
-	mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2))) 
+	#mdl.add(tf.keras.layers.Conv2D(250, (3,3), activation=act, padding = 'valid', data_format = 'channels_first'))
+	#mdl.add(tf.keras.layers.BatchNormalization(axis = 1))
+	#mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first')) 
 	#mdl.add(tf.keras.layers.Dropout(0.2))
+	#
+	outputs = tf.keras.layers.Conv2D(250, (3,3), activation=act, padding = 'valid', data_format = 'channels_first')(outputs)
+	outputs = tf.keras.layers.BatchNormalization(axis = 1)(outputs)
+	outputs = tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first')(outputs)
 
 	# 300 or 200, fully
-	mdl.add(tf.keras.layers.Flatten())
-	mdl.add(tf.keras.layers.Dense(200, activation = act))
-	mdl.add(tf.keras.layers.BatchNormalization())
+	#mdl.add(tf.keras.layers.Flatten())
+	#mdl.add(tf.keras.layers.Dense(200, activation = act))
+	#mdl.add(tf.keras.layers.BatchNormalization())
 	#mdl.add(tf.keras.layers.Dropout(0.5))
+	#
+	outputs = tf.keras.layers.Flatten()(outputs)
+	outputs = tf.keras.layers.Dense(200, activation = act)(outputs)
+	outputs = tf.keras.layers.BatchNormalization()(outputs)
 
 	# 43, fully
-	mdl.add(tf.keras.layers.Dense(43, activation = 'softmax'))
-
+	#mdl.add(tf.keras.layers.Dense(43, activation = 'softmax'))
+	#
+	outputs = tf.keras.layers.Dense(43, activation = 'softmax')(outputs)
+	
+	mdl = tf.keras.models.Model(inputs = inputs, outputs = outputs)
+	
 	## or keras.optimizers import SGD
 	optimizer = tf.keras.optimizers.Adam(lr = 0.001)
 	mdl.compile(loss='categorical_crossentropy', 
@@ -129,12 +154,13 @@ args = parser.parse_args()
 
 train_data, test_data = data_util.load_data('GTSRB', args.datadir, with_hist = bool(args.w_hist))
 
+print (train_data[0].shape)
 destfile = os.path.join(args.dest, "gtsrb.model.{}.wh.{}.h5".format(args.mdlkey, args.w_hist))
 
-gen_and_train_model(train_data[0], train_data[1], 
-	test_data[0], test_data[1], 
+gen_and_train_model(train_data[0], data_util.format_label(train_data[1], 43), 
+	test_data[0], data_util.format_label(test_data[1], 43), 
 	destfile, 
-	num_epoch = 50, patience = 5, batch_size = 64)
+	num_epoch = 5000, patience = 100, batch_size = 64)
 
 #mdl.save('test.h5')
 #_, train_acc = mdl.evaluate(train_data[0], train_data[1], verbose=0)
@@ -149,6 +175,7 @@ saved_model = tf.keras.models.load_model(destfile)
 
 
 # evaluate the model
-_, train_acc = saved_model.evaluate(train_data[0], train_data[1], verbose=0)
-_, test_acc = saved_model.evaluate(test_data[0], test_data[1], verbose=0)
+_, train_acc = saved_model.evaluate(train_data[0], data_util.format_label(train_data[1], 43), verbose=0)
+_, test_acc = saved_model.evaluate(test_data[0], data_util.format_label(test_data[1], 43), verbose=0)
+
 print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))

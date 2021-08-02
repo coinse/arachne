@@ -31,18 +31,30 @@ def build_k_frame_model(mdl, X, indices_to_tls):
 				network_dict['input_layers_of'][layer_name].append(layer.name)
 
 	min_idx_to_tl = np.min(indices_to_tls)
-	t_mdl = Model(inputs = mdl.input, outputs = mdl.layers[min_idx_to_tl-1].output)
-	prev_output = t_mdl.predict(X)
+	#t_mdl = Model(inputs = mdl.input, outputs = mdl.layers[min_idx_to_tl-1].output)
+	#prev_output = t_mdl.predict(X)
 	num_layers = len(mdl.layers)
 	
 	# Iterate over all layers after the input
 	model_outputs = []
-	dtype = mdl.layers[min_idx_to_tl-1].output.dtype
-	x = tf.constant(prev_output, dtype = dtype) # can be changed to a placeholder and take the prev_output freely
+	
+	#dtype = mdl.layers[min_idx_to_tl-1].output.dtype
+	#x = tf.constant(prev_output, dtype = dtype) # can be changed to a placeholder and take the prev_output freely
 	
 	# Set the output tensor of the input layer (or more exactly, our starting point)
-	network_dict['new_output_tensor_of'].update({mdl.layers[min_idx_to_tl-1].name: x})
-	
+	if min_idx_to_tl == 0 or min_idx_to_tl - 1 == 0:
+		x = tf.constant(X, dtype = tf.float32) #X.dtype)
+		layer_name = mdl.layers[0].name
+		network_dict['new_output_tensor_of'].update({layer_name: x})
+	else:
+		t_mdl = Model(inputs = mdl.input, outputs = mdl.layers[min_idx_to_tl-1].output)
+		prev_output = t_mdl.predict(X)	
+		dtype = mdl.layers[min_idx_to_tl-1].output.dtype
+		x = tf.constant(prev_output, dtype = dtype) # can be changed to a placeholder and take the prev_output freely
+
+		network_dict['new_output_tensor_of'].update({mdl.layers[min_idx_to_tl-1].name: x})
+
+	print (network_dict['new_output_tensor_of'].keys())
 	t_ws = []
 	#for layer in model.layers[1:]:
 	for idx_to_l in range(min_idx_to_tl, num_layers):
@@ -84,7 +96,6 @@ def build_k_frame_model(mdl, X, indices_to_tls):
 							strides = list(layer.get_config()['strides'])*2, 
 							padding = layer.get_config()['padding'].upper(), 
 							data_format = 'NCHW',  
-							#data_format = 'NHWC',
 							name = layer_name)
 					
 					x = tf.nn.bias_add(x, t_b, data_format = 'NCHW')	
@@ -103,8 +114,9 @@ def build_k_frame_model(mdl, X, indices_to_tls):
 
 	#return Model(inputs=model.inputs, outputs=model_outputs)
 	last_layer_name = mdl.layers[-1].name
+	num_label = int(mdl.layers[-1].output.shape[-1])
 
-	ys = tf.placeholder(dtype = tf.float32, shape = (None,10))
+	ys = tf.placeholder(dtype = tf.float32, shape = (None, num_label))
 	pred_probs = tf.math.softmax(network_dict['new_output_tensor_of'][last_layer_name]) # softmax
 	loss_op = tf.keras.metrics.categorical_crossentropy(ys, pred_probs)
 

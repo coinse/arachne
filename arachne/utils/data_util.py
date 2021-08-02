@@ -96,7 +96,7 @@ def load_data(which, path_to_data,
 		sorted_test_vs = [test_vs[n] for n in names_in_test]
 		test_data[0] = [vs[0] for vs in sorted_test_vs]
 		test_data[1] = [vs[1] for vs in sorted_test_vs]
-	else:
+	elif which != 'GTSRB':
 		import torch
 		import torchvision
 		import torchvision.transforms as transforms
@@ -145,6 +145,20 @@ def load_data(which, path_to_data,
 
 		test_data[0] = np.asarray(test_data[0])
 		test_data[1] = np.asarray(test_data[1])
+	else: # GTSRB
+		#which, path_to_data,
+		import pickle
+		# train
+		with open(os.path.join(args.datadir, "train_data.pkl"), 'rb') as f:
+			train_data_dict = pickle.load(f)
+
+		train_data = [train_data_dict['data'], train_data_dict['label']]
+
+		# test
+		with open(os.path.join(args.datadir, "test_data.pkl"), 'rb') as f:
+			test_data_dict = pickle.load(f)
+
+		test_data = [test_data_dict['data'], test_data_dict['label']]
 
 	return (train_data, test_data)
 

@@ -23,47 +23,59 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-if args.which_data == 'cifar10':
-	if bool(args.is_train):
-		dataset = torchvision.datasets.CIFAR10(root=args.datadir, train=True,
-			download=True, transform=transforms.ToTensor())
-	else: # test
-		dataset = torchvision.datasets.CIFAR10(root=args.datadir, train=False,
-			download=True, transform=transforms.ToTensor())
-else:
-	if bool(args.is_train):
-		dataset = torchvision.datasets.FashionMNIST(root=args.datadir, train=True,
-			download=True, transform=transforms.ToTensor())
-	else: # test
-		dataset = torchvision.datasets.FashionMNIST(root=args.datadir, train=False,
-			download=True, transform=transforms.ToTensor())
-
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
-X = []; y = []
-for data in dataloader:
-	images, labels = data
+if args.which_data != 'GTSRB':
 	if args.which_data == 'cifar10':
-		X.append(images.numpy()[0])
-	else:
-		if is_input_2d:
-			X.append(images.numpy()[0].reshape(-1,))
+		if bool(args.is_train):
+			dataset = torchvision.datasets.CIFAR10(root=args.datadir, train=True,
+				download=True, transform=transforms.ToTensor())
+		else: # test
+			dataset = torchvision.datasets.CIFAR10(root=args.datadir, train=False,
+				download=True, transform=transforms.ToTensor())
+	elif args.which_data == 'fashion_mnist':
+		if bool(args.is_train):
+			dataset = torchvision.datasets.FashionMNIST(root=args.datadir, train=True,
+				download=True, transform=transforms.ToTensor())
+		else: # test
+			dataset = torchvision.datasets.FashionMNIST(root=args.datadir, train=False,
+				download=True, transform=transforms.ToTensor())
+
+	dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+	X = []; y = []
+	for data in dataloader:
+		images, labels = data
+		if args.which_data == 'cifar10':
+			X.append(images.numpy()[0])
 		else:
-			X.append(images.numpy()[0].reshape(1,-1))
+			if is_input_2d:
+				X.append(images.numpy()[0].reshape(-1,)) # since (1,x,x,x)
+			else:
+				X.append(images.numpy()[0].reshape(1,-1))
+		y.append(labels.item())
 
-	y.append(labels.item())
+	X = np.asarray(X)
+	y = np.asarray(y)
+else: # gtsrb
+	import pickle
+	if bool(args.is_train):
+		with open(os.path.join(args.datadir, "train_data.pkl"), 'rb') as f:
+			data = pickle.load(f)
+	else:
+		with open(os.path.join(args.datadir, "test_data.pkl"), 'rb') as f:
+			data = pickle.load(f)
 
-X = np.asarray(X)
-y = np.asarray(y)
+	X = data['data']
+	y = data['label']		
+
 loaded_model = load_model(args.model)
 loaded_model.summary()
 
-if args.which_data == 'cifar10':
+if args.which_data in ['cifar10', 'GTSRB']: # and also GTSRB
 	predicteds = loaded_model.predict(X)
 else:
 	if is_input_2d:
 		predicteds = loaded_model.predict(X)
 	else:
-		predicteds = loaded_model.predict(X).reshape(-1,10)
+		predicteds = loaded_model.predict(X).reshape(-1, 10)
 
 pred_labels = np.argmax(predicteds, axis = 1)
 os.makedirs(args.dest, exist_ok = True)

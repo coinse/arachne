@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import utils.data_util as data_util
 
-def gen_and_train_model(train_X, train_y, test_X, test_y, 
+def gen_and_train_model(train_X, train_y, test_X, test_y, destfile, 
 	num_epoch = 5000, patience = 100, batch_size = 64):
 	"""
 	Implement a simple feed-forward CNN model with seven layers used in "A Committee of Neural Networks for Traffic Sign Classification"
@@ -45,29 +45,30 @@ def gen_and_train_model(train_X, train_y, test_X, test_y,
 
 	mdl = tf.keras.models.Sequential()
 	input_shape = (48, 48, 3)
+	act = 'relu' # tanh
 
 	# 7x7 or 3x3, 100
 	mdl.add(tf.keras.layers.Conv2D(100, (3,3), 
-		activation='tanh', padding = 'valid', input_shape = input_shape))
+		activation=act, padding = 'valid', input_shape = input_shape))
 	mdl.add(tf.keras.layers.BatchNormalization(axis = 1))
 	mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2)))
 	#mdl.add(tf.keras.layers.Dropout(0.2))
 
 	# 4x4 or 4x4, 150
-	mdl.add(tf.keras.layers.Conv2D(150, (4,4), activation='tanh', padding = 'valid'))
+	mdl.add(tf.keras.layers.Conv2D(150, (4,4), activation=act, padding = 'valid'))
 	mdl.add(tf.keras.layers.BatchNormalization(axis = -1))
 	mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2)))
 	#mdl.add(tf.keras.layers.Dropout(0.2))
 
 	# 4x4 or 3x3, 250
-	mdl.add(tf.keras.layers.Conv2D(250, (3,3), activation='tanh', padding = 'valid'))
+	mdl.add(tf.keras.layers.Conv2D(250, (3,3), activation=act, padding = 'valid'))
 	mdl.add(tf.keras.layers.BatchNormalization(axis = -1))
 	mdl.add(tf.keras.layers.MaxPooling2D(pool_size = (2,2))) 
 	#mdl.add(tf.keras.layers.Dropout(0.2))
 
 	# 300 or 200, fully
 	mdl.add(tf.keras.layers.Flatten())
-	mdl.add(tf.keras.layers.Dense(200, activation = 'tanh'))
+	mdl.add(tf.keras.layers.Dense(200, activation = act))
 	mdl.add(tf.keras.layers.BatchNormalization())
 	#mdl.add(tf.keras.layers.Dropout(0.5))
 
@@ -78,7 +79,7 @@ def gen_and_train_model(train_X, train_y, test_X, test_y,
 	optimizer = tf.keras.optimizers.Adam(lr = 0.001)
 	mdl.compile(loss='categorical_crossentropy', 
 		optimizer = optimizer, 
-		metrics = ['accuracy', 'categorical_crossentropy'])
+		metrics = ['accuracy'])
 
 	# callbacks = [
 	# 	tf.keras.callbacks.EarlyStopping(
@@ -90,45 +91,64 @@ def gen_and_train_model(train_X, train_y, test_X, test_y,
 	# 		patience=10, 
 	# 		#restore_best_weights = True, # restore to the best weights during the patience 
 	# 		verbose=1)]
+		
 	callbacks = [
 		tf.keras.callbacks.EarlyStopping(
 			# Stop training when `val_acc` is no longer improving
 			monitor = "val_acc",
+			mode = 'max', 
 			min_delta = 0, 
 			# "no longer improving" being further defined as "for at least 100 epochs"
 			patience = patience, 
-			restore_best_weights = True, # restore the weights to the best ones obtained during the patience 
-			verbose = 1)]
+			verbose = 1), 
+		tf.keras.callbacks.ModelCheckpoint(
+			destfile,
+			monitor = 'val_acc', 
+			mode = 'max', 
+			verbose = 1, 
+			save_best_only = True)
+		]	
 
 	# or batch_size = 128
 	mdl.fit(train_X, train_y, 
 		epochs = num_epoch, 
 		batch_size = batch_size, 
 		callbacks = callbacks, 
-		verbose = 2,
+		verbose = 1,
 		validation_data = (test_X, test_y))
 
-	return mdl
+	#return mdl
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-datadir", type = str, default = 'data/GTSRB/')
 parser.add_argument("-dest", type = str, default = ".")
 parser.add_argument("-mdlkey", type = str, default = 'gtsrb.cnn')
+parser.add_argument("-w_hist", type= int, default = 0)
 
 args = parser.parse_args()
 
-train_data, test_data = data_util.load_data('GTSRB', args.datadir)
+train_data, test_data = data_util.load_data('GTSRB', args.datadir, with_hist = bool(args.w_hist))
 
-mdl = gen_and_train_model(train_data[0], train_data[1], test_data[0], test_data[1], 
-	num_epoch = 5000, patience = 100, batch_size = 64)
+destfile = os.path.join(args.dest, "gtsrb.model.{}.wh.{}.h5".format(args.mdlkey, args.w_hist))
 
-results = mdl.evaluate(test_data[0], test_data[1], batch_size = 128)
-print("test result", results)
+gen_and_train_model(train_data[0], train_data[1], 
+	test_data[0], test_data[1], 
+	destfile, 
+	num_epoch = 50, patience = 5, batch_size = 64)
+
+#mdl.save('test.h5')
+#_, train_acc = mdl.evaluate(train_data[0], train_data[1], verbose=0)
+#_, test_acc = mdl.evaluate(test_data[0], test_data[1], verbose=0)
+#print('Returned: Train: %.3f, Test: %.3f' % (train_acc, test_acc))
 
 #print("Generate predictions for 3 samples")
 #predictions = model.predict(x_test[:3])
 #print("predictions shape:", predictions.shape)
 
-# save
-destfile = os.path.join(args.dest, "gtsrb.model.{}.h5".format(args.mdlkey))
-mdl.save('destfile')
+saved_model = tf.keras.models.load_model(destfile)
+
+
+# evaluate the model
+_, train_acc = saved_model.evaluate(train_data[0], train_data[1], verbose=0)
+_, test_acc = saved_model.evaluate(test_data[0], test_data[1], verbose=0)
+print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))

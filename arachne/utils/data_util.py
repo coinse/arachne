@@ -62,7 +62,8 @@ def get_lfw_data(is_train = True):
 
 def load_data(which, path_to_data, 
 	is_input_2d = False, 
-	path_to_female_names = None):
+	path_to_female_names = None, 
+	with_hist = True):
 	import tensorflow as tf
 	import os
 		
@@ -149,16 +150,19 @@ def load_data(which, path_to_data,
 		#which, path_to_data,
 		import pickle
 		# train
-		with open(os.path.join(args.datadir, "train_data.pkl"), 'rb') as f:
+		if with_hist:
+			path_to_data = os.path.join(path_to_data, 'hist')
+
+		with open(os.path.join(path_to_data, "train_data.pkl"), 'rb') as f:
 			train_data_dict = pickle.load(f)
 
-		train_data = [train_data_dict['data'], train_data_dict['label']]
+		train_data = [np.moveaxis(train_data_dict['data'], [1], [-1]), format_label(train_data_dict['label'],43)]
 
 		# test
-		with open(os.path.join(args.datadir, "test_data.pkl"), 'rb') as f:
+		with open(os.path.join(path_to_data, "test_data.pkl"), 'rb') as f:
 			test_data_dict = pickle.load(f)
 
-		test_data = [test_data_dict['data'], test_data_dict['label']]
+		test_data = [np.moveaxis(test_data_dict['data'], [1], [-1]), format_label(test_data_dict['label'],43)]
 
 	return (train_data, test_data)
 

@@ -149,9 +149,12 @@ def patch(
 	## -> at least for predc & corr_predc
 	# compute prediction & corr_predictions
 	predictions = model.predict(data_X)
+	if len(predictions.shape) == 3:
+		predictions = predictions.reshape((predictions.shape[0], predictions.shape[-1]))
+
 	correct_predictions = np.argmax(predictions, axis = 1)
 	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
-	
+
 	indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
 
 	#check whether gien predef_indices_to_wrong to wrong is actually correct

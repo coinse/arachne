@@ -211,6 +211,17 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
+		import pickle
+		loc_dest = os.path.join("new_loc/{}/grad".format(which))
+		os.makedirs(loc_dest, exist_ok=True)
+
+		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
+		destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+		output_df.to_pickle(destfile)
+
+		with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			pickle.dump(indices_w_costs, f)
+		
 	elif loc_method == 'localiser':
 		# indices_to_places_to_fix, front_lst = where_to_fix_from_bl(
 		# 	indices_to_selected_wrong,
@@ -257,7 +268,17 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-	#t2 = time.time()
+		loc_dest = os.path.join("new_loc/{}/random".format(which))	
+		os.makedirs(loc_dest, exist_ok=True)
+
+		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
+		destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+		output_df.to_pickle(destfile)
+
+		with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			pickle.dump(indices_to_places_to_fix, f)
+
+	t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))
 	run_localise.reset_keras([model])
 	print (indices_to_places_to_fix)

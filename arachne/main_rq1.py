@@ -56,6 +56,7 @@ if __name__ == "__main__":
 	parser.add_argument("-dest", default = ".", type = str)
 	# temporary for localising over all
 	parser.add_argument("-new_loc", type = int, default = 0)
+	parser.add_argument("-target_all", type = int, default = 1)
 
 	args = parser.parse_args()	
 
@@ -74,9 +75,9 @@ if __name__ == "__main__":
 	num_train = len(train_y)
 	test_X, test_y = test_data
 
-	dest = args.dest
-	os.makedirs(dest, exist_ok = True)
-	path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
+	#dest = args.dest
+	#os.makedirs(dest, exist_ok = True)
+	#path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
 
 	if bool(args.new_loc): # temp
 		output = run_localise.localise_offline(

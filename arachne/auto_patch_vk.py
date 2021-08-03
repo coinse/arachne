@@ -126,17 +126,17 @@ def patch(
 	else: # target all, but only those that statisfy the predefined layer conditions
 		indices_to_target_layers = None
 	
-	import subprocess	
+	#import subprocess	
 	model = load_model(path_to_keras_model, compile = False)
-	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
-	print (result)
+	#result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	#print (result)
 	target_weights = run_localise.get_target_weights(model,
 		path_to_keras_model, 
 		indices_to_target = indices_to_target_layers, 
 		target_all = target_all) # if target_all == True, then indices_to_target will be ignored
 
-	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
-	print (result)
+	#result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	#print (result)
 	print ('Total {} layers are targeted'.format(target_weights.keys()))
 	#### HOW CAN WE KNOW WHICH LAYER IS PREDICTION LAYER and WEIGHT LAYER? => assumes they are given;;;
 	# if not, then ... well everything becomes complicated
@@ -195,6 +195,8 @@ def patch(
 	########### logging and testing end ###########
 
 	#t1 = time.time()
+	import pickle
+	import pandas as pd
 	if loc_method == 'gradient_loss': # here, top n is not the number of inpouts, arather it is the number of neural weights to fix
 		if not only_loc: # for RQ2 
 			#### should fix this 
@@ -211,7 +213,6 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		import pickle
 		loc_dest = os.path.join("new_loc/{}/grad".format(which))
 		os.makedirs(loc_dest, exist_ok=True)
 
@@ -233,7 +234,6 @@ def patch(
 		# 	init_plchldr_feed_dict = init_plchldr_feed_dict,
 		# 	path_to_keras_model = path_to_keras_model,
 		# 	pareto_ret_all = only_loc)
-		print (os.path.exists(loc_file))
 		if loc_file is None or not (os.path.exists(loc_file)):
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v2(
 				X, y,
@@ -242,8 +242,6 @@ def patch(
 				path_to_keras_model = path_to_keras_model)
 			print ("Places to fix", indices_to_places_to_fix)
 			#import sys; sys.exit()
-			import pickle
-			import pandas as pd
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
 			loc_dest = os.path.join("new_loc/{}".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
@@ -256,7 +254,6 @@ def patch(
 			#indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
 			import pandas as pd
 			df = pd.read_pickle(loc_file)
-			print (df)
 			indices_to_places_to_fix = df.values
 	else: # randomly select
 		if not only_loc:
@@ -282,8 +279,8 @@ def patch(
 	#print ("Time taken for localisation: %f" % (t2 - t1))
 	run_localise.reset_keras([model])
 	print (indices_to_places_to_fix)
-	result = subprocess.run(['nvidia-smi'], shell = True)
-	print (result)
+	#result = subprocess.run(['nvidia-smi'], shell = True)
+	#print (result)
 	if only_loc:
 		if loc_method == 'localiser':
 			return indices_to_places_to_fix, front_lst

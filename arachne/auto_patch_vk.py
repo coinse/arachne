@@ -125,13 +125,18 @@ def patch(
 			indices_to_target_layers = [indices_to_target_layers]
 	else: # target all, but only those that statisfy the predefined layer conditions
 		indices_to_target_layers = None
-
+	
+	import subprocess	
 	model = load_model(path_to_keras_model, compile = False)
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
 	target_weights = run_localise.get_target_weights(model,
 		path_to_keras_model, 
 		indices_to_target = indices_to_target_layers, 
 		target_all = target_all) # if target_all == True, then indices_to_target will be ignored
 
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
 	print ('Total {} layers are targeted'.format(target_weights.keys()))
 	#### HOW CAN WE KNOW WHICH LAYER IS PREDICTION LAYER and WEIGHT LAYER? => assumes they are given;;;
 	# if not, then ... well everything becomes complicated
@@ -141,7 +146,7 @@ def patch(
 	predictions = model.predict(data_X)
 	correct_predictions = np.argmax(predictions, axis = 1)
 	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
-
+	
 	indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
 
 	#check whether gien predef_indices_to_wrong to wrong is actually correct
@@ -154,6 +159,10 @@ def patch(
 	print ('Total number of wrongly processed input(s): {}'.format(len(indices_to_selected_wrong)))
 
 	indices_to_correct = indices_to_target['correct']
+	#if which == 'GTSRB':
+	#	num = int(len(indices_to_correct)/2)
+	#	indices_to_correct = np.random.choice(indices_to_correct, num, replace = False)
+	#	print ("Due to memory allocation error, we use only half of it: {} -> {}".format(len(indices_to_correct), num))
 	# logging
 	print ('Number of wrong: %d' % (len(indices_to_selected_wrong)))
 
@@ -248,10 +257,12 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-	t2 = time.time()
+	#t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))
-	#print (indices_to_places_to_fix)
-	#import sys; sys.exit()
+	run_localise.reset_keras([model])
+	print (indices_to_places_to_fix)
+	result = subprocess.run(['nvidia-smi'], shell = True)
+	print (result)
 	if only_loc:
 		if loc_method == 'localiser':
 			return indices_to_places_to_fix, front_lst
@@ -275,6 +286,7 @@ def patch(
 	# patch target layers
 	indices_to_ptarget_layers = sorted(list(set([idx_to_tl for idx_to_tl,_ in indices_to_places_to_fix])))
 	print ("Patch target layers", indices_to_ptarget_layers)
+	#import sys; sys.exit()
 
 	if search_method == 'DE':
 		# searcher = de.DE_searcher(

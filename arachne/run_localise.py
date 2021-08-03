@@ -1021,7 +1021,11 @@ def localise_by_gradient(
 		print ("targeting layer {} ({})".format(idx_to_tl, lname))
 		
 		t1 = time.time()
-		grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
+		if is_C2D(lname):
+			by_batch = True
+		else:
+			by_batch = False
+		grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True)
 		t2 = time.time()
 
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))

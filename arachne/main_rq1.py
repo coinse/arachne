@@ -105,35 +105,34 @@ if __name__ == "__main__":
 		import sys; sys.exit()
 	else:
 		indices_to_places_to_fix, entire_k_and_cost = auto_patch.patch(
-			num_label,
+			args.num_label,
 			train_data, 
 			args.tensor_name_file,
 			which = args.which,
-			loc_method = args.loc_method,
+			loc_method = args.loc_method, #"localiser",
+			patch_target_key = "loc.{}".format(args.seed),
 			path_to_keras_model = args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_wrong,
 			seed = args.seed,
 			target_all = bool(args.target_all),
 			only_loc = True)
-			#loc_file = args.loc_file)
-		
 
-	
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
 	print ("\t".join([str(index) for index in indices_to_places_to_fix]))
-	if args.loc_method == 'localiser':
-		indices_to_places_to_fix = np.int32(indices_to_places_to_fix).tolist()
-		front_lst = [np.int32(sub_front).tolist() for sub_front in front_lst]
+	#if args.loc_method == 'localiser':
+	#	indices_to_places_to_fix = np.int32(indices_to_places_to_fix).tolist()
+	#	front_lst = [np.int32(sub_front).tolist() for sub_front in front_lst]
+	#
+	#	with open(path_to_loc_file, 'w') as f:
+	#		f.write(json.dumps({"front_0":indices_to_places_to_fix, "fronts":front_lst}))
 
-		with open(path_to_loc_file, 'w') as f:
-			f.write(json.dumps({"front_0":indices_to_places_to_fix, "fronts":front_lst}))
+	# if args.loc_method == 'gradient_loss':
+	# 	sorted_indices_and_grads = sorted(front_lst, key = lambda v: v[1], reverse = True)
+	# 	final_results = {'weights':[(int(ridx),int(cidx)) for (ridx,cidx),_ in sorted_indices_and_grads],
+	# 		'grads':[float(grad) for _, grad in sorted_indices_and_grads]}
 
-	elif args.loc_method == 'gradient_loss':
-		sorted_indices_and_grads = sorted(front_lst, key = lambda v: v[1], reverse = True)
-		final_results = {'weights':[(int(ridx),int(cidx)) for (ridx,cidx),_ in sorted_indices_and_grads],
-			'grads':[float(grad) for _,grad in sorted_indices_and_grads]}
 
-		with open(path_to_loc_file, 'w') as f:
-			f.write(json.dumps(final_results))
-	else: 
-		pass
+	# 	with open(path_to_loc_file, 'w') as f:
+	# 		f.write(json.dumps(final_results))
+	# else: 
+	# 	pass

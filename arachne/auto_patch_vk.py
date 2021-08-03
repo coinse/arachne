@@ -100,6 +100,7 @@ def patch(
 	import random
 	import run_localise
 	from tensorflow.keras.models import load_model, Model
+	import subprocess
 
 	random.seed(seed)
 	np.random.seed(seed)
@@ -126,18 +127,22 @@ def patch(
 	else: # target all, but only those that statisfy the predefined layer conditions
 		indices_to_target_layers = None
 	
-	#import subprocess	
+	#import subprocess
+	run_localise.reset_keras([])
+	
 	model = load_model(path_to_keras_model, compile = False)
-	#result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
-	#print (result)
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
+	
 	target_weights = run_localise.get_target_weights(model,
 		path_to_keras_model, 
 		indices_to_target = indices_to_target_layers, 
 		target_all = target_all) # if target_all == True, then indices_to_target will be ignored
 
-	#result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
-	#print (result)
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
 	print ('Total {} layers are targeted'.format(target_weights.keys()))
+	#import sys; sys.exit()
 	#### HOW CAN WE KNOW WHICH LAYER IS PREDICTION LAYER and WEIGHT LAYER? => assumes they are given;;;
 	# if not, then ... well everything becomes complicated
 	# identify using print (l['name'], l['class_name']) ..? d['layers'] -> mdl.get_config()

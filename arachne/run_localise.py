@@ -709,7 +709,10 @@ def localise_offline_v2(
 		#t_w_tensor = model.layers[idx_to_tl].weights[0]
 		############ FI ############
 		model = load_model(path_to_keras_model, compile = False)
-		prev_output = model.layers[idx_to_tl - 1].output
+		if idx_to_tl == 0: # meaning the model doesn't specify the input layer explicitly
+			prev_output = target_X
+		else:
+			prev_output = model.layers[idx_to_tl - 1].output
 		layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
@@ -717,8 +720,11 @@ def localise_offline_v2(
 			from_front = []
 			#model = load_model(path_to_keras_model, compile = False)
 			#t_w_tensor = model.layers[idx_to_tl].weights[0]
-			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-			prev_output = t_model.predict(target_X)
+			if idx_to_tl == 0 or idx_to_tl - 1 == 0:
+				prev_output = target_X
+			else:
+				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+				prev_output = t_model.predict(target_X)
 			#prev_output = model.layers[idx_to_tl - 1].output	
 			##
 			#from_front_tensors = []
@@ -755,7 +761,7 @@ def localise_offline_v2(
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif is_C2D(lname):
-			kernel_shape = t_w.shape[:2]  # kernel == filter
+			kernel_shape = t_w.shape[:2] # kernel == filter
 			#true_ws_shape = t_w.shape[2:] # this is (Channel_in (=prev_output.shape[1]), Channel_out (=output.shape[1]))
 			strides = layer_config['strides']
 			padding_type =  layer_config['padding']
@@ -847,8 +853,11 @@ def localise_offline_v2(
 			# 	from_front.extend(outputs)
 			
 			###############
-			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-			prev_output_v = t_model.predict(target_X)
+			if idx_to_tl == 0 or idx_to_tl - 1 == 0:
+				prev_output_v = target_X
+			else:
+				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+				prev_output_v = t_model.predict(target_X)
 			tr_prev_output_v = np.moveaxis(prev_output_v, [1,2,3],[3,1,2])
 			#tensors_for_FI = generate_FI_tensor_cnn(t_w, prev_output_v)
 			tensors_for_FI = generate_FI_tensor_cnn_v2(t_w)

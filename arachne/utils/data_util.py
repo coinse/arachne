@@ -10,12 +10,29 @@ def divide_into_val_and_test(X, y, num_label = 10, is_val = True, half_n = 500):
 	"""
 	new_indices = []
 	
+	if half_n <= 0: 
+		cnts = {}
+		for ay in y:
+			if ay not in cnts.keys():
+				cnts[ay] = 0
+			cnts[ay] += 1
+		
+		assert len(cnts.keys()) == num_label, "{} vs {}".format(len(cnts.keys()), num_label)
+	else:
+		cnts = None
+
 	for class_idx in range(num_label):
 		class_img_idxs = np.where(np.asarray(y) == class_idx)[0]
-		if is_val:
-			new_indices.extend(list(class_img_idxs[:half_n]))
+		if half_n > 0: 
+			if is_val:
+				new_indices.extend(list(class_img_idxs[:half_n]))
+			else:
+				new_indices.extend(list(class_img_idxs[half_n:]))
 		else:
-			new_indices.extend(list(class_img_idxs[half_n:]))
+			if is_val:
+				new_indices.extend(list(class_img_idxs[:int(cnts[class_idx]/2)]))
+			else:
+				new_indices.extend(list(class_img_idxs[int(cnts[class_idx]/2):]))
 
 	new_X = X[new_indices]
 	new_y = y[new_indices]
@@ -62,7 +79,8 @@ def get_lfw_data(is_train = True):
 
 def load_data(which, path_to_data, 
 	is_input_2d = False, 
-	path_to_female_names = None):
+	path_to_female_names = None, 
+	with_hist = True):
 	import tensorflow as tf
 	import os
 		
@@ -149,15 +167,19 @@ def load_data(which, path_to_data,
 		#which, path_to_data,
 		import pickle
 		# train
-		with open(os.path.join(args.datadir, "train_data.pkl"), 'rb') as f:
+		if with_hist:
+			path_to_data = os.path.join(path_to_data, 'hist')
+
+		with open(os.path.join(path_to_data, "train_data.pkl"), 'rb') as f:
 			train_data_dict = pickle.load(f)
 
+		#train_data = [np.moveaxis(train_data_dict['data'], [1], [-1]), train_data_dict['label']]
 		train_data = [train_data_dict['data'], train_data_dict['label']]
-
 		# test
-		with open(os.path.join(args.datadir, "test_data.pkl"), 'rb') as f:
+		with open(os.path.join(path_to_data, "test_data.pkl"), 'rb') as f:
 			test_data_dict = pickle.load(f)
 
+		#test_data = [np.moveaxis(test_data_dict['data'], [1], [-1]), test_data_dict['label']]
 		test_data = [test_data_dict['data'], test_data_dict['label']]
 
 	return (train_data, test_data)

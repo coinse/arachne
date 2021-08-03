@@ -43,8 +43,9 @@ train_X,train_y = train_data
 num_train = len(train_y)
 
 test_X,test_y = test_data
+num_label = 10 if args.which_data != 'GTSRB' else 43
 test_X, test_y, indices_to_test = data_util.divide_into_val_and_test(test_X, test_y, 
-	num_label = 10, is_val = True, half_n = int(len(test_y)/10/2))
+	num_label = num_label, is_val = True, half_n = int(len(test_y)/num_data/2) if args.which_data != 'GTSRB' else 0)
 
 test_data = [test_X, test_y]
 
@@ -57,7 +58,6 @@ with open(index_file, 'w') as f:
 print ("Record indices to valid in file {}".format(index_file))
 num_test = len(test_y)
 iter_num = args.iter_num
-num_label = 10
 
 # miclfds: key = (true label, predicted label), values: indices to the misclassified inputs 
 misclfds = data_util.get_misclf_indices(args.target_indices_file, 
@@ -69,6 +69,7 @@ num_entire_misclfs = np.sum([len(vs) for vs in misclfds.values()])
 
 sorted_keys = data_util.sort_keys_by_cnt(misclfds)
 misclf_key = (args.org_label, args.pred_label)
+print (misclfds.keys())
 indices = misclfds[misclf_key]
 
 print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))

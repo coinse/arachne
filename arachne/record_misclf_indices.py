@@ -7,6 +7,7 @@ from tensorflow.keras.models import load_model
 import tensorflow as tf
 import time
 import numpy as np
+import utils.data_util as data_util
 
 is_input_2d = False 
 
@@ -16,6 +17,7 @@ parser.add_argument("-datadir", type = str)
 parser.add_argument("-dest", type = str, default = ".")
 parser.add_argument("-which_data", type = str, default = "cifar10", help = "cifar10, FM")
 parser.add_argument("-is_train", type = int, default = 1)
+parser.add_argument("-w_hist", type = int, default = 0)
 
 args = parser.parse_args()
 
@@ -55,16 +57,13 @@ if args.which_data != 'GTSRB':
 	X = np.asarray(X)
 	y = np.asarray(y)
 else: # gtsrb
-	import pickle
+	train_data, test_data = data_util.load_data('GTSRB', args.datadir, with_hist = bool(args.w_hist))
+	
 	if bool(args.is_train):
-		with open(os.path.join(args.datadir, "train_data.pkl"), 'rb') as f:
-			data = pickle.load(f)
+		X,y = train_data
 	else:
-		with open(os.path.join(args.datadir, "test_data.pkl"), 'rb') as f:
-			data = pickle.load(f)
-
-	X = data['data']
-	y = data['label']		
+		X,y = test_data
+		
 
 loaded_model = load_model(args.model)
 loaded_model.summary()

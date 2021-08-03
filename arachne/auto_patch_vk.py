@@ -154,6 +154,10 @@ def patch(
 	print ('Total number of wrongly processed input(s): {}'.format(len(indices_to_selected_wrong)))
 
 	indices_to_correct = indices_to_target['correct']
+	#if which == 'GTSRB':
+	#	num = int(len(indices_to_correct)/2)
+	#	indices_to_correct = np.random.choice(indices_to_correct, num, replace = False)
+	#	print ("Due to memory allocation error, we use only half of it: {} -> {}".format(len(indices_to_correct), num))
 	# logging
 	print ('Number of wrong: %d' % (len(indices_to_selected_wrong)))
 

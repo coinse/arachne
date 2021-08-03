@@ -725,6 +725,10 @@ def localise_offline_v2(
 			else:
 				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
 				prev_output = t_model.predict(target_X)
+			#
+			if len(prev_output.shape) == 3:
+				prev_output = prev_output.reshape(prev_output.shape[0], prev_output.shape[-1])
+			#
 			#prev_output = model.layers[idx_to_tl - 1].output	
 			##
 			#from_front_tensors = []

@@ -70,7 +70,7 @@ if __name__ == "__main__":
 	indices_to_wrong = brokens.index.values
 
 	# is_input_2d = True => to match the format with faulty model
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = True)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir)#, is_input_2d = True)
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data

@@ -37,19 +37,26 @@ def cnt_error_num(pred, y, k):
 parser = argparse.ArgumentParser()
 parser.add_argument("-datadir", type = str, default = None)
 parser.add_argument("-model_path", type = str)
-parser.add_argument("-model_w", type = str)
-
+parser.add_argument("-model_w", type = str, default = None)
+parser.add_argument("-which_data", type = str)
 
 args = parser.parse_args()
 
-train_data, test_data = data_util.load_data('cifar10', args.datadir)
+train_data, test_data = data_util.load_data(args.which_data, args.datadir)
 
 mdl = load_model(args.model_path)
-with open(args.model_w, 'rb') as f:
-	new_weights = pickle.load(f)
+if args.model_w is not None:
+	with open(args.model_w, 'rb') as f:
+		new_weights = pickle.load(f)
+else:
+	new_weights = {}
 
 pred_train = mdl.predict(train_data[0])
+if len(pred_train.shape) == 3:
+	pred_train = pred_train.reshape(pred_train.shape[0], pred_train.shape[-1])
 pred_test = mdl.predict(test_data[0])
+if len(pred_test.shape) == 3:
+	pred_test = pred_test.reshape(pred_test.shape[0], pred_test.shape[-1])
 top_10_freq = get_top_10_freq(pred_test, test_data[1])
 
 print ("For the original model")
@@ -65,8 +72,11 @@ for idx_to_tl, new_w in new_weights.items():
 
 print ("For a new model")
 pred_train = mdl.predict(train_data[0])
+if len(pred_train.shape) == 3:
+	pred_train = pred_train.reshape(pred_train.shape[0], pred_train.shape[-1])
 pred_test = mdl.predict(test_data[0])
-
+if len(pred_test.shape) == 3:
+	pred_test = pred_test.reshape(pred_test.shape[0], pred_test.shape[-1])
 print ("\tTrain: {}".format(compute_acc(pred_train, train_data[1])))
 print ('\tTest: {}'.format(compute_acc(pred_test, test_data[1])))
 for k in top_10_freq:

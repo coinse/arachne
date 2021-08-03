@@ -63,25 +63,47 @@ def is_C2D(lname):
 	pattns = ['Conv2D']
 	return any([bool(re.match(t,lname)) for t in pattns])
 
-def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X):
+def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_batch = False):
 	"""
 	compute gradients normalisesd and averaged for a given input X
 	"""
 	from sklearn.preprocessing import Normalizer
 	norm_scaler = Normalizer(norm = "l1")
-	
+		
 	model = load_model(path_to_keras_model, compile = False)
 	target = model.layers[idx_to_target_layer].output
-
+	import subprocess
+	result = subprocess.run(['nvidia-smi'], shell = True)
+	print (result)
+	
 	tensor_grad = tf.gradients(
 		model.output, 
 		target,
 		name = 'output_grad')
 
-	gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X})[0]
-	print ("tensor grad", tensor_grad)
-	print ("\t", gradient.shape)
+	# since this might cause OOM error, divide them 
+	num = X.shape[0]
+	if by_batch:
+		batch_size = 256 
+		num_split = int(np.round(num/batch_size))
+		chunks = np.array_split(np.arange(num), num_split)
+	else:
+		chunks = [np.arange(num)]
 
+	
+	grad_shape = tuple([num] + [int(v) for v in tensor_grad[0].shape[1:]])
+
+	print ("Grad shape", grad_shape)
+	print (tensor_grad)	
+	gradient = np.zeros(grad_shape)
+	#fn = K.function([model.input], tensor_grad)
+	for chunk in chunks:
+		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
+		#_gradient = fn([X[chunk]])[0]	
+		#print ("tensor grad", tensor_grad, X.shape)
+		#print ("\t", _gradient.shape)
+		gradient[chunk] = _gradient
+	
 	gradient = np.abs(gradient)
 	#print ("Gradient", gradient)
 	reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
@@ -99,7 +121,7 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X):
 	reset_keras([tensor_grad])
 	return ret_gradient 
 			
-def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y):
+def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_batch = False):
 	"""
 	compute gradients for the loss
 	"""
@@ -117,43 +139,57 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y):
 		loss_tensor,
 		target, 
 		name = 'loss_grad')
+
+	###
+	# since this might cause OOM error, divide them 
+	num = X.shape[0]
+	if by_batch:
+		batch_size = 512
+		num_split = int(np.round(num/batch_size))
+		chunks = np.array_split(np.arange(num), num_split)
+	else:
+		chunks = [np.arange(num)]
 	
-	gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X, y_tensor: y})[0]
-	print ("tensor grad to loss", tensor_grad)
-	print ("\t", gradient.shape)
-	
+	gradients = []
+	for chunk in chunks:
+		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk]})[0]
+		gradients.append(_gradient)
+
+		#print ("tensor grad", tensor_grad)
+		#print ("\t", _gradient.shape)
+
+	#print (np.asarray(gradients).shape)
+	gradient = np.sum(np.asarray(gradients), axis = 0)
+	#print (gradient[:10])
+	#import sys; sys.exit()	
 	gradient = np.abs(gradient)
-	#print ("Gradient", gradient)
-	#K.clear_session()
-	#s = tf.InteractiveSession()
-	#K.set_session(s)
 	reset_keras([gradient, loss_tensor, y_tensor])
+
 	return gradient
 	
-def reset_keras(delete_list = None):
+def reset_keras(delete_list = None, frac = 1):
+	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction = frac)
+	config = tf.ConfigProto(gpu_options=gpu_options)
+	#config.gpu_options.visible_device_list = "0"
+
 	if delete_list is None:
 		K.clear_session()
-		s = tf.InteractiveSession()
+		s = tf.InteractiveSession(config = config)
 		K.set_session(s)
 	else:
 		import gc
-		#sess = K.get_session()
 		K.clear_session()
-		#sess.close()
-		sess = K.get_session()
 		try:
 			for d in delete_list:
 				del d
 		except:
 			pass
 
-		print(gc.collect()) # if it's done something you should see a number being outputted
+		gc.collect() # if it's done something you should see a number being outputted
 
 		# use the same config as you used to create the session
-		config = tf.ConfigProto()
-		config.gpu_options.per_process_gpu_memory_fraction = 1
-		config.gpu_options.visible_device_list = "0"
-		K.set_session(tf.Session(config=config))
+		K.set_session(tf.Session(config = config))
+
 
 def localise_offline(
 	num_label,
@@ -887,7 +923,7 @@ def localise_offline_v2(
 			from_front = np.moveaxis(from_front, [0,1,2], [3,4,5])
 			print ("axis moved", from_front.shape) # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
 
-			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
+			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X, by_batch = True) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
 			print ("From behind", from_behind.shape)
 			#from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
 			
@@ -901,7 +937,7 @@ def localise_offline_v2(
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
-			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True)
 			# ##		
 		else:
 			print ("Currenlty not supported: {}. (shoulde be filtered before)".format(lname))		

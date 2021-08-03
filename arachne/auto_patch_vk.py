@@ -100,6 +100,7 @@ def patch(
 	import random
 	import run_localise
 	from tensorflow.keras.models import load_model, Model
+	import subprocess
 
 	random.seed(seed)
 	np.random.seed(seed)
@@ -126,18 +127,22 @@ def patch(
 	else: # target all, but only those that statisfy the predefined layer conditions
 		indices_to_target_layers = None
 	
-	#import subprocess	
+	#import subprocess
+	run_localise.reset_keras([])
+	
 	model = load_model(path_to_keras_model, compile = False)
-	#result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
-	#print (result)
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
+	
 	target_weights = run_localise.get_target_weights(model,
 		path_to_keras_model, 
 		indices_to_target = indices_to_target_layers, 
 		target_all = target_all) # if target_all == True, then indices_to_target will be ignored
 
-	#result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
-	#print (result)
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
 	print ('Total {} layers are targeted'.format(target_weights.keys()))
+	#import sys; sys.exit()
 	#### HOW CAN WE KNOW WHICH LAYER IS PREDICTION LAYER and WEIGHT LAYER? => assumes they are given;;;
 	# if not, then ... well everything becomes complicated
 	# identify using print (l['name'], l['class_name']) ..? d['layers'] -> mdl.get_config()
@@ -217,10 +222,10 @@ def patch(
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
-		destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 			pickle.dump(indices_w_costs, f)
 		
 	elif loc_method == 'localiser':
@@ -245,10 +250,10 @@ def patch(
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
 			loc_dest = os.path.join("new_loc/{}".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
-			destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
 
-			with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 				pickle.dump(front_lst, f)
 		else: # since I dont' want to localise again
 			#indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
@@ -269,10 +274,10 @@ def patch(
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
-		destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 			pickle.dump(indices_to_places_to_fix, f)
 
 	t2 = time.time()

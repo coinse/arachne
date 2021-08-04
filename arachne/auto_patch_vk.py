@@ -100,6 +100,7 @@ def patch(
 	import random
 	import run_localise
 	from tensorflow.keras.models import load_model, Model
+	import subprocess
 
 	random.seed(seed)
 	np.random.seed(seed)
@@ -125,20 +126,32 @@ def patch(
 			indices_to_target_layers = [indices_to_target_layers]
 	else: # target all, but only those that statisfy the predefined layer conditions
 		indices_to_target_layers = None
-
+	
+	#import subprocess
+	run_localise.reset_keras([])
+	
 	model = load_model(path_to_keras_model, compile = False)
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
+	
 	target_weights = run_localise.get_target_weights(model,
 		path_to_keras_model, 
 		indices_to_target = indices_to_target_layers, 
 		target_all = target_all) # if target_all == True, then indices_to_target will be ignored
 
+	result = subprocess.run(['nvidia-smi'], shell = True) #stdout = subprocess.PIPE.stdout, stderr = subprocess.PIPE.stderr)
+	print (result)
 	print ('Total {} layers are targeted'.format(target_weights.keys()))
+	#import sys; sys.exit()
 	#### HOW CAN WE KNOW WHICH LAYER IS PREDICTION LAYER and WEIGHT LAYER? => assumes they are given;;;
 	# if not, then ... well everything becomes complicated
 	# identify using print (l['name'], l['class_name']) ..? d['layers'] -> mdl.get_config()
 	## -> at least for predc & corr_predc
 	# compute prediction & corr_predictions
 	predictions = model.predict(data_X)
+	if len(predictions.shape) == 3:
+		predictions = predictions.reshape((predictions.shape[0], predictions.shape[-1]))
+
 	correct_predictions = np.argmax(predictions, axis = 1)
 	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
 
@@ -154,6 +167,10 @@ def patch(
 	print ('Total number of wrongly processed input(s): {}'.format(len(indices_to_selected_wrong)))
 
 	indices_to_correct = indices_to_target['correct']
+	#if which == 'GTSRB':
+	#	num = int(len(indices_to_correct)/2)
+	#	indices_to_correct = np.random.choice(indices_to_correct, num, replace = False)
+	#	print ("Due to memory allocation error, we use only half of it: {} -> {}".format(len(indices_to_correct), num))
 	# logging
 	print ('Number of wrong: %d' % (len(indices_to_selected_wrong)))
 
@@ -186,6 +203,8 @@ def patch(
 	########### logging and testing end ###########
 
 	#t1 = time.time()
+	import pickle
+	import pandas as pd
 	if loc_method == 'gradient_loss': # here, top n is not the number of inpouts, arather it is the number of neural weights to fix
 		if not only_loc: # for RQ2 
 			#### should fix this 
@@ -202,15 +221,14 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		import pickle
 		loc_dest = os.path.join("new_loc/{}/grad".format(which))
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
-		destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 			pickle.dump(indices_w_costs, f)
 		
 	elif loc_method == 'localiser':
@@ -224,7 +242,6 @@ def patch(
 		# 	init_plchldr_feed_dict = init_plchldr_feed_dict,
 		# 	path_to_keras_model = path_to_keras_model,
 		# 	pareto_ret_all = only_loc)
-		print (os.path.exists(loc_file))
 		if loc_file is None or not (os.path.exists(loc_file)):
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v2(
 				X, y,
@@ -233,21 +250,18 @@ def patch(
 				path_to_keras_model = path_to_keras_model)
 			print ("Places to fix", indices_to_places_to_fix)
 			#import sys; sys.exit()
-			import pickle
-			import pandas as pd
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
 			loc_dest = os.path.join("new_loc/{}".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
-			destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
 
-			with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 				pickle.dump(front_lst, f)
 		else: # since I dont' want to localise again
 			#indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
 			import pandas as pd
 			df = pd.read_pickle(loc_file)
-			print (df)
 			indices_to_places_to_fix = df.values
 	else: # randomly select
 		if not only_loc:
@@ -263,16 +277,18 @@ def patch(
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
-		destfile = os.path.join(loc_dest, "rq5.{}.{}.pkl".format(patch_target_key, int(target_all)))
+		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "rq5.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 			pickle.dump(indices_to_places_to_fix, f)
 
 	t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))
-	#print (indices_to_places_to_fix)
-	#import sys; sys.exit()
+	run_localise.reset_keras([model])
+	print (indices_to_places_to_fix)
+	#result = subprocess.run(['nvidia-smi'], shell = True)
+	#print (result)
 	if only_loc:
 		if loc_method == 'localiser':
 			return indices_to_places_to_fix, front_lst
@@ -296,6 +312,7 @@ def patch(
 	# patch target layers
 	indices_to_ptarget_layers = sorted(list(set([idx_to_tl for idx_to_tl,_ in indices_to_places_to_fix])))
 	print ("Patch target layers", indices_to_ptarget_layers)
+	#import sys; sys.exit()
 
 	if search_method == 'DE':
 		# searcher = de.DE_searcher(

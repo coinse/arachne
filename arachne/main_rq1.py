@@ -56,6 +56,7 @@ if __name__ == "__main__":
 	parser.add_argument("-dest", default = ".", type = str)
 	# temporary for localising over all
 	parser.add_argument("-new_loc", type = int, default = 0)
+	parser.add_argument("-target_all", type = int, default = 1)
 
 	args = parser.parse_args()	
 
@@ -69,14 +70,14 @@ if __name__ == "__main__":
 	indices_to_wrong = brokens.index.values
 
 	# is_input_2d = True => to match the format with faulty model
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = True)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir)#, is_input_2d = True)
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data
 
-	dest = args.dest
-	os.makedirs(dest, exist_ok = True)
-	path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
+	#dest = args.dest
+	#os.makedirs(dest, exist_ok = True)
+	#path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
 
 	if bool(args.new_loc): # temp
 		output = run_localise.localise_offline(

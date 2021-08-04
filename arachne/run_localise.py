@@ -1001,6 +1001,259 @@ def localise_offline_v2(
 	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
 	return pareto_front, costs_and_keys
 
+def localise_by_sbfl(
+	X, y,
+	indices_to_selected_wrong,
+	indices_to_correct, 
+	target_weights,
+	path_to_keras_model = None, 
+	pass_input = True):
+	"""
+	Not exactly the same with DeepFL -> adjust it to apply on neural weights instead of neurons 
+	"""
+	total_cands = {}
+
+	print ('Total {} layers are targeted'.format(len(target_weights)))
+	t0 = time.time()
+	## slice inputs
+	target_X = X[indices_to_selected_wrong + indices_to_correct]
+	target_y = y[indices_to_selected_wrong + indices_to_correct]
+	# local indices
+	new_indices_to_selected_wrong = np.arange(len(target_X))[:len(indices_to_selected_wrong)]
+	new_indices_to_correct = np.arange(len(target_X))[len(indices_to_selected_wrong):]
+
+	ochiai = lambda a_s, n_s, a_f, n_f: a_f/np.sqrt((a_f + n_f)*(a_f + a_s)) if (a_f + a_s > 0) else 0.
+	loc_start_time = time.time()
+	##
+	for idx_to_tl, vs in target_weights.items():
+		t1 = time.time()
+		t_w, lname = vs
+		print ("targeting layer {} ({})".format(idx_to_tl, lname))
+		#t_w_tensor = model.layers[idx_to_tl].weights[0]
+
+		model = load_model(path_to_keras_model, compile = False)
+		if idx_to_tl - 1 == 0 and pass_input: # meaning the model doesn't specify the input layer explicitly
+			#prev_output = target_X
+			continue # we will pass the first 
+		else:
+			#prev_output = model.layers[idx_to_tl - 1].output
+			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+			prev_output = t_model.predict(target_X)
+
+		indices_to_prev_output = list(np.ndindex(t_w.shape)) # without the input dimension
+		hit_spectrum_w = np.zeros(t_w.shape)
+		##
+		indices_to_active = list(zip(*np.where(prev_output != 0)))
+		indices_to_act_input = indices_to_active[:,0] # 
+		indices_to_non_active = list(zip(*np.where(prev_output == 0)))
+		indices_to_non_act_input = indices_to_non_active[:,0] # 
+
+		### ....
+		indices_to_a_s_input = list(set(new_indices_to_correct).intersection(set(indices_to_act_input)))
+		indices_to_a_f_input = list(set(new_indices_to_selected_wrong).intersection(set(indices_to_act_input)))
+		indices_to_n_s_input = list(set(new_indices_to_correct).intersection(set(indices_to_non_act_input)))
+		indices_to_n_f_input = list(set(new_indices_to_selected_wrong).intersection(set(indices_to_non_act_input)))
+		
+		# to construct a hit-spectrum
+		#indices_to_as = indices_to_active[indices_to_a_s_input] # active in passing inputs 
+		#indices_to_af = indices_to_active[indices_to_a_f_input] # active in failing inputs
+		#indices_to_ns = indices_to_non_active[indices_to_n_s_input] # non-active in passing inputs
+		#indices_to_nf = indices_to_non_active[indices_to_n_f_input] # non-active in failing inputs
+
+		##
+		for i in range(indices_to_as.shape[0]):
+
+		##
+		layer_config = model.layers[idx_to_tl].get_config() 
+
+		# if this takes too long, then change to tensor and compute them using K (backend)
+		if is_FC(lname):
+			from_front = []
+			#model = load_model(path_to_keras_model, compile = False)
+			#t_w_tensor = model.layers[idx_to_tl].weights[0]
+			if idx_to_tl == 0 or idx_to_tl - 1 == 0:
+				prev_output = target_X
+			else:
+				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+				prev_output = t_model.predict(target_X)
+			#
+			if len(prev_output.shape) == 3:
+				prev_output = prev_output.reshape(prev_output.shape[0], prev_output.shape[-1])
+			#
+			#prev_output = model.layers[idx_to_tl - 1].output	
+			##
+			#from_front_tensors = []
+			for idx in tqdm(range(t_w.shape[-1])):
+				assert int(prev_output.shape[-1]) == t_w.shape[0], "{} vs {}".format(
+					int(prev_output.shape[-1]), t_w.shape[0])
+					
+				output = np.multiply(prev_output, t_w[:,idx]) # -> shape = prev_output.shape
+				#output = tf.math.multiply(prev_output, t_w_tensor[:,idx]) # shape = prev_output.shape
+				output = np.abs(output)
+				#output = tf.math.abs(output)
+				output = norm_scaler.fit_transform(output) # -> shape = prev_output.shape (normalisation on )
+				#t_sum = tf.math.reduce_sum(output, axis = -1) 
+				#output = tf.transpose(tf.div_no_nan(tf.transpose(output), t_sum))
+				output = np.mean(output, axis = 0) # -> shape = (reshaped_t_w.shape[-1],)
+				#output = tf.math.reduce_mean(output, axis = 0) #  
+				#temp_tensors.append(output_tensor)
+				#from_front_tensors.append(output) #
+				from_front.append(output) 
+			
+			from_front = np.asarray(from_front)
+			from_front = from_front.T
+			print ('From front', from_front.shape)
+			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X)
+			print ("From behind", from_behind.shape)
+			#print ("\t FR", from_front[:10])
+			#print ("\t BH" , from_behind[:10])
+			FIs = from_front * from_behind
+			print ("Max: {}, min:{}".format(np.max(FIs), np.min(FIs)))
+			############ FI end #########
+
+			# Gradient
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
+			print ("Vals", FIs.shape, grad_scndcr.shape)	
+			# G end
+		elif is_C2D(lname):
+			kernel_shape = t_w.shape[:2] # kernel == filter
+			#true_ws_shape = t_w.shape[2:] # this is (Channel_in (=prev_output.shape[1]), Channel_out (=output.shape[1]))
+			strides = layer_config['strides']
+			padding_type =  layer_config['padding']
+
+			if padding_type == 'valid':
+				paddings = [0,0]
+			elif padding_type == 'same':
+				#P = ((S-1)*W-S+F)/2
+				#paddings = [int(((strides[i]-1)*true_ws_shape[i]-strides[i]+kernel_shape[i])/2) for i in range(2)]
+				paddings = [0,0] # since, we are getting the padded input
+			else:
+				print ("padding type: {} not supported".format(padding_type))
+				paddings = [0,0]
+
+			#num_kernels = prev_output.shape[1] # Channel_in
+			num_kernels = int(prev_output.shape[1]) # Channel_in
+			assert num_kernels == t_w.shape[2], "{} vs {}".format(num_kernels, t_w.shape[2])
+
+			# H x W				
+			#input_shape = prev_output.shape[2:] # the last two (front two are # of inputs and # of kernels (Channel_in))
+			input_shape = [int(v) for v in prev_output.shape[2:]] # the last two (front two are # of inputs and # of kernels (Channel_in))
+
+			# (W1−F+2P)/S+1, W1 = input volumne , F = kernel, P = padding
+			n_mv_0 = int((input_shape[0] - kernel_shape[0] + 2 * paddings[0])/strides[0] + 1) # H_out
+			n_mv_1 = int((input_shape[1] - kernel_shape[1] + 2 * paddings[1])/strides[1] + 1) # W_out
+
+			k = 0 # for logging
+			n_output_channel = t_w.shape[-1] # Channel_out
+			from_front = []
+			#from_front_tensors = []
+			# move axis for easier computation
+			print ("range", n_output_channel, n_mv_0, n_mv_1) # currenlty taking too long -> change to compute on gpu
+		
+			if idx_to_tl == 0 or idx_to_tl - 1 == 0:
+				prev_output_v = target_X
+			else:
+				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+				prev_output_v = t_model.predict(target_X)
+			tr_prev_output_v = np.moveaxis(prev_output_v, [1,2,3],[3,1,2])
+			#tensors_for_FI = generate_FI_tensor_cnn(t_w, prev_output_v)
+			tensors_for_FI = generate_FI_tensor_cnn_v2(t_w)
+			
+			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
+				for i in range(n_mv_0): # H
+					for j in range(n_mv_1): # W
+						curr_prev_output_slice = tr_prev_output_v[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:]
+						curr_prev_output_slice = curr_prev_output_slice[:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]
+						
+						output = curr_prev_output_slice * t_w[:,:,:,idx_ol] 
+						output = np.abs(output)
+						sum_output = np.nan_to_num(np.sum(output), posinf = 0.)
+						output = output/sum_output
+						output = np.mean(output, axis = 0) 
+						
+						from_front.append(output)
+			##############
+			
+			#outputs = K.get_session().run(from_front_tensors, feed_dict = {model.input: target_X})
+			#from_front = np.asarray(outputs)	
+			from_front = np.asarray(from_front)
+			print ("From front", from_front.shape) # [Channel_out * n_mv_0 * n_mv_1, F1, F2, Channel_in]
+			from_front = from_front.reshape(
+				(n_output_channel,n_mv_0,n_mv_1,kernel_shape[0],kernel_shape[1],int(prev_output.shape[1])))
+			print ("reshaped", from_front.shape)
+			from_front = np.moveaxis(from_front, [0,1,2], [3,4,5])
+			print ("axis moved", from_front.shape) # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
+
+			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X, by_batch = True) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
+			print ("From behind", from_behind.shape)
+			#from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
+			
+			t1 = time.time()
+			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
+			t2 = time.time()
+			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
+			#FIs = np.mean(np.mean(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
+			FIs = np.sum(np.sum(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
+			t3 = time.time()
+			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
+			## Gradient
+			# will be [F1, F2, Channel_in, Channel_out]
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True)
+			# ##		
+		else:
+			print ("Currenlty not supported: {}. (shoulde be filtered before)".format(lname))		
+			import sys; sys.exit()
+
+		t2 = time.time()
+		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
+		####
+		pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
+		#print ("Pairs", pairs.shape)
+		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
+		#sess = K.get_session()
+		#sess.close()
+	
+	t3 = time.time()
+	print ("Time for computing total costs: {}".format(t3 - t0))
+
+	# compute pareto front
+	indices_to_tl = list(total_cands.keys())
+	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
+	costs = np.asarray([vs[1] for vs in costs_and_keys])
+	#print (costs_and_keys[0])
+	#print (costs[0])
+	#print (costs[:10], costs[-10:])
+	print ("Indices", indices_to_tl)
+	print ("the number of total cands: {}".format(len(costs)))
+	#print (total_cands)
+
+	# a list of [index to the target layer, index to a neural weight]
+	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], total_cands[vs[0][0]]['shape'])] for vs in costs_and_keys]
+	#print (indices_to_nodes[0], indices_to_nodes[-1])
+	#print (len(costs), len(indices_to_nodes), len(costs_and_keys))
+	#print ("Cost", costs[:20], indices_to_nodes[:20]) 
+
+	t4 = time.time()
+	#while len(curr_nodes_to_lookat) > 0:
+	_costs = costs.copy()
+	is_efficient = np.arange(costs.shape[0])
+	next_point_index = 0 # Next index in the is_efficient array to search for
+	while next_point_index < len(_costs):
+		nondominated_point_mask = np.any(_costs > _costs[next_point_index], axis=1)
+		nondominated_point_mask[next_point_index] = True
+		is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+		_costs = _costs[nondominated_point_mask]
+		next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1	
+
+	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
+	#pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
+	##
+	t5 = time.time()
+	print ("Time for computing the pareto front: {}".format(t5 - t4))
+	loc_end_time = time.time()
+	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
+	return pareto_front, costs_and_keys
+
 
 def localise_by_gradient(
 	X, y,
@@ -1025,7 +1278,11 @@ def localise_by_gradient(
 		print ("targeting layer {} ({})".format(idx_to_tl, lname))
 		
 		t1 = time.time()
-		grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
+		if is_C2D(lname):
+			by_batch = True
+		else:
+			by_batch = False
+		grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True)
 		t2 = time.time()
 
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))

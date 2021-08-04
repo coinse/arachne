@@ -144,6 +144,64 @@ def gen_and_train_model(train_X, train_y, test_X, test_y, destfile,
 
 	#return mdl
 
+
+
+def gen_and_train_simple_model(train_X, train_y, test_X, test_y, destfile, 
+	num_epoch = 5000, patience = 100, batch_size = 64):
+	"""
+	simple 
+	"""
+
+	act = 'relu'
+	
+	# input layer
+	input_shape = (3, 48, 48) #(48, 48, 3)
+	inputs = tf.keras.Input(shape = input_shape)
+
+	outputs = tf.keras.layers.Conv2D(16, (3,3), activation=act, padding = 'valid', data_format = 'channels_first')(inputs)
+	outputs = tf.keras.layers.BatchNormalization(axis = 1)(outputs)
+	outputs = tf.keras.layers.MaxPooling2D(pool_size = (2,2), data_format = 'channels_first')(outputs) 	
+
+	outputs = tf.keras.layers.Flatten()(outputs)
+	outputs = tf.keras.layers.Dense(512, activation = act)(outputs)
+	outputs = tf.keras.layers.BatchNormalization()(outputs)
+
+	outputs = tf.keras.layers.Dense(43, activation = 'softmax')(outputs)
+	
+	mdl = tf.keras.models.Model(inputs = inputs, outputs = outputs)
+	
+	## or keras.optimizers import SGD
+	optimizer = tf.keras.optimizers.Adam(lr = 0.001)
+	mdl.compile(loss='categorical_crossentropy', 
+		optimizer = optimizer, 
+		metrics = ['accuracy'])
+
+	callbacks = [
+		tf.keras.callbacks.EarlyStopping(
+			# Stop training when `val_acc` is no longer improving
+			monitor = "val_acc",
+			mode = 'max', 
+			min_delta = 0, 
+			# "no longer improving" being further defined as "for at least 100 epochs"
+			patience = patience, 
+			verbose = 1), 
+		tf.keras.callbacks.ModelCheckpoint(
+			destfile,
+			monitor = 'val_acc', 
+			mode = 'max', 
+			verbose = 1, 
+			save_best_only = True)
+		]	
+
+	# or batch_size = 128
+	mdl.fit(train_X, train_y, 
+		epochs = num_epoch, 
+		batch_size = batch_size, 
+		callbacks = callbacks, 
+		verbose = 1,
+		validation_data = (test_X, test_y))
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-datadir", type = str, default = 'data/GTSRB/')
 parser.add_argument("-dest", type = str, default = ".")

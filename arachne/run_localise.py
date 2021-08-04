@@ -84,8 +84,10 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
-		batch_size = 256 
+		batch_size = 64 
 		num_split = int(np.round(num/batch_size))
+		if num_split == 0:
+			num_split = 1
 		chunks = np.array_split(np.arange(num), num_split)
 	else:
 		chunks = [np.arange(num)]
@@ -144,8 +146,10 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
-		batch_size = 512
+		batch_size = 64
 		num_split = int(np.round(num/batch_size))
+		if num_split == 0:
+			num_split += 1
 		chunks = np.array_split(np.arange(num), num_split)
 	else:
 		chunks = [np.arange(num)]

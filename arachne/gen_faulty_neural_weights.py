@@ -19,16 +19,19 @@ def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True):
 def random_sample_weights(target_ws, indices_to_target, num_sample = 1):
 	"""
 	"""
-	indices = []
-	for idx in indices_to_target:
+	cand_layers = indices_to_target
+	if len(cand_layers) >= num_sample:
+		sel_layers = np.random.choice(cand_layers, num_sample, replace = False)
+	else:
+		sel_layers = np.random.choice(cand_layers, num_sample, replace = True)
+
+	selected_neural_weights = []
+	for idx in sel_layers:
 		target_w = target_ws[idx][0]
 		curr_indices = list(np.ndindex(target_w.shape))
-		curr_indices = list(zip([idx]*len(curr_indices), curr_indices))
-		
-		indices.extend(curr_indices)
+		sel_idx = curr_indices[np.random.choice(np.arange(len(curr_indices)), 1, replace = False)[0]]
+		selected_neural_weights.append((idx, sel_idx))
 
-	sel_indices = np.random.choice(np.arange(len(indices)), num_sample, replace = False)
-	selected_neural_weights = [indices[i] for i in sel_indices]
 	return selected_neural_weights
 
 
@@ -65,7 +68,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	num_prev_corr = num_init_corr
 	by = by_v # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.
+	chg_limit = 0.0005
 
 	which_direction_arr = np.ones(len(selected_neural_weights))
 	print ("Number of selected neural weights", len(selected_neural_weights))
@@ -113,8 +116,10 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 
 		# check whehter the accuracy decreases
 		num_aft_corr = np.sum(aft_corr_predictions)
+		print ("Current: {} vs {} vs {}".format(num_aft_corr, num_prev_corr, num_init_corr))
+		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr)
 		#print ("--", num_init_corr - num_aft_corr, (num_init_corr - num_aft_corr)/num_inputs, (num_init_corr - num_aft_corr)/num_inputs > chg_limit)
-		if num_init_corr - num_aft_corr > 0: #num_inputs * chg_limit:
+		if num_init_corr - num_aft_corr > num_inputs * chg_limit:
 			print ("Accuracy has been decreased: {} -> {}".format(num_prev_corr/num_inputs, num_aft_corr/num_inputs))
 			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
@@ -175,7 +180,7 @@ if __name__ == "__main__":
 
 	num_label = args.num_label
 
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist')
 
 	k_fn_mdl, target_weights = generate_base_mdl(args.model_path, train_data[0], 
 		indices_to_target = None, target_all = bool(args.target_all))
@@ -184,6 +189,8 @@ if __name__ == "__main__":
 	indices_to_target_layers = list(target_weights.keys())
 	selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
 
+	print ("Selected Neural Weights", selected_neural_weights)
+	sys.exit()
 	from collections import Iterable
 	if not isinstance(train_data[1][0], Iterable):
 		new_ys = data_util.format_label(train_data[1], num_label)

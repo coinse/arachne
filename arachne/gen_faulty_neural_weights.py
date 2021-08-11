@@ -46,6 +46,9 @@ def inject_faults_for_keras_mdl(deltas_as_lst, mdl):
 		mdl.layers[idx_to_tl].set_weights([delta, org_bias])
 	return mdl
 
+def is_in_bound(bound_lr, v):
+	bound_l,bound_r = bound_lr
+	return (bound_l <= v) and (bound_r >= v)
 
 def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1):
 	"""
@@ -70,7 +73,8 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	num_prev_corr = num_init_corr
 	by = by_v # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.0005
+	chg_limit = 0. #0005
+	print (num_inputs * chg_limit)
 
 	which_direction_arr = np.ones(len(selected_neural_weights))
 	print ("Number of selected neural weights", len(selected_neural_weights))
@@ -78,8 +82,20 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	which_direction = {tuple(vs):d for vs,d in zip(selected_neural_weights, which_direction_arr)}
 
 	org_weights = {idx_to_tl:np.copy(target_weights[idx_to_tl][0]) for idx_to_tl in indices_to_tls}
+
+	bound_lr_vs = {}
+	for idx_to_tl in indices_to_tls:
+		w = target_weights[idx_to_tl][0]
+		std_v = np.std(w)
+		mean_v = np.mean(w)
+		bound_l = np.min([mean_v - 3 * std_v, np.quantile(w, 0.25)])
+		bound_r = np.max([mean_v + 3 * std_v, np.quantile(w, 0.75)])
+		bound_lr_vs[idx_to_tl] = [bound_l, bound_r]
+
+	print (bound_lr_vs)
 	t1 = time.time()
 	timeout = 60 * 5
+	is_out_of_bound = False
 	while True:
 		t2 = time.time()
 		if t2 - t1 > timeout:
@@ -94,8 +110,11 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 			if idx_to_tl not in indices_to_uniq_sel_w_tls:
 				deltas_as_lst.append(init_weight)
 			else:
-				w_stdev = np.std(init_weight)
-				w_mean = np.mean(init_weight)
+				#w_stdev = np.std(init_weight)
+				#w_mean = np.mean(init_weight)
+				w_stdev = np.std(org_weights[idx_to_tl])
+				#w_mean = np.mean(org_weights[idx_to_tl])
+
 				local_indices_to_sel_nws = list(zip(*np.where(indices_to_sel_w_tls == idx_to_tl))) 
 				curr_indices_to_sel_nws = [indices_to_sel_ws[i] for i in local_indices_to_sel_nws]
 				delta = by * w_stdev * np.random.rand(*init_weight.shape) 
@@ -103,6 +122,13 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 					deltas_of_snws['init_v'].append(org_weights[idx_to_tl][tuple(idx)])
 					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])
 					init_weight[tuple(idx)] += which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
+
+					## check whether a new value exceeeds the bound
+					if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
+						print (bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
+						is_out_of_bound = True
+						break
+					
 					#which_dir = -1. if np.random.rand(1)[0] > 0.5 else -1.
 					#init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
 					#print ("++", init_weight[tuple(idx)], delta[tuple(idx)]*which_direction[(idx_to_tl,tuple(idx))])
@@ -119,17 +145,22 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 		# check whehter the accuracy decreases
 		num_aft_corr = np.sum(aft_corr_predictions)
 		print ("Current: {} vs {} vs {}".format(num_aft_corr, num_prev_corr, num_init_corr))
-		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr)
-		#print ("--", num_init_corr - num_aft_corr, (num_init_corr - num_aft_corr)/num_inputs, (num_init_corr - num_aft_corr)/num_inputs > chg_limit)
-		if num_init_corr - num_aft_corr > num_inputs * chg_limit:
+		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr, by)
+		##
+	
+		if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
 			print ("Accuracy has been decreased: {} -> {}".format(num_prev_corr/num_inputs, num_aft_corr/num_inputs))
 			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
 			print ("\tNumber of broken: {}, number of patched: {}".format(num_broken, num_patched))
 			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
 		else:
-			if num_init_corr < num_aft_corr: # fix 
-				print ("Has been improved instead: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
+			if is_out_of_bound or (num_init_corr < num_aft_corr): # fix 
+				if is_out_of_bound:
+					print ('A new value is out of bound')
+					is_out_of_bound = False
+				else:
+					print ("Has been improved instead: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
 				# set to init weight
 				for idx_to_tl in indices_to_tls:
 					target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
@@ -138,7 +169,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 					which_direction[tuple(vs)] *= -1
 			
 				num_prev_corr = num_init_corr
-		
+	
 			else: # num_prev == num_aft_corr (nothing has been changed)
 				print ("here", num_prev_corr - num_aft_corr, num_init_corr - num_aft_corr, by)
 				if num_prev_corr > num_aft_corr:
@@ -148,16 +179,16 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 				by += by_v/2
 				if by > 3:
 					print ("Out of the initial distribution: {}".format(by))
-					if by > 4.5:
-						for idx_to_tl in indices_to_tls:
-							target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
-					
-						# reverse
-						which_direction = {tuple(vs):-1*d for vs,d in zip(selected_neural_weights, which_direction_arr)}
+					#if by > 4.5:
+					for idx_to_tl in indices_to_tls:
+						target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
+				
+					# reverse
+					which_direction = {tuple(vs):-1*d for vs,d in zip(selected_neural_weights, which_direction_arr)}
 		
-						num_prev_corr = num_init_corr
-						by = by_v*2
-						print ("Increase by and start again", by)
+					num_prev_corr = num_init_corr
+					by = by_v*2
+					print ("Increase by and start again", by)
 
 
 
@@ -192,7 +223,6 @@ if __name__ == "__main__":
 	selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
 
 	print ("Selected Neural Weights", selected_neural_weights)
-	sys.exit()
 	from collections import Iterable
 	if not isinstance(train_data[1][0], Iterable):
 		new_ys = data_util.format_label(train_data[1], num_label)

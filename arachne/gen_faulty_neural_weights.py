@@ -12,6 +12,8 @@ def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True):
 		indices_to_target = indices_to_target, target_all = target_all)
 	
 	print (target_weights.keys())
+	print ([v[0].shape for v in target_weights.values()])
+	print (X.shape)
 	k_fn_mdl, _, _  = build_k_frame_model(mdl, X, list(sorted(target_weights.keys())))
 	return k_fn_mdl, target_weights
 
@@ -175,7 +177,7 @@ if __name__ == "__main__":
 
 	num_label = args.num_label
 
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist')
 
 	k_fn_mdl, target_weights = generate_base_mdl(args.model_path, train_data[0], 
 		indices_to_target = None, target_all = bool(args.target_all))

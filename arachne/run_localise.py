@@ -1036,31 +1036,52 @@ def localise_by_sbfl(
 			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
 			prev_output = t_model.predict(target_X)
 
-		indices_to_prev_output = list(np.ndindex(t_w.shape)) # without the input dimension
-		hit_spectrum_w = np.zeros(t_w.shape)
 		##
 		indices_to_active = list(zip(*np.where(prev_output != 0)))
 		indices_to_act_input = indices_to_active[:,0] # 
 		indices_to_non_active = list(zip(*np.where(prev_output == 0)))
 		indices_to_non_act_input = indices_to_non_active[:,0] # 
 
-		### ....
-		indices_to_a_s_input = list(set(new_indices_to_correct).intersection(set(indices_to_act_input)))
+		### indices to active/non-active and pass/fail inputs -> input-dimension
+		indices_to_a_s_input = list(set(new_indices_to_correct).intersection(set(indices_to_act_input))) # active and 
+		local_indices_to_a_s_input = [np.where(indices_to_act_input == idx)[0][0] for idx in indices_to_a_s_input]
 		indices_to_a_f_input = list(set(new_indices_to_selected_wrong).intersection(set(indices_to_act_input)))
-		indices_to_n_s_input = list(set(new_indices_to_correct).intersection(set(indices_to_non_act_input)))
-		indices_to_n_f_input = list(set(new_indices_to_selected_wrong).intersection(set(indices_to_non_act_input)))
+		local_indices_to_a_f_input = [np.where(indices_to_act_input == idx)[0][0] for idx in indices_to_a_f_input]
 		
-		# to construct a hit-spectrum
-		#indices_to_as = indices_to_active[indices_to_a_s_input] # active in passing inputs 
-		#indices_to_af = indices_to_active[indices_to_a_f_input] # active in failing inputs
-		#indices_to_ns = indices_to_non_active[indices_to_n_s_input] # non-active in passing inputs
-		#indices_to_nf = indices_to_non_active[indices_to_n_f_input] # non-active in failing inputs
+		indices_to_n_s_input = list(set(new_indices_to_correct).intersection(set(indices_to_non_act_input)))
+		local_indices_to_n_s_input = [np.where(indices_to_non_act_input == idx)[0][0] for idx in indices_to_n_s_input]
+		indices_to_n_f_input = list(set(new_indices_to_selected_wrong).intersection(set(indices_to_non_act_input)))
+		local_indices_to_n_f_input = [np.where(indices_to_non_act_input == idx)[0][0] for idx in indices_to_n_f_input]
+		
+		############### for computing hit spectrum #########################
+		## below is for identifying suspicious neurons 
+		def set_hit_spectrum(hit_T_indices, prev_output_shape):
+			"""
+			"""
+			hit_cnt_arr = np.zeros(prev_output_shape[1:])
+			for idx in hit_T_indices[:,1:]:
+				hit_cnt_arr[idx] += 1
 
-		##
-		for i in range(indices_to_as.shape[0]):
+			return hit_cnt_arr
 
+		# to construct a hit-spectrum 
+		indices_to_as = indices_to_active[local_indices_to_a_s_input] # active in passing inputs 
+		indices_to_af = indices_to_active[local_indices_to_a_f_input] # active in failing inputs
+		indices_to_ns = indices_to_non_active[local_indices_to_n_s_input] # non-active in passing inputs
+		indices_to_nf = indices_to_non_active[local_indices_to_n_f_input] # non-active in failing inputs
+
+		hit_as = set_hit_spectrum(indices_to_as, prev_output.shape)
+		hit_af = set_hit_spectrum(indices_to_af, prev_output.shape)
+		hit_ns = set_hit_spectrum(indices_to_ns, prev_output.shape)
+		hit_nf = set_hit_spectrum(indices_to_nf, prev_output.shape)
+
+		# prev_output without input dimension -> for each, a vector of length 4
+		hit_spectrum_of_prev_output = np.moveaxis(np.asarray([hit_as, hit_af, hit_ns, hit_nf]), [0], [-1])
+		##########################################################################
 		##
-		layer_config = model.layers[idx_to_tl].get_config() 
+		#for i in range(indices_to_as.shape[0]):
+		##
+		#layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
 		if is_FC(lname):

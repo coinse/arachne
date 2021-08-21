@@ -56,7 +56,7 @@ def is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, min_nu
 	"""
 	num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 	num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
-	
+	print ("===", num_broken, num_patched, min_num_broken)	
 	if num_broken > min_num_broken and num_patched == 0:
 		return True
 	else:
@@ -134,16 +134,21 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 				for idx in curr_indices_to_sel_nws:
 					deltas_of_snws['init_v'].append(org_weights[idx_to_tl][tuple(idx)])
 					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])
-					#init_weight[tuple(idx)] += which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
+					init_weight[tuple(idx)] += which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
 
 					## check whether a new value exceeeds the bound
-					#if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
-					#	print (bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
-					#	is_out_of_bound = True
-					#	break
+					if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
+						print (bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
+						is_out_of_bound = True
+						# go back to the previous value
+						init_weight[tuple(idx)] -= which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
+						deltas_of_snws['layer'].append(idx_to_tl)
+						deltas_of_snws['w_idx'].append(idx)
+						deltas_of_snws['new_v'].append(init_weight[tuple(idx)])
+						break
 					
-					which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
-					init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
+					#which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
+					#init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
 					#print ("++", init_weight[tuple(idx)], which_dir, org_weights[idx_to_tl][tuple(idx)], delta[tuple(idx)]*which_dir)
 					#print ("++", init_weight[tuple(idx)], delta[tuple(idx)]*which_direction[(idx_to_tl,tuple(idx))])
 					deltas_of_snws['layer'].append(idx_to_tl)
@@ -164,46 +169,49 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 		print (num_init_corr - num_aft_corr, num_inputs * chg_limit)	
 		#if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
 		if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
-			print ("Accuracy has been decreased: {} -> {}".format(num_prev_corr/num_inputs, num_aft_corr/num_inputs))
+			print ("Accuracy has been decreased: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
 			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
 			print ("\tNumber of broken: {}, number of patched: {}".format(num_broken, num_patched))
 			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
-#		else:
-#			if is_out_of_bound or (num_init_corr < num_aft_corr): # fix 
-#				if is_out_of_bound:
-#					print ('A new value is out of bound')
-#					is_out_of_bound = False
-#				else:
-#					print ("Has been improved instead: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
-#				# set to init weight
-#				for idx_to_tl in indices_to_tls:
-#					target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
-#					
-#				for vs in selected_neural_weights:
-#					which_direction[tuple(vs)] *= -1
-#			
-#				num_prev_corr = num_init_corr
-#	
-#			else: # num_prev == num_aft_corr (nothing has been changed)
-#				print ("here", num_prev_corr - num_aft_corr, num_init_corr - num_aft_corr, by)
-#				if num_prev_corr > num_aft_corr:
-#					for vs in selected_neural_weights:
-#						which_direction[tuple(vs)] *= -1	
-#				num_prev_corr = num_aft_corr
-#				by += by_v/2
-#				if by > 3:
-#					print ("Out of the initial distribution: {}".format(by))
-#					#if by > 4.5:
-#					for idx_to_tl in indices_to_tls:
-#						target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
-#				
-#					# reverse
-#					which_direction = {tuple(vs):-1*d for vs,d in zip(selected_neural_weights, which_direction_arr)}
-#		
-#					num_prev_corr = num_init_corr
-#					by = by_v*2
-#					print ("Increase by and start again", by)
+		else:
+			# tricky, tricky, tricky .... I mean, we cannot control the model's accuracy, especially if the selected neural weight is located near the input layer
+			# maybe.. goining back to the initial stage might be the solution ... (but, is likley to meet the time-limit)
+			if is_out_of_bound or (num_init_corr < num_aft_corr): # fix 
+				if is_out_of_bound:
+					print ('A new value is out of bound')
+					is_out_of_bound = False
+				else:
+					print ("Has been improved instead: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
+
+				# set to init weight
+				for idx_to_tl in indices_to_tls:
+					target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
+					
+				for vs in selected_neural_weights:
+					which_direction[tuple(vs)] *= -1
+			
+				num_prev_corr = num_init_corr
+	
+			else: # num_prev == num_aft_corr (nothing has been changed)
+				print ("here", num_prev_corr - num_aft_corr, num_init_corr - num_aft_corr, by)
+				if num_prev_corr > num_aft_corr:
+					for vs in selected_neural_weights:
+						which_direction[tuple(vs)] *= -1	
+				num_prev_corr = num_aft_corr
+				by += by_v/2
+				if by > 3:
+					print ("Out of the initial distribution: {}".format(by))
+					#if by > 4.5:
+					for idx_to_tl in indices_to_tls:
+						target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
+				
+					# reverse
+					which_direction = {tuple(vs):-1*d for vs,d in zip(selected_neural_weights, which_direction_arr)}
+		
+					num_prev_corr = num_init_corr
+					by = by_v*2
+					print ("Increase by and start again", by)
 
 
 
@@ -268,6 +276,4 @@ if __name__ == "__main__":
 
 	print ("Saved to {}".format(mdl_destfile))
 	new_mdl.save(mdl_destfile)
-	
-
 

@@ -1061,10 +1061,10 @@ def localise_by_sbfl(
 		#indices_to_nf = indices_to_non_active[indices_to_n_f_input] # non-active in failing inputs
 
 		##
-		for i in range(indices_to_as.shape[0]):
+		#for i in range(indices_to_as.shape[0]):
 
 		##
-		layer_config = model.layers[idx_to_tl].get_config() 
+		#layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
 		if is_FC(lname):

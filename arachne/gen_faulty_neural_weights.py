@@ -86,7 +86,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	num_prev_corr = num_init_corr
 	by = by_v # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0. #0005
+	chg_limit = 0.001 #0005
 	print (num_inputs * chg_limit)
 
 	which_direction_arr = np.ones(len(selected_neural_weights))
@@ -107,7 +107,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 
 	print (bound_lr_vs)
 	t1 = time.time()
-	timeout = 60 * 5
+	timeout = 60 * 10
 	is_out_of_bound = False
 	while True:
 		t2 = time.time()

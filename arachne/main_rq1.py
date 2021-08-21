@@ -57,6 +57,7 @@ if __name__ == "__main__":
 	# temporary for localising over all
 	parser.add_argument("-new_loc", type = int, default = 0)
 	parser.add_argument("-target_all", type = int, default = 1)
+	parser.add_argument("-w_hist", type = int, default = 0)
 
 	args = parser.parse_args()	
 
@@ -70,7 +71,7 @@ if __name__ == "__main__":
 	indices_to_wrong = brokens.index.values
 
 	# is_input_2d = True => to match the format with faulty model
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir)#, is_input_2d = True)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))#, is_input_2d = True)
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data
@@ -119,7 +120,7 @@ if __name__ == "__main__":
 			only_loc = True)
 
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
-	print ("\t".join([str(index) for index in indices_to_places_to_fix]))
+	#print ("\t".join([str(index) for index in indices_to_places_to_fix]))
 	#if args.loc_method == 'localiser':
 	#	indices_to_places_to_fix = np.int32(indices_to_places_to_fix).tolist()
 	#	front_lst = [np.int32(sub_front).tolist() for sub_front in front_lst]

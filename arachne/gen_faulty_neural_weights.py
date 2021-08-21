@@ -50,6 +50,19 @@ def is_in_bound(bound_lr, v):
 	bound_l,bound_r = bound_lr
 	return (bound_l <= v) and (bound_r >= v)
 
+
+def is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, min_num_broken):
+	"""
+	"""
+	num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
+	num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
+	
+	if num_broken > min_num_broken and num_patched == 0:
+		return True
+	else:
+		return False
+
+
 def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1):
 	"""
 	"""
@@ -94,7 +107,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 
 	print (bound_lr_vs)
 	t1 = time.time()
-	timeout = 60 * 5
+	timeout = 60 * 10
 	is_out_of_bound = False
 	while True:
 		t2 = time.time()
@@ -132,6 +145,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 					which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
 					init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
 					#print (org_weights[idx_to_tl][tuple(idx)], delta[tuple(idx)]*which_dir)
+					#print ("++", init_weight[tuple(idx)], which_dir, org_weights[idx_to_tl][tuple(idx)], delta[tuple(idx)]*which_dir)
 					#print ("++", init_weight[tuple(idx)], delta[tuple(idx)]*which_direction[(idx_to_tl,tuple(idx))])
 					deltas_of_snws['layer'].append(idx_to_tl)
 					deltas_of_snws['w_idx'].append(idx)
@@ -145,11 +159,12 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 
 		# check whehter the accuracy decreases
 		num_aft_corr = np.sum(aft_corr_predictions)
-		print ("Current: {} vs {} vs {}".format(num_aft_corr, num_prev_corr, num_init_corr))
+		print ("Current: {} vs {} vs {}".format(num_aft_corr, num_prev_corr, num_init_corr), is_out_of_bound)
 		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr, by)
 		##
-	
-		if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
+		print (num_init_corr - num_aft_corr, num_inputs * chg_limit)	
+		#if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
+		if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
 			print ("Accuracy has been decreased: {} -> {}".format(num_prev_corr/num_inputs, num_aft_corr/num_inputs))
 			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))

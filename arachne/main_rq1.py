@@ -36,7 +36,6 @@ def set_loc_name(dest, aft_pred_file, key):
 	
 	return loc_name
 
-
 if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser()
@@ -52,29 +51,47 @@ if __name__ == "__main__":
 		default = "data/tensor_names/tensor.lastLayer.names ", type = str)
 	parser.add_argument("-loc_method", action = "store", default = None, help = 'random, localiser, gradient_loss')
 	parser.add_argument("-path_to_keras_model", action = 'store', default = None)
+	parser.add_argument("-path_to_faulty_model", action = 'store', default = None, type = str)
 	parser.add_argument("-seed", action = "store", default = 1, type = int)
 	parser.add_argument("-dest", default = ".", type = str)
 	# temporary for localising over all
 	parser.add_argument("-new_loc", type = int, default = 0)
 	parser.add_argument("-target_all", type = int, default = 1)
 	parser.add_argument("-w_hist", type = int, default = 0)
+	# 
+	parser.add_argument("-gt_file", type = str, default = None)
 
 	args = parser.parse_args()	
-
-	init_pred_df = read_and_add_flag(args.init_pred_file)
-	aft_pred_df = read_and_add_flag(args.aft_pred_file)
-	combined_df = combine_init_aft_predcs(init_pred_df, aft_pred_df)
-
-	brokens = get_brokens(combined_df)
-	patcheds = get_patcheds(combined_df)
-
-	indices_to_wrong = brokens.index.values
 
 	# is_input_2d = True => to match the format with faulty model
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))#, is_input_2d = True)
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data
+
+	init_pred_df = read_and_add_flag(args.init_pred_file)
+	if args.aft_pred_file is None:
+		assert args.path_to_faulty_model is not None, "Neither aft_pred_file nor path_to_faulty_model is given"
+		from tensorflow.keras.models import load_model
+
+		faulty_mdl = load_model(args.path_to_faulty_model)
+		pred_labels = np.argmax(faulty_mdl.predict(train_X), axis = 1)
+		
+		aft_preds = [['index', 'true', 'pred', 'flag']]
+		for i, (true_label, pred_label) in enumerate(zip(train_y, pred_labels)):
+			aft_preds.append([i, true_label, pred_label, true_label == pred_label])
+		aft_preds = np.asarray(aft_preds)
+		aft_pred_df = pd.DataFrame(aft_preds[1:], columns = aft_preds[0])
+	else:
+		aft_pred_df = read_and_add_flag(args.aft_pred_file)
+	combined_df = combine_init_aft_predcs(init_pred_df, aft_pred_df)
+
+	## this should be changed... 
+	## both brokens and patched denote the changes in a target DNN model
+	brokens = get_brokens(combined_df) # correct -> incorrect
+	patcheds = get_patcheds(combined_df) # incorrect -> correct
+	# currently, we are using only the ones that are broken
+	indices_to_wrong = brokens.index.values
 
 	#dest = args.dest
 	#os.makedirs(dest, exist_ok = True)
@@ -111,7 +128,7 @@ if __name__ == "__main__":
 			train_data, 
 			args.tensor_name_file,
 			which = args.which,
-			loc_method = args.loc_method, #"localiser",
+			loc_method = args.loc_method, 
 			patch_target_key = "loc.{}".format(args.seed),
 			path_to_keras_model = args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_wrong,
@@ -120,6 +137,29 @@ if __name__ == "__main__":
 			only_loc = True)
 
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
+
+	if args.gt_file is not None:
+		gt_df = pd.read_pickle(args.gt_file)
+		gts_layer = gt_df.layer.values
+		gts_weight = gt_df.w_idx.values
+		gts = list(zip(gts_layer, gts_weight)) # a list of [layer, index to a weight (np.ndarray)]
+
+		localised_at = []
+		for i, (l_idx, w_idx) in enumerate(indices_to_places_to_fix):
+			_indices_to_l = np.where(gts_layer == l_idx)[0]
+			if len(_indices_to_l) > 0: # is within 
+				_indices_to_w = np.where(list(map(np.array_equal, 
+					gts_weight, len(gts_weight)*[np.asarray(w_idx)])))[0]
+				if len(_indices_to_w) > 0:
+					localised_at.append(i)
+
+		if args.loc_method == 'localiser':
+			print ("Localised within the pareto front of the length of {}".format(len(indices_to_places_to_fix)))
+		
+		print ("\tAt", localised_at)
+		print ('\t', [idx/len(entire_k_and_cost) for idx in localised_at])
+
+
 	#print ("\t".join([str(index) for index in indices_to_places_to_fix]))
 	#if args.loc_method == 'localiser':
 	#	indices_to_places_to_fix = np.int32(indices_to_places_to_fix).tolist()

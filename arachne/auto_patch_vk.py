@@ -159,7 +159,8 @@ def patch(
 
 	#check whether gien predef_indices_to_wrong to wrong is actually correct
 	if predef_indices_to_wrong is not None:
-		diff = set(predef_indices_to_wrong) - set(indices_to_target['wrong'])
+		### THIS ASSERTION MUST BE CHANGED IF WE WANT TO APPLY REPAIR(?) ON THE MOST INFLUENTIAL NWS
+		diff = set(predef_indices_to_wrong) - set(indices_to_target['wrong']) 
 		assert len(diff) == 0, diff 
 		indices_to_target['wrong'] = predef_indices_to_wrong
 

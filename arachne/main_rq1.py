@@ -64,7 +64,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()	
 
 	# is_input_2d = True => to match the format with faulty model
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))#, is_input_2d = True)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data
@@ -75,13 +75,14 @@ if __name__ == "__main__":
 		from tensorflow.keras.models import load_model
 
 		faulty_mdl = load_model(args.path_to_faulty_model)
-		pred_labels = np.argmax(faulty_mdl.predict(train_X), axis = 1)
-		
-		aft_preds = [['index', 'true', 'pred', 'flag']]
+		predcs = faulty_mdl.predict(train_X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(train_X).reshape(len(train_X),-1)
+		pred_labels = np.argmax(predcs, axis = 1)
+	
+		aft_preds = []
+		aft_preds_column = ['index', 'true', 'pred', 'flag']
 		for i, (true_label, pred_label) in enumerate(zip(train_y, pred_labels)):
 			aft_preds.append([i, true_label, pred_label, true_label == pred_label])
-		aft_preds = np.asarray(aft_preds)
-		aft_pred_df = pd.DataFrame(aft_preds[1:], columns = aft_preds[0])
+		aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
 	else:
 		aft_pred_df = read_and_add_flag(args.aft_pred_file)
 	combined_df = combine_init_aft_predcs(init_pred_df, aft_pred_df)
@@ -92,7 +93,7 @@ if __name__ == "__main__":
 	patcheds = get_patcheds(combined_df) # incorrect -> correct
 	# currently, we are using only the ones that are broken
 	indices_to_wrong = brokens.index.values
-
+	print ("Indices to wrong", indices_to_wrong)
 	#dest = args.dest
 	#os.makedirs(dest, exist_ok = True)
 	#path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
@@ -157,7 +158,7 @@ if __name__ == "__main__":
 			print ("Localised within the pareto front of the length of {}".format(len(indices_to_places_to_fix)))
 		
 		print ("\tAt", localised_at)
-		print ('\t', [idx/len(entire_k_and_cost) for idx in localised_at])
+		print ('\t', [idx/len(entire_k_and_cost) if entire_k_and_cost is not None else idx/len(indices_to_places_to_fix) for idx in localised_at])
 
 
 	#print ("\t".join([str(index) for index in indices_to_places_to_fix]))

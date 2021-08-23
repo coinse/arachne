@@ -63,7 +63,7 @@ def is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, min_nu
 		return False
 
 
-def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1):
+def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False):
 	"""
 	"""
 	import tensorflow as tf
@@ -123,10 +123,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 			if idx_to_tl not in indices_to_uniq_sel_w_tls:
 				deltas_as_lst.append(init_weight)
 			else:
-				#w_stdev = np.std(init_weight)
-				#w_mean = np.mean(init_weight)
 				w_stdev = np.std(org_weights[idx_to_tl])
-				#w_mean = np.mean(org_weights[idx_to_tl])
 
 				local_indices_to_sel_nws = list(zip(*np.where(indices_to_sel_w_tls == idx_to_tl))) 
 				curr_indices_to_sel_nws = [indices_to_sel_ws[i] for i in local_indices_to_sel_nws]
@@ -134,21 +131,24 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 				for idx in curr_indices_to_sel_nws:
 					deltas_of_snws['init_v'].append(org_weights[idx_to_tl][tuple(idx)])
 					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])
-					init_weight[tuple(idx)] += which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
-
-					## check whether a new value exceeeds the bound
-					if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
-						print (bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
-						is_out_of_bound = True
-						# go back to the previous value
-						init_weight[tuple(idx)] -= which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
-						deltas_of_snws['layer'].append(idx_to_tl)
-						deltas_of_snws['w_idx'].append(idx)
-						deltas_of_snws['new_v'].append(init_weight[tuple(idx)])
-						break
 					
-					#which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
-					#init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
+					if not is_rd:
+						init_weight[tuple(idx)] += which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
+						## check whether a new value exceeeds the bound
+						if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
+							print (bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
+							is_out_of_bound = True
+							# go back to the previous value
+							init_weight[tuple(idx)] -= which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
+							deltas_of_snws['layer'].append(idx_to_tl)
+							deltas_of_snws['w_idx'].append(idx)
+							deltas_of_snws['new_v'].append(init_weight[tuple(idx)])
+							break
+					else:
+						which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
+						init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
+						#init_weight[tuple(idx)] = delta[tuple(idx)]*which_dir
+
 					#print ("++", init_weight[tuple(idx)], which_dir, org_weights[idx_to_tl][tuple(idx)], delta[tuple(idx)]*which_dir)
 					#print ("++", init_weight[tuple(idx)], delta[tuple(idx)]*which_direction[(idx_to_tl,tuple(idx))])
 					deltas_of_snws['layer'].append(idx_to_tl)
@@ -167,13 +167,15 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr, by)
 		##
 		print (num_init_corr - num_aft_corr, num_inputs * chg_limit)	
-		#if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
-		if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
+		if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
+		#if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
 			print ("Accuracy has been decreased: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
 			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
 			print ("\tNumber of broken: {}, number of patched: {}".format(num_broken, num_patched))
 			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
+		elif is_rd:
+			continue 
 		else:
 			# tricky, tricky, tricky .... I mean, we cannot control the model's accuracy, especially if the selected neural weight is located near the input layer
 			# maybe.. goining back to the initial stage might be the solution ... (but, is likley to meet the time-limit)
@@ -195,9 +197,10 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	
 			else: # num_prev == num_aft_corr (nothing has been changed)
 				print ("here", num_prev_corr - num_aft_corr, num_init_corr - num_aft_corr, by)
-				if num_prev_corr > num_aft_corr:
+				if num_prev_corr < num_aft_corr: # has been improved from the "previous" result (but, still below the initial results)
 					for vs in selected_neural_weights:
-						which_direction[tuple(vs)] *= -1	
+						which_direction[tuple(vs)] *= -1
+	
 				num_prev_corr = num_aft_corr
 				by += by_v/2
 				if by > 3:
@@ -229,6 +232,7 @@ if __name__ == "__main__":
 	parser.add_argument("-num_label", type = int, default = 10)
 	parser.add_argument("-by_v", type = float, default = 0.1)
 	parser.add_argument("-num_sample", type = int, default = 1)
+	parser.add_argument("-rd", type = int, default = 0)
 
 	args = parser.parse_args()
 
@@ -253,7 +257,7 @@ if __name__ == "__main__":
 		new_ys = train_data[1]
 
 	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights(
-		k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v)
+		k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))
 	
 	print ("Changed Accuracy: {}".format(num_aft_corr/len(train_data[1])))
 	deltas_of_snws = pd.DataFrame.from_dict(deltas_of_snws)

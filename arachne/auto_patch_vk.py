@@ -160,6 +160,9 @@ def patch(
 	#check whether gien predef_indices_to_wrong to wrong is actually correct
 	if predef_indices_to_wrong is not None:
 		diff = set(predef_indices_to_wrong) - set(indices_to_target['wrong'])
+		print (len(predef_indices_to_wrong), len(indices_to_target['wrong']))
+		print (predef_indices_to_wrong[:10])
+		print (indices_to_target['wrong'][:10])
 		assert len(diff) == 0, diff 
 		indices_to_target['wrong'] = predef_indices_to_wrong
 
@@ -255,7 +258,8 @@ def patch(
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
-
+			
+			print ("Saved to", destfile)
 			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 				pickle.dump(front_lst, f)
 		else: # since I dont' want to localise again
@@ -286,7 +290,8 @@ def patch(
 	t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))
 	run_localise.reset_keras([model])
-	print (indices_to_places_to_fix)
+	if loc_method == 'localiser':
+		print (indices_to_places_to_fix)
 	#result = subprocess.run(['nvidia-smi'], shell = True)
 	#print (result)
 	if only_loc:

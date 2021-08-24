@@ -49,7 +49,7 @@ if __name__ == "__main__":
 		default = 'cifar10', type = str, help = 'fashion_mnist,cifaf10,lfw')
 	parser.add_argument("-tensor_name_file", action = "store",
 		default = "data/tensor_names/tensor.lastLayer.names ", type = str)
-	parser.add_argument("-loc_method", action = "store", default = None, help = 'random, localiser, gradient_loss')
+	parser.add_argument("-loc_method", action = "store", default = None, help = 'random, localiser, gradient_loss, c_localiser')
 	parser.add_argument("-path_to_keras_model", action = 'store', default = None)
 	parser.add_argument("-path_to_faulty_model", action = 'store', default = None, type = str)
 	parser.add_argument("-seed", action = "store", default = 1, type = int)
@@ -90,10 +90,15 @@ if __name__ == "__main__":
 	## this should be changed... 
 	## both brokens and patched denote the changes in a target DNN model
 	brokens = get_brokens(combined_df) # correct -> incorrect
-	patcheds = get_patcheds(combined_df) # incorrect -> correct
+	patcheds = get_patcheds(combined_df) # incorrect -> correct'
+	chgds = combined_df.loc[combined_df.pred != combined_df.new_pred] # all
+	assert len(brokens) + len(patcheds) == len(chgds), "{} vs {}".format(len(brokens) + len(patcheds), len(chgds))
+	
 	# currently, we are using only the ones that are broken
-	indices_to_wrong = brokens.index.values
-	print ("Indices to wrong", indices_to_wrong)
+	#indices_to_wrong = brokens.index.values
+	#print ("Indices to wrong", indices_to_wrong)
+	indices_to_chgd = chgds.index.values
+	print ("Indices to changed", indices_to_chgd)
 	#dest = args.dest
 	#os.makedirs(dest, exist_ok = True)
 	#path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
@@ -104,7 +109,7 @@ if __name__ == "__main__":
 			train_data,
 			args.tensor_name_file,
 			path_to_keras_model = args.path_to_keras_model,
-			predef_indices_to_wrong = indices_to_wrong,
+			predef_indices_to_wrong = indices_to_chgd, #indices_to_wrong,
 			seed = args.seed,
 			target_all = True)
 			
@@ -132,7 +137,7 @@ if __name__ == "__main__":
 			loc_method = args.loc_method, 
 			patch_target_key = "loc.{}".format(args.seed),
 			path_to_keras_model = args.path_to_keras_model,
-			predef_indices_to_wrong = indices_to_wrong,
+			predef_indices_to_wrong = indices_to_chgd, #indices_to_wrong,
 			seed = args.seed,
 			target_all = bool(args.target_all),
 			only_loc = True)

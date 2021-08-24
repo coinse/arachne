@@ -718,13 +718,61 @@ def generate_FI_tensor_cnn_v2(t_w_v):
 	return {'output':output, 'curr_prev_output_slice':curr_prev_output_slice, 't_w_t':t_w_t, 'idx_to_out_channel':idx_to_out_channel}
 
 
-def localise_offline_v2(
+def sample_input_for_loc(
+	indices_to_chgd, 
+	indices_to_unchgd, 
+	predictions, init_pred_labels,
+	seed):
+	"""
+	prediction -> model ouput. Right before outputing as the final classification result 
+	## in auto_patch.patch: new_indices_to_target = list(indices_to_correct) + list(indices_to_selected_wrong) 
+	sample the indices to changed and unchanged behaviour later used for localisation 
+	"""
+	np.random.seed(seed)
+
+	num_chgd = len(indices_to_chgd)
+	if num_chgd >= len(indices_to_unchgd): # no need to do any sampling
+		return indices_to_chgd, indices_to_unchgd
+
+	pred_labels = np.argmax(predictions, axis = 1)
+	# checking]
+	_indices_to_unchgd = np.where(pred_labels == init_pred_labels)[0]; _indices_to_unchgd.sort()
+	indices_to_unchgd = np.asarray(indices_to_unchgd); indices_to_unchgd.sort()
+	_indices_to_chgd = np.where(pred_labels != init_pred_labels)[0]; _indices_to_chgd.sort()
+	indices_to_chgd = np.asarray(indices_to_chgd); indices_to_chgd.sort()
+	assert all(_indices_to_unchgd == indices_to_unchgd)
+	assert all(_indices_to_chgd == indices_to_chgd)
+	# checking end
+
+	uniq_labels = sorted(list(set(init_pred_labels[indices_to_unchgd])))
+	grouped_by_label = {uniq_label:[] for uniq_label in uniq_labels}
+	for idx in indices_to_unchgd:	
+		pred_label = pred_labels[idx]
+		grouped_by_label[pred_label].append(idx)
+
+	num_unchgd = len(indices_to_unchgd)
+	sampled_indices_to_unchgd = {}
+	for uniq_label,vs in grouped_by_label.items():
+		num_sample = int(np.round(num_chgd * len(vs)/num_unchgd))
+		if num_sample <= 0:
+			num_sample = 1
+		
+		if num_sample > len(vs):
+			num_sample = len(vs)
+
+		sampled_indices_to_unchgd[uniq_label] = np.random.choice(vs, num_sample, replace = False)
+
+	return indices_to_chgd, sampled_indices_to_unchgd
+
+
+
+def compute_FI_and_GL(
 	X, y,
-	indices_to_selected_wrong,
+	indices_to_target,
 	target_weights,
 	path_to_keras_model = None):
 	"""
-	localise offline
+	compute FL and GL for the given inputs
 	"""
 
 	## Now, start localisation !!! ##
@@ -737,10 +785,9 @@ def localise_offline_v2(
 	print ('Total {} layers are targeted'.format(len(target_weights)))
 	t0 = time.time()
 	## slice inputs
-	target_X = X[indices_to_selected_wrong]
-	target_y = y[indices_to_selected_wrong]
+	target_X = X[indices_to_target]
+	target_y = y[indices_to_target]
 
-	loc_start_time = time.time()
 	##
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
@@ -963,16 +1010,33 @@ def localise_offline_v2(
 	t3 = time.time()
 	print ("Time for computing total costs: {}".format(t3 - t0))
 
+	return total_cands
+
+
+def localise_offline_v2(
+	X, y,
+	indices_to_target,
+	target_weights,
+	path_to_keras_model = None):
+	"""
+	localise offline
+	here, we want to find those likely to be highly influential to both the changed behaviour and the unchanged behaviour while 
+	putting more weight on the changed behaviour (the sampling startegy (not here, but before calling this method)) 
+	"""
+	loc_start_time = time.time()
+	# compute FI and GL
+	total_cands = compute_FI_and_GL(
+		X, y,
+		indices_to_target,
+		target_weights,
+		path_to_keras_model = path_to_keras_model)
+
 	# compute pareto front
 	indices_to_tl = list(total_cands.keys())
 	costs_and_keys = [([idx_to_tl, local_i], c) for idx_to_tl in indices_to_tl for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
-	#print (costs_and_keys[0])
-	#print (costs[0])
-	#print (costs[:10], costs[-10:])
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
-	#print (total_cands)
 
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], total_cands[vs[0][0]]['shape'])] for vs in costs_and_keys]
@@ -1000,6 +1064,79 @@ def localise_offline_v2(
 	loc_end_time = time.time()
 	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
 	return pareto_front, costs_and_keys
+
+
+def localise_offline_v3(
+	chgd_input,
+	unchgd_input, 
+	indices_to_chgd,
+	indices_to_unchgd,
+	target_weights,
+	path_to_keras_model = None):
+	"""
+	here, we want to find those likely to be highly influential to the changed behaviour while less influential to the unchanged behaviour
+	"""
+	chgd_X, chgd_y = chgd_input
+	unchgd_X, unchgd_y = unchgd_input
+
+	loc_start_time = time.time()
+
+	# compute FI and GL with changed inputs
+	total_cands_chgd = compute_FI_and_GL(
+		chgd_X, chgd_y,
+		indices_to_chgd,
+		target_weights,
+		path_to_keras_model = path_to_keras_model)
+
+	# compute FI and GL with unchanged inputs
+	total_cands_unchgd = compute_FI_and_GL(
+		unchgd_X, unchgd_y,
+		indices_to_unchgd,
+		target_weights,
+		path_to_keras_model = path_to_keras_model)
+
+	indices_to_tl = list(total_cands_chgd.keys()) 
+	costs_and_keys = []
+	shapes = {}
+	for idx_to_tl in indices_to_tl:
+		cost_from_chgd = total_cands_chgd[idx_to_tl]['cost']
+		cost_from_unchgd = total_cands_unchgd[idx_to_tl]['cost']
+		## key: more influential to changed behaviour and less influential to unchanged behaviour
+		costs_combined = cost_from_chgd/cost_from_unchgd # shape = (N,2)
+		shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']
+
+		for i,c in enumerate(costs_combined):
+			costs_and_keys.append(([idx_to_tl, i], c))
+
+	costs = np.asarray([vs[1] for vs in costs_and_keys])
+
+	print ("Indices", indices_to_tl)
+	print ("the number of total cands: {}".format(len(costs)))
+
+	# a list of [index to the target layer, index to a neural weight]
+	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], shapes[vs[0][0]])] for vs in costs_and_keys]
+
+	t4 = time.time()
+	#while len(curr_nodes_to_lookat) > 0:
+	_costs = costs.copy()
+	is_efficient = np.arange(costs.shape[0])
+	next_point_index = 0 # Next index in the is_efficient array to search for
+	while next_point_index < len(_costs):
+		nondominated_point_mask = np.any(_costs > _costs[next_point_index], axis=1)
+		nondominated_point_mask[next_point_index] = True
+		is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+		_costs = _costs[nondominated_point_mask]
+		next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1	
+
+	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
+	#pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
+	##
+	t5 = time.time()
+	print ("Time for computing the pareto front: {}".format(t5 - t4))
+	loc_end_time = time.time()
+	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
+	return pareto_front, costs_and_keys
+
 
 def localise_by_sbfl(
 	X, y,

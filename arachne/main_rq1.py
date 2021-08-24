@@ -49,7 +49,7 @@ if __name__ == "__main__":
 		default = 'cifar10', type = str, help = 'fashion_mnist,cifaf10,lfw')
 	parser.add_argument("-tensor_name_file", action = "store",
 		default = "data/tensor_names/tensor.lastLayer.names ", type = str)
-	parser.add_argument("-loc_method", action = "store", default = None, help = 'random, localiser, gradient_loss')
+	parser.add_argument("-loc_method", action = "store", default = None, help = 'random, localiser, gradient_loss, c_localiser')
 	parser.add_argument("-path_to_keras_model", action = 'store', default = None)
 	parser.add_argument("-path_to_faulty_model", action = 'store', default = None, type = str)
 	parser.add_argument("-seed", action = "store", default = 1, type = int)

@@ -181,6 +181,17 @@ def patch(
 	new_indices_to_target = list(indices_to_correct) + list(indices_to_selected_wrong) 
 	# set input for the searcher -> searcher will look only upon this input hereafter
 
+	### sample inputs for localisation (newly added) ###################
+	_, indices_to_correct = run_localise.sample_input_for_loc(
+		indices_to_selected_wrong, 
+		indices_to_correct, # since we assume an ideal model, unchanged inputs == correct inputs
+		predictions[new_indices_to_target], data_y[new_indices_to_target],
+		seed)
+	
+	# redefine new_indices_to_target
+	new_indices_to_target = list(indices_to_selected_wrong) + list(indices_to_correct)
+	####################################################################
+
 	# extraction for the target predictions
 	predictions = predictions[new_indices_to_target] # slice
 	# extraction for data
@@ -232,25 +243,42 @@ def patch(
 		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 			pickle.dump(indices_w_costs, f)
 		
-	elif loc_method == 'localiser':
-		# indices_to_places_to_fix, front_lst = where_to_fix_from_bl(
-		# 	indices_to_selected_wrong,
-		# 	X, y, num_label,
-		# 	predictions, ## newly added to compute the forward impact
-		# 	which,
-		# 	empty_graph_for_fl, 
-		# 	tensor_name_file, 
-		# 	init_plchldr_feed_dict = init_plchldr_feed_dict,
-		# 	path_to_keras_model = path_to_keras_model,
-		# 	pareto_ret_all = only_loc)
+	elif loc_method == 'old_localiser': # will be deleted 
 		if loc_file is None or not (os.path.exists(loc_file)):
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v2(
 				X, y,
 				indices_to_selected_wrong,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
+			
 			print ("Places to fix", indices_to_places_to_fix)
 			#import sys; sys.exit()
+			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
+			loc_dest = os.path.join("new_loc/{}/old_loc".format(which))
+			os.makedirs(loc_dest, exist_ok= True)
+			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
+			output_df.to_pickle(destfile)
+
+			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+				pickle.dump(front_lst, f)
+
+		else: # since I dont' want to localise again
+			import pandas as pd
+			df = pd.read_pickle(loc_file)
+			indices_to_places_to_fix = df.values
+
+	elif loc_method == 'localiser':
+		if loc_file is None or not (os.path.exists(loc_file)):
+			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v3(
+				[X[indices_to_selected_wrong], y[indices_to_selected_wrong]]
+				[X[indices_to_correct], y[indices_to_correct]],
+				indices_to_selected_wrong,
+				indices_to_correct,
+				target_weights,
+				path_to_keras_model = path_to_keras_model)
+
+			print ("Places to fix", indices_to_places_to_fix)
+
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
 			loc_dest = os.path.join("new_loc/{}".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
@@ -259,11 +287,12 @@ def patch(
 
 			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 				pickle.dump(front_lst, f)
+				
 		else: # since I dont' want to localise again
-			#indices_to_places_to_fix = [(2, (0, 2, 0, 9)), (2, (1, 1, 0, 9)), (2, (1, 2, 1, 9)), (2, (2, 1, 0, 9)), (2, (2, 1, 2, 9)), (2, (2, 2, 0, 9)), (25, (553, 3)), (25, (553, 9)), (25, (970, 4)), (25, (1977, 5))]
 			import pandas as pd
 			df = pd.read_pickle(loc_file)
 			indices_to_places_to_fix = df.values
+			
 	else: # randomly select
 		if not only_loc:
 			top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
@@ -291,7 +320,7 @@ def patch(
 	#result = subprocess.run(['nvidia-smi'], shell = True)
 	#print (result)
 	if only_loc:
-		if loc_method == 'localiser':
+		if loc_method in ['localiser', 'c_localiser']:
 			return indices_to_places_to_fix, front_lst
 		elif loc_method == 'gradient_loss':
 			#return indices_to_places_to_fix, indices_and_grads

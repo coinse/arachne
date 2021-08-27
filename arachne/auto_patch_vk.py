@@ -78,7 +78,8 @@ def patch(
 	loc_method = "localiser",
 	patch_target_key = None,
 	path_to_keras_model = None,
-	predef_indices_to_wrong = None,
+	predef_indices_to_chgd = None,
+	predef_indices_to_unchgd = None, 
 	#top_n = -1,
 	seed = 1,
 	only_loc = False,
@@ -155,61 +156,69 @@ def patch(
 	correct_predictions = np.argmax(predictions, axis = 1)
 	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
 
-	indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
+	if not only_loc:
+		indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
+		#check whether gien predef_indices_to_chgd to wrong is actually correct
+		if predef_indices_to_chgd is not None:  # Since, here, we asssume an ideal model
+			diff = set(predef_indices_to_chgd) - set(indices_to_target['wrong'])
+			print (len(predef_indices_to_chgd), len(indices_to_target['wrong']))
+			print (predef_indices_to_chgd[:10])
+			print (indices_to_target['wrong'][:10])
+			### THIS ASSERTION MUST BE CHANGED IF WE WANT TO APPLY REPAIR(?) ON THE MOST INFLUENTIAL NWS
+			assert len(diff) == 0, diff 
+		indices_to_target['wrong'] = predef_indices_to_chgd
+	else: # only loc, so do not need to care about correct and wrong classification
+		assert predef_indices_to_unchgd is not None, "For this, both the list of changed and unchanged should be given"
+		indices_to_target = {'wrong':predef_indices_to_chgd, 'correct':predef_indices_to_unchgd}	
 
-	#check whether gien predef_indices_to_wrong to wrong is actually correct
-	if predef_indices_to_wrong is not None:
-		diff = set(predef_indices_to_wrong) - set(indices_to_target['wrong'])
-		print (len(predef_indices_to_wrong), len(indices_to_target['wrong']))
-		print (predef_indices_to_wrong[:10])
-		print (indices_to_target['wrong'][:10])
-		### THIS ASSERTION MUST BE CHANGED IF WE WANT TO APPLY REPAIR(?) ON THE MOST INFLUENTIAL NWS
-		assert len(diff) == 0, diff 
-		indices_to_target['wrong'] = predef_indices_to_wrong
-
+	################ !!!!!!!!! for only loc we are looking at unchanged 	
+	
 	indices_to_selected_wrong = indices_to_target['wrong'] # target all of them 
 	print ('Total number of wrongly processed input(s): {}'.format(len(indices_to_selected_wrong)))
-
 	indices_to_correct = indices_to_target['correct']
 	#if which == 'GTSRB':
 	#	num = int(len(indices_to_correct)/2)
 	#	indices_to_correct = np.random.choice(indices_to_correct, num, replace = False)
 	#	print ("Due to memory allocation error, we use only half of it: {} -> {}".format(len(indices_to_correct), num))
 	# logging
-	print ('Number of wrong: %d' % (len(indices_to_selected_wrong)))
 
 	# extract the input vectors that are directly related to our target 
 	# correct one first, followed by misclassified ones
 	# FOR LFW, THIS WILL BE USED TO SLICE THE PRE-COMPUTE ATS
 	new_indices_to_target = list(indices_to_correct) + list(indices_to_selected_wrong) 
+	print ("New", len(new_indices_to_target))
 	# set input for the searcher -> searcher will look only upon this input hereafter
 
 	### sample inputs for localisation (newly added) ###################
-	_, indices_to_correct = run_localise.sample_input_for_loc(
+	# sampled_indices_to_correct -> will be used for localisation only. For the APR, all correct inputs will be used as default, but, actually I plan to compare both 
+	### NOT SURE WHEHTER THE CURRENT IMPLEMENTATION OF SAMPLE_INPUT_FOR_LOC SUPPORT THE SAMPLING OF INCORRECT INPUTS
+	_, sampled_indices_to_correct = run_localise.sample_input_for_loc(
 		indices_to_selected_wrong, 
 		indices_to_correct, # since we assume an ideal model, unchanged inputs == correct inputs
-		predictions[new_indices_to_target], data_y[new_indices_to_target],
+		predictions[new_indices_to_target], data_y[new_indices_to_target], 
 		seed)
 	
 	# redefine new_indices_to_target
 	new_indices_to_target = list(indices_to_selected_wrong) + list(indices_to_correct)
+	new_indices_for_loc = list(indices_to_selected_wrong) + list(sampled_indices_to_correct)
 	####################################################################
 
 	# extraction for the target predictions
 	predictions = predictions[new_indices_to_target] # slice
 	# extraction for data
-	X = data_X[new_indices_to_target]
-	y = data_y[new_indices_to_target]
+	X = data_X[new_indices_to_target]; X_for_loc = data_X[new_indices_for_loc]
+	y = data_y[new_indices_to_target]; y_for_loc = data_y[new_indices_for_loc]
 
 	########### For logging & testing ############# 
-	num_of_our_target = len(new_indices_to_target)
+	num_of_our_target = len(new_indices_to_target); num_of_our_loc_target = len(new_indices_for_loc)
 	num_of_wrong = len(indices_to_selected_wrong)
 	num_of_correct = len(indices_to_correct)
 
 	print ("The number of our target:%d, (%d(correct), %d(wrong))" % (num_of_our_target, num_of_correct, num_of_wrong))
 	# set new local indices to correct & wrong for the new predictions
-	indices_to_correct = list(range(0, num_of_correct))
-	indices_to_selected_wrong = list(range(num_of_correct, num_of_our_target))
+	indices_to_selected_wrong = list(range(0, num_of_wrong))
+	indices_to_correct = list(range(num_of_wrong, num_of_our_target))
+	indices_to_correct_for_loc = list(range(num_of_wrong, num_of_our_loc_target))
 
 	assert_msg = "%d + %d vs %d" % (len(indices_to_correct), len(indices_to_selected_wrong), num_of_our_target)
 	assert len(indices_to_correct) + len(indices_to_selected_wrong) == num_of_our_target, assert_msg
@@ -229,7 +238,7 @@ def patch(
 			top_n = -1
 
 		indices_w_costs = run_localise.localise_by_gradient(
-				X, y,
+				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
@@ -249,7 +258,7 @@ def patch(
 	elif loc_method == 'old_localiser': # will be deleted 
 		if loc_file is None or not (os.path.exists(loc_file)):
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v2(
-				X, y,
+				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
@@ -272,18 +281,21 @@ def patch(
 
 	elif loc_method == 'localiser':
 		if loc_file is None or not (os.path.exists(loc_file)):
+			print (indices_to_correct)
+			print (indices_to_selected_wrong)
+			print ("Now ready to localiser")
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v3(
-				[X[indices_to_selected_wrong], y[indices_to_selected_wrong]]
-				[X[indices_to_correct], y[indices_to_correct]],
+				[X_for_loc[indices_to_selected_wrong], y_for_loc[indices_to_selected_wrong]],
+				[X_for_loc[indices_to_correct_for_loc], y_for_loc[indices_to_correct_for_loc]],
 				indices_to_selected_wrong,
-				indices_to_correct,
+				indices_to_correct_for_loc,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
 
 			print ("Places to fix", indices_to_places_to_fix)
 
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join("new_loc/{}".format(which))
+			loc_dest = os.path.join("new_loc/{}/c_loc".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
@@ -380,6 +392,8 @@ def patch(
 
 		places_to_fix = indices_to_places_to_fix
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)
+		## HERE, Due to our new defintion of localisation, we may have to call set_indices_to_correct
+		## But, not sure yet... maybe, since this won't take much, just use all correct behaviour
 		
 		name_key = str(0) if patch_target_key is None else str(patch_target_key)
 		

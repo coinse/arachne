@@ -721,10 +721,12 @@ def generate_FI_tensor_cnn_v2(t_w_v):
 def sample_input_for_loc(
 	indices_to_chgd, 
 	indices_to_unchgd, 
-	predictions, init_pred_labels,
+	predictions, init_predictions,
 	seed):
 	"""
 	prediction -> model ouput. Right before outputing as the final classification result 
+		from 0~len(indices_to_unchgd)-1, the results of unchagned
+		from len(indices_to_unchgd)~end, the results of changed 
 	## in auto_patch.patch: new_indices_to_target = list(indices_to_correct) + list(indices_to_selected_wrong) 
 	sample the indices to changed and unchanged behaviour later used for localisation 
 	"""
@@ -735,25 +737,37 @@ def sample_input_for_loc(
 		return indices_to_chgd, indices_to_unchgd
 
 	pred_labels = np.argmax(predictions, axis = 1)
+	init_pred_labels = np.argmax(init_predictions, axis = 1)
+	_indices = np.zeros(len(indices_to_unchgd) + len(indices_to_chgd))
+	_indices[:len(indices_to_unchgd)] = indices_to_unchgd
+	_indices[len(indices_to_unchgd):] = indices_to_chgd
 	# checking]
 	_indices_to_unchgd = np.where(pred_labels == init_pred_labels)[0]; _indices_to_unchgd.sort()
 	indices_to_unchgd = np.asarray(indices_to_unchgd); indices_to_unchgd.sort()
 	_indices_to_chgd = np.where(pred_labels != init_pred_labels)[0]; _indices_to_chgd.sort()
 	indices_to_chgd = np.asarray(indices_to_chgd); indices_to_chgd.sort()
-	assert all(_indices_to_unchgd == indices_to_unchgd)
-	assert all(_indices_to_chgd == indices_to_chgd)
+
+	assert all(indices_to_unchgd == _indices[_indices_to_unchgd])
+	assert all(indices_to_chgd == _indices[_indices_to_chgd])
 	# checking end
 
-	uniq_labels = sorted(list(set(init_pred_labels[indices_to_unchgd])))
+	# here, only the labels of the initial predictions are considered
+	uniq_labels = sorted(list(set(init_pred_labels[_indices_to_unchgd])))
 	grouped_by_label = {uniq_label:[] for uniq_label in uniq_labels}
-	for idx in indices_to_unchgd:	
+	for idx in _indices_to_unchgd:	
 		pred_label = pred_labels[idx]
 		grouped_by_label[pred_label].append(idx)
 
-	num_unchgd = len(indices_to_unchgd)
+	## by the prediction result: c_y -> c_pred
+	init_pred_labels[_indices_to_unchgd], y
+
+	print ("Sampled", [(k, len(vs)) for k,vs in grouped_by_label.items()])
+	num_unchgd = len(_indices_to_unchgd)
 	sampled_indices_to_unchgd = {}
+	num_total_sampled = 0
 	for uniq_label,vs in grouped_by_label.items():
 		num_sample = int(np.round(num_chgd * len(vs)/num_unchgd))
+		print ("++", num_sample, len(vs)/num_unchgd)
 		if num_sample <= 0:
 			num_sample = 1
 		
@@ -761,7 +775,9 @@ def sample_input_for_loc(
 			num_sample = len(vs)
 
 		sampled_indices_to_unchgd[uniq_label] = np.random.choice(vs, num_sample, replace = False)
+		num_total_sampled += num_sample
 
+	print ("Total number of sampled: {}".format(num_total_sampled))
 	return indices_to_chgd, sampled_indices_to_unchgd
 
 

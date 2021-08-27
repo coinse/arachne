@@ -227,6 +227,12 @@ def split_into_wrong_and_correct(correct_predictions):
 	return indices
 
 
+def split_into_chgd_and_unchgd():
+	"""
+	"""
+	pass
+
+
 def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = True):
 	"""
 	"""

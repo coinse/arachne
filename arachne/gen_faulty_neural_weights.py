@@ -63,7 +63,7 @@ def is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, min_nu
 		return False
 
 
-def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False):
+def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False, test_mdl = None, test_ys = None):
 	"""
 	"""
 	import tensorflow as tf
@@ -86,8 +86,16 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	num_prev_corr = num_init_corr
 	by = by_v # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.001 #0005
+	chg_limit = 0.005 #0.001 #0005
 	print (num_inputs * chg_limit)
+	### for testing
+	if test_mdl is not None:
+		print (k_fn_mdl_test)
+		test_init_predictions, _ = k_fn_mdl_test([target_weights[idx][0] for idx in indices_to_tls] + [test_ys])
+		test_init_corr_predictions = np.argmax(test_init_predictions, axis = 1)
+		test_init_corr_predictions = test_init_corr_predictions == np.argmax(test_ys, axis = 1)
+		test_num_init_corr = np.sum(test_init_corr_predictions)
+	###
 
 	which_direction_arr = np.ones(len(selected_neural_weights))
 	print ("Number of selected neural weights", len(selected_neural_weights))
@@ -101,8 +109,8 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 		w = target_weights[idx_to_tl][0]
 		std_v = np.std(w)
 		mean_v = np.mean(w)
-		bound_l = np.min([mean_v - 3 * std_v, np.quantile(w, 0.25)])
-		bound_r = np.max([mean_v + 3 * std_v, np.quantile(w, 0.75)])
+		bound_l = np.max([mean_v - 3 * std_v, np.min(w)]) #np.quantile(w, 0.25)])
+		bound_r = np.min([mean_v + 3 * std_v, np.max(w)])  #np.quantile(w, 0.75)])
 		bound_lr_vs[idx_to_tl] = [bound_l, bound_r]
 
 	print (bound_lr_vs)
@@ -146,8 +154,8 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 							break
 					else:
 						which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
-						init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
-						#init_weight[tuple(idx)] = delta[tuple(idx)]*which_dir
+						#init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
+						init_weight[tuple(idx)] = delta[tuple(idx)]*which_dir
 
 					#print ("++", init_weight[tuple(idx)], which_dir, org_weights[idx_to_tl][tuple(idx)], delta[tuple(idx)]*which_dir)
 					#print ("++", init_weight[tuple(idx)], delta[tuple(idx)]*which_direction[(idx_to_tl,tuple(idx))])
@@ -160,15 +168,24 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 		aft_predictions, _ = k_fn_mdl(deltas_as_lst + [ys])
 		aft_corr_predictions = np.argmax(aft_predictions, axis = 1)
 		aft_corr_predictions = aft_corr_predictions == np.argmax(ys, axis = 1)
-
+		
 		# check whehter the accuracy decreases
 		num_aft_corr = np.sum(aft_corr_predictions)
+		### testing
+		if test_mdl is not None:
+			test_aft_predictions, _ = k_fn_mdl_test(deltas_as_lst + [test_ys])
+			test_aft_corr_predictions = np.argmax(test_aft_predictions, axis = 1)
+			test_aft_corr_predictions = test_aft_corr_predictions == np.argmax(test_ys, axis = 1)
+			test_num_aft_corr = np.sum(test_aft_corr_predictions)
+		###
 		print ("Current: {} vs {} vs {}".format(num_aft_corr, num_prev_corr, num_init_corr), is_out_of_bound)
+		if test_mdl is not None:
+			print ("\t", test_num_aft_corr, test_num_init_corr, test_num_init_corr - test_num_aft_corr)
 		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr, by)
 		##
 		print (num_init_corr - num_aft_corr, num_inputs * chg_limit)	
-		if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
-		#if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
+		#if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
+		if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
 			print ("Accuracy has been decreased: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
 			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
 			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
@@ -244,7 +261,10 @@ if __name__ == "__main__":
 
 	k_fn_mdl, target_weights = generate_base_mdl(args.model_path, train_data[0], 
 		indices_to_target = None, target_all = bool(args.target_all))
-
+	####
+	k_fn_mdl_test, _ = generate_base_mdl(args.model_path, test_data[0],
+		indices_to_target = None, target_all = bool(args.target_all))
+	####
 	num_sample = args.num_sample
 	indices_to_target_layers = list(target_weights.keys())
 	selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
@@ -253,11 +273,12 @@ if __name__ == "__main__":
 	from collections import Iterable
 	if not isinstance(train_data[1][0], Iterable):
 		new_ys = data_util.format_label(train_data[1], num_label)
+		new_ys_test = data_util.format_label(test_data[1], num_label)
 	else:
 		new_ys = train_data[1]
 
 	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights(
-		k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))
+		k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
 	
 	print ("Changed Accuracy: {}".format(num_aft_corr/len(train_data[1])))
 	deltas_of_snws = pd.DataFrame.from_dict(deltas_of_snws)

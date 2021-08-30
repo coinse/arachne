@@ -806,7 +806,6 @@ def sample_input_for_loc_sophis(
 	return indices_to_chgd, sampled_indices_to_unchgd
 
 
-
 def compute_FI_and_GL(
 	X, y,
 	indices_to_target,
@@ -1512,6 +1511,64 @@ def localise_by_gradient(
 
 	return sorted_costs_and_keys
 
+def localise_by_gradient_v2(
+	X, y,
+	indices_to_chgd,
+	indices_to_unchgd,
+	target_weights,
+	path_to_keras_model = None):
+	"""
+	localise offline
+	"""
+	total_cands = {}
+
+	print ('Total {} layers are targeted'.format(len(target_weights)))
+	t0 = time.time()
+	## slice inputs
+
+	loc_start_time = time.time()
+	##
+	for idx_to_tl, vs in target_weights.items():
+		t_w, lname = vs
+		print ("targeting layer {} ({})".format(idx_to_tl, lname))
+		
+		t1 = time.time()
+		if is_C2D(lname):
+			by_batch = True
+		else:
+			by_batch = False
+
+		grad_scndcr_for_chgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_chgd], y[indices_to_chgd], by_batch = True)
+		grad_scndcr_for_unchgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_unchgd], y[indices_to_unchgd], by_batch = True)
+		t2 = time.time()
+
+		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
+		assert t_w.shape == grad_scndcr_for_chgd.shape, "{} vs {}".format(t_w.shape, grad_scndcr_for_chgd.shape)
+
+		total_cands[idx_to_tl] = {'shape':grad_scndcr_for_chgd.shape, 'costs':grad_scndcr_for_chgd.flatten()/(1.+grad_scndcr_for_unchgd.flatten())}
+	
+	t3 = time.time()
+	print ("Time for computing total costs: {}".format(t3 - t0))
+
+	# compute pareto front
+	indices_to_tl = list(total_cands.keys())
+	costs_and_keys = [([idx_to_tl, np.unravel_index(local_i, total_cands[idx_to_tl]['shape'])], c) 
+		for idx_to_tl in indices_to_tl 
+		for local_i,c in enumerate(total_cands[idx_to_tl]['costs'])]
+	
+	costs = np.asarray([vs[1] for vs in costs_and_keys])
+	#print (costs_and_keys[0])
+	#print (costs[0])
+	#print (costs[:10], costs[-10:])
+	print ("Indices", indices_to_tl)
+	print ("the number of total cands: {}".format(len(costs)))
+	#print (total_cands)
+
+	sorted_costs_and_keys = sorted(costs_and_keys, key = lambda vs:vs[1], reverse = True)
+	loc_end_time = time.time()
+	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
+
+	return sorted_costs_and_keys
 
 def localise_by_random_selection(number_of_place_to_fix, target_weights):
 	"""

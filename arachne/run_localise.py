@@ -718,11 +718,35 @@ def generate_FI_tensor_cnn_v2(t_w_v):
 	return {'output':output, 'curr_prev_output_slice':curr_prev_output_slice, 't_w_t':t_w_t, 'idx_to_out_channel':idx_to_out_channel}
 
 
-def sample_input_for_loc(
+def sample_input_for_loc_by_rd(
+	indices_to_chgd, 
+	indices_to_unchgd,
+	predictions = None, init_predictions = None):
+	"""
+	By default, we assume the random sampling is enough to reflect the initial prediction distributiuon of indices_to_unchgd
+	"""
+	num_chgd = len(indices_to_chgd)
+	if num_chgd >= len(indices_to_unchgd): # no need to do any sampling
+		return indices_to_chgd, indices_to_unchgd
+	
+	if predictions is None and init_predictions is None:
+		print (indices_to_unchgd[0])
+		print (num_chgd)
+		sampled_indices_to_unchgd = np.random.choice(indices_to_unchgd, num_chgd, replace = False)	
+		return indices_to_chgd, sampled_indices_to_unchgd
+	else:
+		_, sampled_indices_to_unchgd = sample_input_for_loc_sophis(
+			indices_to_chgd, 
+			indices_to_unchgd, 
+			predictions, init_predictions, len(indices_to_target))
+
+		return indices_to_chgd, sampled_indices_to_unchgd
+
+
+def sample_input_for_loc_sophis(
 	indices_to_chgd, 
 	indices_to_unchgd, 
-	predictions, init_predictions,
-	seed):
+	predictions, init_predictions):
 	"""
 	prediction -> model ouput. Right before outputing as the final classification result 
 		from 0~len(indices_to_unchgd)-1, the results of unchagned
@@ -730,12 +754,6 @@ def sample_input_for_loc(
 	## in auto_patch.patch: new_indices_to_target = list(indices_to_correct) + list(indices_to_selected_wrong) 
 	sample the indices to changed and unchanged behaviour later used for localisation 
 	"""
-	np.random.seed(seed)
-
-	num_chgd = len(indices_to_chgd)
-	if num_chgd >= len(indices_to_unchgd): # no need to do any sampling
-		return indices_to_chgd, indices_to_unchgd
-
 	pred_labels = np.argmax(predictions, axis = 1)
 	init_pred_labels = np.argmax(init_predictions, axis = 1)
 	_indices = np.zeros(len(indices_to_unchgd) + len(indices_to_chgd))
@@ -759,11 +777,18 @@ def sample_input_for_loc(
 		grouped_by_label[pred_label].append(idx)
 
 	## by the prediction result: c_y -> c_pred
-	init_pred_labels[_indices_to_unchgd], y
+	#grouped_by_label = {}
+	#for idx, (init_predv, yv) in enumerate(list(zip(init_pred_labels[_indices_to_unchgd], ys[_indices_to_unchgd]))):
+	#	k = yv, init_predv
+	#	if k not in grouped_by_label.keys():
+	#		grouped_by_label[k] = []
+	#		uniq_labels.append(k)
+	#	grouped_by_label[k].append(idx)
+	###
 
 	print ("Sampled", [(k, len(vs)) for k,vs in grouped_by_label.items()])
 	num_unchgd = len(_indices_to_unchgd)
-	sampled_indices_to_unchgd = {}
+	sampled_indices_to_unchgd = []
 	num_total_sampled = 0
 	for uniq_label,vs in grouped_by_label.items():
 		num_sample = int(np.round(num_chgd * len(vs)/num_unchgd))
@@ -774,7 +799,7 @@ def sample_input_for_loc(
 		if num_sample > len(vs):
 			num_sample = len(vs)
 
-		sampled_indices_to_unchgd[uniq_label] = np.random.choice(vs, num_sample, replace = False)
+		sampled_indices_to_unchgd.extend(list(np.random.choice(vs, num_sample, replace = False)))
 		num_total_sampled += num_sample
 
 	print ("Total number of sampled: {}".format(num_total_sampled))
@@ -801,6 +826,7 @@ def compute_FI_and_GL(
 	print ('Total {} layers are targeted'.format(len(target_weights)))
 	t0 = time.time()
 	## slice inputs
+	print (X.shape, np.max(indices_to_target), len(indices_to_target))
 	target_X = X[indices_to_target]
 	target_y = y[indices_to_target]
 
@@ -1083,8 +1109,7 @@ def localise_offline_v2(
 
 
 def localise_offline_v3(
-	chgd_input,
-	unchgd_input, 
+	X, y,
 	indices_to_chgd,
 	indices_to_unchgd,
 	target_weights,
@@ -1092,31 +1117,30 @@ def localise_offline_v3(
 	"""
 	here, we want to find those likely to be highly influential to the changed behaviour while less influential to the unchanged behaviour
 	"""
-	chgd_X, chgd_y = chgd_input
-	unchgd_X, unchgd_y = unchgd_input
 
 	loc_start_time = time.time()
 
 	# compute FI and GL with changed inputs
 	total_cands_chgd = compute_FI_and_GL(
-		chgd_X, chgd_y,
+		X, y,
 		indices_to_chgd,
 		target_weights,
 		path_to_keras_model = path_to_keras_model)
 
 	# compute FI and GL with unchanged inputs
 	total_cands_unchgd = compute_FI_and_GL(
-		unchgd_X, unchgd_y,
+		X, y,
 		indices_to_unchgd,
 		target_weights,
 		path_to_keras_model = path_to_keras_model)
+
 
 	indices_to_tl = list(total_cands_chgd.keys()) 
 	costs_and_keys = []
 	shapes = {}
 	for idx_to_tl in indices_to_tl:
-		cost_from_chgd = total_cands_chgd[idx_to_tl]['cost']
-		cost_from_unchgd = total_cands_unchgd[idx_to_tl]['cost']
+		cost_from_chgd = total_cands_chgd[idx_to_tl]['costs']
+		cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
 		## key: more influential to changed behaviour and less influential to unchanged behaviour
 		costs_combined = cost_from_chgd/cost_from_unchgd # shape = (N,2)
 		shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']

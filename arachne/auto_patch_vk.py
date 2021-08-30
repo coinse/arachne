@@ -171,8 +171,6 @@ def patch(
 		assert predef_indices_to_unchgd is not None, "For this, both the list of changed and unchanged should be given"
 		indices_to_target = {'wrong':predef_indices_to_chgd, 'correct':predef_indices_to_unchgd}	
 
-	################ !!!!!!!!! for only loc we are looking at unchanged 	
-	
 	indices_to_selected_wrong = indices_to_target['wrong'] # target all of them 
 	print ('Total number of wrongly processed input(s): {}'.format(len(indices_to_selected_wrong)))
 	indices_to_correct = indices_to_target['correct']
@@ -192,12 +190,15 @@ def patch(
 	### sample inputs for localisation (newly added) ###################
 	# sampled_indices_to_correct -> will be used for localisation only. For the APR, all correct inputs will be used as default, but, actually I plan to compare both 
 	### NOT SURE WHEHTER THE CURRENT IMPLEMENTATION OF SAMPLE_INPUT_FOR_LOC SUPPORT THE SAMPLING OF INCORRECT INPUTS
-	_, sampled_indices_to_correct = run_localise.sample_input_for_loc(
-		indices_to_selected_wrong, 
-		indices_to_correct, # since we assume an ideal model, unchanged inputs == correct inputs
-		predictions[new_indices_to_target], data_y[new_indices_to_target], 
-		seed)
-	
+	if only_loc:
+		print ("Target to sample", indices_to_correct[0])
+		print ("\t", indices_to_selected_wrong[0])
+		_, sampled_indices_to_correct = run_localise.sample_input_for_loc_by_rd(indices_to_selected_wrong, indices_to_correct)
+			#predictions[new_indices_to_target], data_y[new_indices_to_target])
+	else:
+		_, sampled_indices_to_correct = run_localise.sample_input_for_loc_by_rd(
+			indices_to_selected_wrong, indices_to_correct, predictions[new_indices_to_target], data_y[new_indices_to_target])
+
 	# redefine new_indices_to_target
 	new_indices_to_target = list(indices_to_selected_wrong) + list(indices_to_correct)
 	new_indices_for_loc = list(indices_to_selected_wrong) + list(sampled_indices_to_correct)
@@ -281,12 +282,10 @@ def patch(
 
 	elif loc_method == 'localiser':
 		if loc_file is None or not (os.path.exists(loc_file)):
-			print (indices_to_correct)
-			print (indices_to_selected_wrong)
+			print (len(indices_to_correct_for_loc), len(indices_to_selected_wrong))
 			print ("Now ready to localiser")
 			indices_to_places_to_fix, front_lst = run_localise.localise_offline_v3(
-				[X_for_loc[indices_to_selected_wrong], y_for_loc[indices_to_selected_wrong]],
-				[X_for_loc[indices_to_correct_for_loc], y_for_loc[indices_to_correct_for_loc]],
+				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
 				indices_to_correct_for_loc,
 				target_weights,

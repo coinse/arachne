@@ -100,7 +100,7 @@ if __name__ == "__main__":
 	#print ("Indices to wrong", indices_to_wrong)
 	indices_to_chgd = chgds.index.values
 	print ("Indices to changed", indices_to_chgd, len(indices_to_chgd))
-	indices_to_unchgd = unchgds.values
+	indices_to_unchgd = unchgds.index.values
 	#dest = args.dest
 	#os.makedirs(dest, exist_ok = True)
 	#path_to_loc_file = set_loc_name(dest, args.aft_pred_file, args.seed)
@@ -154,13 +154,20 @@ if __name__ == "__main__":
 		gts = list(zip(gts_layer, gts_weight)) # a list of [layer, index to a weight (np.ndarray)]
 
 		localised_at = []
-		for i, (l_idx, w_idx) in enumerate(indices_to_places_to_fix):
-			_indices_to_l = np.where(gts_layer == l_idx)[0]
-			if len(_indices_to_l) > 0: # is within 
-				_indices_to_w = np.where(list(map(np.array_equal, 
-					gts_weight, len(gts_weight)*[np.asarray(w_idx)])))[0]
-				if len(_indices_to_w) > 0:
-					localised_at.append(i)
+		print ("Selected")
+	
+		layers_from_loc = np.asarray([vs[0] for vs in indices_to_places_to_fix])
+		layers_from_gt = gts_layer
+		intersected = np.intersect1d(layers_from_loc, layers_from_gt)
+		if len(intersected) > 0:
+			for i, (l_idx, w_idx) in enumerate(indices_to_places_to_fix):
+				if l_idx in intersected:
+					_indices_to_l = np.where(gts_layer == l_idx)[0]
+					_indices_to_w = np.where(list(map(np.array_equal, gts_weight, len(gts_weight)*[np.asarray(w_idx)])))[0]
+					indices_to_common = np.intersect1d(_indices_to_l, _indices_to_w)
+					if len(indices_to_common) > 0:
+						localised_at.append(i)
+						print("Inclu", i, l_idx, w_idx, _indices_to_w)
 
 		if args.loc_method == 'localiser':
 			print ("Localised within the pareto front of the length of {}".format(len(indices_to_places_to_fix)))

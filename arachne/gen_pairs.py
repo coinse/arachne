@@ -80,10 +80,10 @@ def compute_pareto(costs, curr_nodes_to_lookat):
 		costs = np.delete(costs, is_efficient, 0)
 	
 		t2 = time.time()
-		#print ("For computing pareto front", t2 - t1)
-		#print ("\tremain: {} out of {}: {} ({})".format(len(costs), num_total, num_total - len(costs), len(current_ret)))
-		if len(ret_lst) > 20000: #500:
-			break		
+		print ("For computing pareto front", t2 - t1)
+		print ("\tremain: {} out of {}: {} ({})".format(len(costs), num_total, num_total - len(costs), len(current_ret)))
+		#if len(ret_lst) > 4000:
+		#	break		
 	#sys.exit()
 	return ret_lst
 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 	dest = os.path.join(args.loc_dir, "pairs/{}".format(args.loc_which))
 	os.makedirs(dest, exist_ok = True)
 
-	for seed in [0]:#tqdm.tqdm(range(30)):
+	for seed in [1]:#tqdm.tqdm(range(30)):
 		curr_loc_file = os.path.join(args.loc_dir, loc_file.format(seed))
 		pairs = get_weight_and_cost(args.loc_which, seed, curr_loc_file, target_weights, method = 'max')
 		df = pd.DataFrame(list(pairs.items()))

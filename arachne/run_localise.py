@@ -1117,7 +1117,7 @@ def localise_offline_v3(
 	"""
 	here, we want to find those likely to be highly influential to the changed behaviour while less influential to the unchanged behaviour
 	"""
-
+	from scipy.stats import ks_2samp
 	loc_start_time = time.time()
 
 	# compute FI and GL with changed inputs
@@ -1142,17 +1142,18 @@ def localise_offline_v3(
 		cost_from_chgd = total_cands_chgd[idx_to_tl]['costs']
 		cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
 		## key: more influential to changed behaviour and less influential to unchanged behaviour
-		costs_combined = cost_from_chgd/cost_from_unchgd # shape = (N,2)
+		## +1 to the denominator to prevent divide-by-zero
+		print ("+++", idx_to_tl, ks_2samp(cost_from_chgd[:,0], cost_from_unchgd[:,0]))
+		print ("---", idx_to_tl, ks_2samp(cost_from_chgd[:,1], cost_from_unchgd[:,1]))
+		costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
 		shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']
 
 		for i,c in enumerate(costs_combined):
 			costs_and_keys.append(([idx_to_tl, i], c))
 
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
-
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
-
 	# a list of [index to the target layer, index to a neural weight]
 	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], shapes[vs[0][0]])] for vs in costs_and_keys]
 
@@ -1168,7 +1169,7 @@ def localise_offline_v3(
 		_costs = _costs[nondominated_point_mask]
 		next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1	
 
-	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes)[is_efficient]]
+	pareto_front = [tuple(v) for v in np.asarray(indices_to_nodes, dtype = object)[is_efficient]]
 	#pareto_front = [[int(idx_to_tl), [int(v) for v in inner_indices.split(",")]] for idx_to_tl,inner_indices in pareto_front]
 	##
 	t5 = time.time()

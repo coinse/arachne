@@ -316,6 +316,7 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 						init_weight[tuple(idx)] += which_direction[k] * (delta[tuple(idx)] * by[k])
 						## check whether a new value exceeeds the bound
 						if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
+						#if False:
 							is_out_of_bound += 1
 							print ("out of bound: ", bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
 							# go back to the previous value
@@ -359,9 +360,10 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 			
 			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
 		elif is_rd:
+			print ("here", num_chgd)
 			continue
 		else:
-			if is_out_of_bound < 10 * len(selected_neural_weights): # out of bound for more than 10 consecutive runs
+			if is_out_of_bound > 10 * len(selected_neural_weights): # out of bound for more than 10 consecutive runs
 				is_out_of_bound = 0
 				# set to init weight
 				for idx_to_tl in indices_to_tls:
@@ -369,14 +371,16 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 				for k in by.keys():
 					by[k] = by_v
 			else: # num_prev == num_aft_corr (nothing has been changed)
-				print ("here", num_prev_chgd - num_chgd, num_chgd)
+				print ("here: {} -> {} ({})".format(num_prev_chgd, num_chgd, num_chgd - num_prev_chgd))
 				if num_prev_chgd > num_chgd: # has been improved from the "previous" result (but, still below the initial results)
 					for vs in selected_neural_weights:
 						which_direction[(vs[0], tuple(vs[1]))] *= -1
 
 				num_prev_chgd = num_chgd
 				for k in by.keys():	
-					by[k] += by[k]/2
+					by[k] += by_v/2# by[k]/2
+					print ("By", k, by[k])
+					#if False:
 					if by[k] > 3:
 						print ("Out of the initial distribution: {}".format(by[k]))
 						for idx_to_tl in indices_to_tls:

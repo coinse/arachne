@@ -234,6 +234,160 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 					print ("Increase by and start again", by)
 
 
+def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False, test_mdl = None, test_ys = None):
+	"""
+	the criterion would be the changes
+	"""
+	import tensorflow as tf
+	import time
+
+	# initial prediction
+	indices_to_tls = sorted(list(target_weights.keys()))
+	init_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys])
+	init_predictions = np.argmax(init_pred_probas, axis = 1)
+	
+	# 
+	indices_to_sel_w_tls = np.asarray([vs[0] for vs in selected_neural_weights])
+	indices_to_uniq_sel_w_tls = np.unique(indices_to_sel_w_tls)
+	indices_to_uniq_sel_w_tls.sort()
+	indices_to_sel_ws = np.asarray([vs[1] for vs in selected_neural_weights]) 
+
+	num_inputs = len(ys)
+	prev_predictions = np.copy(init_predictions)
+
+	by = {(vs[0],tuple(vs[1])):by_v for vs in selected_neural_weights} # starting from here
+	print ("By: {}".format(by))
+	chg_limit = 0.005 #0.001 #0005
+	print ("\t{} number of inputs should be changed".format(num_inputs * chg_limit))
+	### for testing
+	if test_mdl is not None: # to check the generalisability of the changes (can be removed later)
+		test_init_pred_probas, _ = k_fn_mdl_test([target_weights[idx][0] for idx in indices_to_tls] + [test_ys])
+		test_init_predictions = np.argmax(test_init_pred_probas, axis = 1)
+	###
+
+	which_direction_arr = np.ones(len(selected_neural_weights))
+	print ("Number of selected neural weights", len(selected_neural_weights))
+	which_direction_arr[np.where(which_direction_arr > 0.5)[0]] = -1.
+	which_direction = {(vs[0],tuple(vs[1])):d for vs,d in zip(selected_neural_weights, which_direction_arr)}
+
+	org_weights = {idx_to_tl:np.copy(target_weights[idx_to_tl][0]) for idx_to_tl in indices_to_tls}
+
+	bound_lr_vs = {}
+	for idx_to_tl in indices_to_uniq_sel_w_tls:
+		w = target_weights[idx_to_tl][0]
+		std_v = np.std(w)
+		mean_v = np.mean(w)
+		bound_l = np.max([mean_v - 3 * std_v, np.min(w)]) #np.quantile(w, 0.25)])
+		bound_r = np.min([mean_v + 3 * std_v, np.max(w)])  #np.quantile(w, 0.75)])
+		bound_lr_vs[idx_to_tl] = [bound_l, bound_r]
+
+	print ("Boundary", bound_lr_vs)
+	t1 = time.time()
+	timeout = 60 * 10
+	num_prev_chgd = 0
+	is_out_of_bound = 0 # to count the consecutive out-of-bound cases 
+	while True:
+		t2 = time.time()
+		if t2 - t1 > timeout:
+			print ("Time out: {}".format(t2 - t1))
+			return None, None, None
+
+		deltas_as_lst = []
+		deltas_of_snws = {"layer":[], "w_idx":[], "init_v":[], "new_v":[]} # store current result
+		# update
+		for idx_to_tl in indices_to_tls:
+			init_weight, _ = target_weights[idx_to_tl]
+			if idx_to_tl not in indices_to_uniq_sel_w_tls:
+				deltas_as_lst.append(init_weight)
+			else:
+				w_stdev = np.std(org_weights[idx_to_tl])
+
+				local_indices_to_sel_nws = list(zip(*np.where(indices_to_sel_w_tls == idx_to_tl))) 
+				curr_indices_to_sel_nws = [indices_to_sel_ws[i] for i in local_indices_to_sel_nws]
+				#delta = by[idx_to_tl] * w_stdev * np.random.rand(*init_weight.shape)
+				delta = w_stdev * np.random.rand(*init_weight.shape)  
+
+				for idx in curr_indices_to_sel_nws:
+					k = (idx_to_tl, tuple(idx))
+					#
+					deltas_of_snws['init_v'].append(org_weights[idx_to_tl][tuple(idx)])
+					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])	
+					if not is_rd:
+						init_weight[tuple(idx)] += which_direction[k] * (delta[tuple(idx)] * by[k])
+						## check whether a new value exceeeds the bound
+						if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
+							is_out_of_bound += 1
+							print ("out of bound: ", bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
+							# go back to the previous value
+							init_weight[tuple(idx)] -= which_direction[k] * (delta[tuple(idx)] * by[k])
+							# reset the step size
+							by[k] = by[k]/2 # decrease the step size
+							which_direction[k] *= -1 # change the direction
+						else:
+							is_out_of_bound = 0 
+					else:
+						which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
+						#init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
+						init_weight[tuple(idx)] = delta[tuple(idx)] * which_dir
+
+					deltas_of_snws['layer'].append(idx_to_tl)
+					deltas_of_snws['w_idx'].append(idx)
+					deltas_of_snws['new_v'].append(init_weight[tuple(idx)])
+
+				deltas_as_lst.append(init_weight)
+
+		aft_pred_probas, _ = k_fn_mdl(deltas_as_lst + [ys])
+		aft_predictions = np.argmax(aft_pred_probas, axis = 1)
+		
+		# compute the number of changed inputs
+		num_chgd = np.sum(aft_predictions != prev_predictions)
+		# for the test dataset
+		if test_mdl is not None:
+			test_aft_pred_probas, _ = k_fn_mdl_test(deltas_as_lst + [test_ys])
+			test_aft_predictions = np.argmax(test_aft_pred_probas, axis = 1)
+			test_num_chgd = np.sum(test_init_predictions != test_aft_predictions) 		
+			print ("The number of changes in the test data set: {} ({}/{}), {}%".format(test_num_chgd, test_num_chgd, len(test_ys), 100*test_num_chgd/len(test_ys)))
+
+		if num_chgd >= num_inputs * chg_limit:
+			print ('Success!')
+			prev_corr_predictions = prev_predictions == np.argmax(ys, axis = 1)
+			aft_corr_predictions = aft_predictions == np.argmax(ys, axis =1)
+			num_broken = np.sum((prev_corr_predictions == 1) & (aft_corr_predictions == 0))
+			num_patched = np.sum((prev_corr_predictions == 0) & (aft_corr_predictions == 1))
+			print ("Total number of changes: {}\n\tNumber of broken: {}, number of patched: {}".format(num_chgd, num_broken, num_patched))
+			num_aft_corr = np.sum(aft_corr_predictions)
+			
+			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
+		elif is_rd:
+			continue
+		else:
+			if is_out_of_bound < 10 * len(selected_neural_weights): # out of bound for more than 10 consecutive runs
+				is_out_of_bound = 0
+				# set to init weight
+				for idx_to_tl in indices_to_tls:
+					target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
+				for k in by.keys():
+					by[k] = by_v
+			else: # num_prev == num_aft_corr (nothing has been changed)
+				print ("here", num_prev_chgd - num_chgd, num_chgd)
+				if num_prev_chgd > num_chgd: # has been improved from the "previous" result (but, still below the initial results)
+					for vs in selected_neural_weights:
+						which_direction[(vs[0], tuple(vs[1]))] *= -1
+
+				num_prev_chgd = num_chgd
+				for k in by.keys():	
+					by[k] += by[k]/2
+					if by[k] > 3:
+						print ("Out of the initial distribution: {}".format(by[k]))
+						for idx_to_tl in indices_to_tls:
+							target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
+						# reverse
+						which_direction = {tuple(vs):-1*d for vs,d in zip(selected_neural_weights, which_direction_arr)}
+						#
+						num_prev_chgd = 0
+						by[k] = by_v*2
+						print ("Increase by and start again", by[k])
+
 
 if __name__ == "__main__":
 	import argparse
@@ -277,7 +431,7 @@ if __name__ == "__main__":
 	else:
 		new_ys = train_data[1]
 
-	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights(
+	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(
 		k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
 	
 	print ("Changed Accuracy: {}".format(num_aft_corr/len(train_data[1])))

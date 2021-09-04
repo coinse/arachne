@@ -3,7 +3,6 @@ RQ1 script
 """
 import os, sys
 import pandas as pd
-from tensorflow.python.ops.gen_array_ops import tensor_strided_slice_update_eager_fallback
 import utils.data_util as data_util
 import auto_patch_vk as auto_patch
 from main_eval import read_and_add_flag, combine_init_aft_predcs
@@ -19,17 +18,21 @@ def return_target_fault_id(afile, seed):
 		df = pd.read_csv(afile)
 		return df.iloc[seed].id	
 
-def return_target_mdl_path(afile, seed, which):
+def return_target_mdl_and_gt_path(afile, seed, which_data):
 	"""
 	"""
+	which_keys = {'cifar10':'cifar', 'fashion_mnist':'fmnist'}
 	num_sample = 1
 	fault_id = return_target_fault_id(afile, seed)
-	which_key = which if which == 'cifar10' else 'fmnist'
+	which_key = which_keys[which_data]
 
 	target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_90p_seed{}.h5'	
-	target_mdl_path = target_mdl_path_fm.format(which, num_sample, which_key, fault_id)
+	target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
 
-	return target_mdl_path
+	target_gt_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/faulty_nws.{}.pkl'
+	target_gt_path = target_gt_path_fm.format(which_data, num_sample, fault_id)
+
+	return target_mdl_path, target_gt_path
 
 def get_brokens(combined_df):
 	"""
@@ -80,14 +83,15 @@ if __name__ == "__main__":
 	parser.add_argument("-target_all", type = int, default = 1)
 	parser.add_argument("-w_hist", type = int, default = 0)
 	# 
-	parser.add_argument("-gt_file", type = str, default = None)
+	#parser.add_argument("-gt_file", type = str, default = None)
 	# to retrieve those 
 	parser.add_argument("-fid_file", type = str, 
 		help = "a file that contains the ids (used seeds) of target faulty model", default = None)
 
 	args = parser.parse_args()	
 
-	path_to_faulty_model = return_target_mdl_path(args.fid_file, args.seed, args.which)
+	path_to_faulty_model, gt_file = return_target_mdl_and_gt_path(args.fid_file, args.seed, args.which_data)
+	print (path_to_faulty_model, gt_file)
 
 	# is_input_2d = True => to match the format with faulty model
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
@@ -100,7 +104,7 @@ if __name__ == "__main__":
 		#assert path_to_faulty_model is not None, "Neither aft_pred_file nor path_to_faulty_model is given"
 		from tensorflow.keras.models import load_model
 
-		faulty_mdl = load_model(path_to_faulty_model)
+		faulty_mdl = load_model(path_to_faulty_model, compile = False)
 		predcs = faulty_mdl.predict(train_X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(train_X).reshape(len(train_X),-1)
 		pred_labels = np.argmax(predcs, axis = 1)
 	
@@ -173,8 +177,9 @@ if __name__ == "__main__":
 
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
 
-	if args.gt_file is not None:
-		gt_df = pd.read_pickle(args.gt_file)
+	#if args.gt_file is not None:
+	if True:
+		gt_df = pd.read_pickle(gt_file)
 		gts_layer = gt_df.layer.values
 		gts_weight = gt_df.w_idx.values
 		gts = list(zip(gts_layer, gts_weight)) # a list of [layer, index to a weight (np.ndarray)]

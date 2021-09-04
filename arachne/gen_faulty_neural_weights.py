@@ -1,13 +1,14 @@
 import os, sys
 import utils.data_util as data_util
 import numpy as np
+from run_localise import compute_gradient_to_output
 
 def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True):
 	from tensorflow.keras.models import load_model, Model 
 	from gen_frame_graph import build_k_frame_model
 	from run_localise import get_target_weights
 
-	mdl = load_model(mdl_path)
+	mdl = load_model(mdl_path, compile = False)
 	target_weights = get_target_weights(mdl, mdl_path, 
 		indices_to_target = indices_to_target, target_all = target_all)
 	
@@ -18,7 +19,20 @@ def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True):
 	return k_fn_mdl, target_weights
 
 
-def random_sample_weights(target_ws, indices_to_target, num_sample = 1):
+def get_indices_to_grad_above_mean(path_to_keras_mdl, idx_to_tl, X):
+	"""
+	return the index to neural weights whose gradient is non-zero
+	"""
+	grad = np.abs(compute_gradient_to_output(path_to_keras_mdl, idx_to_tl, X, on_weight = True, wo_reset = True, by_batch = True))
+	mean_grad_v = np.mean(grad.flatten())
+	#print ("Grad", grad.shape)
+	indices_to_above_mean = list(zip(*np.where(grad > mean_grad_v)))
+	#print ("mean", idx_to_tl, len(indices_to_above_mean), mean_grad_v)
+	return indices_to_above_mean	
+
+
+#def random_sample_weights(path_to_keras_mdl, X, target_ws, indices_to_target, num_sample = 1):
+def random_sample_weights(path_to_keras_mdl, X, indices_to_target, num_sample = 1):
 	"""
 	"""
 	cand_layers = indices_to_target
@@ -29,9 +43,10 @@ def random_sample_weights(target_ws, indices_to_target, num_sample = 1):
 
 	selected_neural_weights = []
 	for idx in sel_layers:
-		target_w = target_ws[idx][0]
-		curr_indices = list(np.ndindex(target_w.shape))
-		sel_idx = curr_indices[np.random.choice(np.arange(len(curr_indices)), 1, replace = False)[0]]
+		indices_to_cand_ws = get_indices_to_grad_above_mean(path_to_keras_mdl, idx, X)
+		#target_w = target_ws[idx][0]
+		#curr_indices = list(np.ndindex(target_w.shape))
+		sel_idx = indices_to_cand_ws[np.random.choice(np.arange(len(indices_to_cand_ws)), 1, replace = False)[0]]
 		selected_neural_weights.append((idx, sel_idx))
 
 	return selected_neural_weights
@@ -86,7 +101,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	num_prev_corr = num_init_corr
 	by = by_v # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.005 #0.001 #0005
+	chg_limit = 0.001 #5 #0.001 #0005
 	print (num_inputs * chg_limit)
 	### for testing
 	if test_mdl is not None:
@@ -257,7 +272,7 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 
 	by = {(vs[0],tuple(vs[1])):by_v for vs in selected_neural_weights} # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.005 #0.001 #0005
+	chg_limit = 0.001 #0.001 #0005
 	print ("\t{} number of inputs should be changed".format(num_inputs * chg_limit))
 	### for testing
 	if test_mdl is not None: # to check the generalisability of the changes (can be removed later)
@@ -283,7 +298,7 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 
 	print ("Boundary", bound_lr_vs)
 	t1 = time.time()
-	timeout = 60 * 10
+	timeout = 60 * 5 #10
 	num_prev_chgd = 0
 	is_out_of_bound = 0 # to count the consecutive out-of-bound cases 
 	while True:
@@ -308,17 +323,18 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 				delta = w_stdev * np.random.rand(*init_weight.shape)  
 
 				for idx in curr_indices_to_sel_nws:
-					k = (idx_to_tl, tuple(idx))
+					k = (idx_to_tl, tuple(idx)) # key to a neural weight
 					#
 					deltas_of_snws['init_v'].append(org_weights[idx_to_tl][tuple(idx)])
 					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])	
 					if not is_rd:
 						init_weight[tuple(idx)] += which_direction[k] * (delta[tuple(idx)] * by[k])
+						#print ("+++++++=", which_direction[k], (delta[tuple(idx)] * by[k]),init_weight[tuple(idx)]) 
 						## check whether a new value exceeeds the bound
 						if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
 						#if False:
 							is_out_of_bound += 1
-							print ("out of bound: ", bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
+							#print ("out of bound: ", bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
 							# go back to the previous value
 							init_weight[tuple(idx)] -= which_direction[k] * (delta[tuple(idx)] * by[k])
 							# reset the step size
@@ -360,7 +376,7 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 			
 			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
 		elif is_rd:
-			print ("here", num_chgd)
+			print ("here", num_chgd, deltas_of_snws['init_v'],deltas_of_snws['new_v'])
 			continue
 		else:
 			if is_out_of_bound > 10 * len(selected_neural_weights): # out of bound for more than 10 consecutive runs
@@ -373,12 +389,14 @@ def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v
 			else: # num_prev == num_aft_corr (nothing has been changed)
 				print ("here: {} -> {} ({})".format(num_prev_chgd, num_chgd, num_chgd - num_prev_chgd))
 				if num_prev_chgd > num_chgd: # has been improved from the "previous" result (but, still below the initial results)
+					print ("has been improved")
 					for vs in selected_neural_weights:
+						print ("Before", which_direction[(vs[0], tuple(vs[1]))])
 						which_direction[(vs[0], tuple(vs[1]))] *= -1
-
+						print ("After", which_direction[(vs[0], tuple(vs[1]))])
 				num_prev_chgd = num_chgd
 				for k in by.keys():	
-					by[k] += by_v/2# by[k]/2
+					by[k] += by_v/10# by[k]/2
 					print ("By", k, by[k])
 					#if False:
 					if by[k] > 3:
@@ -425,7 +443,11 @@ if __name__ == "__main__":
 	####
 	num_sample = args.num_sample
 	indices_to_target_layers = list(target_weights.keys())
-	selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
+	#selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
+	if args.which_data == 'fashion_mnist':
+		selected_neural_weights = random_sample_weights(args.model_path, train_data[0].reshape(train_data[0].shape[0],1,train_data[0].shape[-1]), indices_to_target_layers, num_sample = num_sample)
+	else:
+		selected_neural_weights = random_sample_weights(args.model_path, train_data[0], indices_to_target_layers, num_sample = num_sample)
 
 	print ("Selected Neural Weights", selected_neural_weights)
 	from collections import Iterable

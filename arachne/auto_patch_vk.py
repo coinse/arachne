@@ -238,9 +238,10 @@ def patch(
 			# retrieve all
 			top_n = -1
 
-		indices_w_costs = run_localise.localise_by_gradient(
+		indices_w_costs = run_localise.localise_by_gradient_v2(
 				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
+				indices_to_correct_for_loc,
 				target_weights,
 				path_to_keras_model = path_to_keras_model)
 		

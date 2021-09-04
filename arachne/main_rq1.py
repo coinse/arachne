@@ -3,6 +3,7 @@ RQ1 script
 """
 import os, sys
 import pandas as pd
+from tensorflow.python.ops.gen_array_ops import tensor_strided_slice_update_eager_fallback
 import utils.data_util as data_util
 import auto_patch_vk as auto_patch
 from main_eval import read_and_add_flag, combine_init_aft_predcs
@@ -10,6 +11,25 @@ import json
 import numpy as np
 ##
 import run_localise
+
+def return_target_fault_id(afile, seed):
+	if afile is None:
+		return seed
+	else:
+		df = pd.read_csv(afile)
+		return df.iloc[seed].id	
+
+def return_target_mdl_path(afile, seed, which):
+	"""
+	"""
+	num_sample = 1
+	fault_id = return_target_fault_id(afile, seed)
+	which_key = which if which == 'cifar10' else 'fmnist'
+
+	target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_90p_seed{}.h5'	
+	target_mdl_path = target_mdl_path_fm.format(which, num_sample, which_key, fault_id)
+
+	return target_mdl_path
 
 def get_brokens(combined_df):
 	"""
@@ -36,6 +56,7 @@ def set_loc_name(dest, aft_pred_file, key):
 	
 	return loc_name
 
+
 if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser()
@@ -50,8 +71,8 @@ if __name__ == "__main__":
 	parser.add_argument("-tensor_name_file", action = "store",
 		default = "data/tensor_names/tensor.lastLayer.names ", type = str)
 	parser.add_argument("-loc_method", action = "store", default = None, help = 'random, localiser, gradient_loss, c_localiser')
-	parser.add_argument("-path_to_keras_model", action = 'store', default = None)
-	parser.add_argument("-path_to_faulty_model", action = 'store', default = None, type = str)
+	#parser.add_argument("-path_to_keras_model", action = 'store', default = None)
+	#parser.add_argument("-path_to_faulty_model", action = 'store', default = None, type = str)
 	parser.add_argument("-seed", action = "store", default = 1, type = int)
 	parser.add_argument("-dest", default = ".", type = str)
 	# temporary for localising over all
@@ -60,8 +81,13 @@ if __name__ == "__main__":
 	parser.add_argument("-w_hist", type = int, default = 0)
 	# 
 	parser.add_argument("-gt_file", type = str, default = None)
+	# to retrieve those 
+	parser.add_argument("-fid_file", type = str, 
+		help = "a file that contains the ids (used seeds) of target faulty model", default = None)
 
 	args = parser.parse_args()	
+
+	path_to_faulty_model = return_target_mdl_path(args.fid_file, args.seed, args.which)
 
 	# is_input_2d = True => to match the format with faulty model
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
@@ -71,10 +97,10 @@ if __name__ == "__main__":
 
 	init_pred_df = read_and_add_flag(args.init_pred_file)
 	if args.aft_pred_file is None:
-		assert args.path_to_faulty_model is not None, "Neither aft_pred_file nor path_to_faulty_model is given"
+		#assert path_to_faulty_model is not None, "Neither aft_pred_file nor path_to_faulty_model is given"
 		from tensorflow.keras.models import load_model
 
-		faulty_mdl = load_model(args.path_to_faulty_model)
+		faulty_mdl = load_model(path_to_faulty_model)
 		predcs = faulty_mdl.predict(train_X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(train_X).reshape(len(train_X),-1)
 		pred_labels = np.argmax(predcs, axis = 1)
 	
@@ -110,7 +136,7 @@ if __name__ == "__main__":
 			args.num_label,
 			train_data,
 			args.tensor_name_file,
-			path_to_keras_model = args.path_to_keras_model,
+			path_to_keras_model = path_to_faulty_model, #args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_chgd, #indices_to_wrong,
 			seed = args.seed,
 			target_all = True)
@@ -138,7 +164,7 @@ if __name__ == "__main__":
 			which = args.which,
 			loc_method = args.loc_method, 
 			patch_target_key = "loc.{}".format(args.seed),
-			path_to_keras_model = args.path_to_keras_model,
+			path_to_keras_model = path_to_faulty_model, #args.path_to_keras_model,
 			predef_indices_to_chgd = indices_to_chgd, #indices_to_wrong,
 			predef_indices_to_unchgd = indices_to_unchgd,
 			seed = args.seed,

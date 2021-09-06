@@ -11,12 +11,17 @@ import numpy as np
 ##
 import run_localise
 
+LAYER = -1
+
 def return_target_fault_id(afile, seed):
 	if afile is None:
 		return seed
 	else:
 		df = pd.read_csv(afile)
-		return df.iloc[seed].id	
+		if LAYER < 0 or df.iloc[seed].layer == LAYER:
+			return df.iloc[seed].id	
+		else:
+			return None
 
 def return_target_mdl_and_gt_path(afile, seed, which_data):
 	"""
@@ -24,11 +29,16 @@ def return_target_mdl_and_gt_path(afile, seed, which_data):
 	which_keys = {'cifar10':'cifar', 'fashion_mnist':'fmnist'}
 	num_sample = 1
 	fault_id = return_target_fault_id(afile, seed)
+	if fault_id is None:
+		return None, None
 	which_key = which_keys[which_data]
 
-	target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_90p_seed{}.h5'	
-	target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
-
+	if which_data == 'cifar10':
+		target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_90p_seed{}.h5'	
+		target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
+	else: #fmnist_simple_seed0.h5
+		target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_seed{}.h5'
+		target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
 	target_gt_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/faulty_nws.{}.pkl'
 	target_gt_path = target_gt_path_fm.format(which_data, num_sample, fault_id)
 
@@ -91,6 +101,9 @@ if __name__ == "__main__":
 	args = parser.parse_args()	
 
 	path_to_faulty_model, gt_file = return_target_mdl_and_gt_path(args.fid_file, args.seed, args.which_data)
+	if path_to_faulty_model is None:
+		print ('Seed {} not our target for layer {}'.format(args.seed, LAYER))
+		sys.exit()
 	print (path_to_faulty_model, gt_file)
 
 	# is_input_2d = True => to match the format with faulty model

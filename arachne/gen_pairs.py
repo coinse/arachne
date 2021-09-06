@@ -82,22 +82,23 @@ def compute_pareto(costs, curr_nodes_to_lookat):
 		t2 = time.time()
 		print ("For computing pareto front", t2 - t1)
 		print ("\tremain: {} out of {}: {} ({})".format(len(costs), num_total, num_total - len(costs), len(current_ret)))
-		#if len(ret_lst) > 4000:
-		#	break		
+		if len(ret_lst):
+			break		
 	#sys.exit()
 	return ret_lst
 
 if __name__ == "__main__":
 	import argparse
 	from run_localise import get_target_weights
+	from main_rq1 import return_target_mdl_and_gt_path
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-which_data", type = str, help = "fashion_mnist, cifar10, GTSRB")
 	parser.add_argument("-loc_which", default = 'localiser', type = str, help = "localiser, gradient_loss, random")
 	parser.add_argument("-loc_dir", type = str)
+	parser.add_argument("-fid_file", type = str)
 
 	args = parser.parse_args()
-
 
 	loc_loc_file = "c_loc/loc.all_cost.loc.{}.1.pkl"
 	loc_grad_file = "grad/loc.all_cost.loc.{}.1.grad.pkl"
@@ -124,11 +125,34 @@ if __name__ == "__main__":
 	
 	dest = os.path.join(args.loc_dir, "pairs/{}".format(args.loc_which))
 	os.makedirs(dest, exist_ok = True)
+	comp = lambda a,b: a == b
+	for seed in tqdm.tqdm(range(40)): #40)): # 40 for cifar10 and 31 for fm
+		## get gt
+		_, gt_file = return_target_mdl_and_gt_path(args.fid_file, seed, args.which_data)
+		print (gt_file)
+		gt_df = pd.read_pickle(gt_file)
+		gts_layer = gt_df.layer.values
+		gts_weight = list(map(tuple, gt_df.w_idx.values))
+		gts = list(zip(gts_layer, gts_weight)) # a list of [layer, index to a weight (np.ndarray)]
+		##
 
-	for seed in [1]:#tqdm.tqdm(range(30)):
 		curr_loc_file = os.path.join(args.loc_dir, loc_file.format(seed))
 		pairs = get_weight_and_cost(args.loc_which, seed, curr_loc_file, target_weights, method = 'max')
 		df = pd.DataFrame(list(pairs.items()))
 		pairfile = os.path.join(dest, "{}.pairs.csv".format(seed))
-	
+		print (pairfile)	
 		df.to_csv(pairfile, sep = ";", header = False, index = False)
+		
+		print ("For {}".format(seed))
+		ranks = []
+		for gt in gts:
+			output = df.loc[list(map(comp, df[0].values, [gt]*len(df[0])))].index.values
+			if len(output) > 0:
+				rank = output[0]	
+				ranks.append(rank)
+				print ("GT ({}) {}: {}".format(seed, gt, rank))
+			else:
+				print ("GT ({}) {}: -".format(seed, gt))
+	
+
+

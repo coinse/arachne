@@ -63,24 +63,23 @@ def is_C2D(lname):
 	pattns = ['Conv2D']
 	return any([bool(re.match(t,lname)) for t in pattns])
 
-def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_batch = False):
+def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_batch = False, on_weight = False, wo_reset = False):
 	"""
 	compute gradients normalisesd and averaged for a given input X
+	on_weight = False -> on output of idx_to_target_layer'th layer
 	"""
 	from sklearn.preprocessing import Normalizer
 	norm_scaler = Normalizer(norm = "l1")
 		
 	model = load_model(path_to_keras_model, compile = False)
-	target = model.layers[idx_to_target_layer].output
-	import subprocess
-	result = subprocess.run(['nvidia-smi'], shell = True)
-	print (result)
-	
+	target = model.layers[idx_to_target_layer].output if not on_weight else model.layers[idx_to_target_layer].weights[0]
+	print ("Target", target)	
 	tensor_grad = tf.gradients(
 		model.output, 
 		target,
 		name = 'output_grad')
 
+	print (tensor_grad)
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
@@ -92,38 +91,47 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 	else:
 		chunks = [np.arange(num)]
 
-	
-	grad_shape = tuple([num] + [int(v) for v in tensor_grad[0].shape[1:]])
 
-	print ("Grad shape", grad_shape)
-	print (tensor_grad)	
-	gradient = np.zeros(grad_shape)
-	#fn = K.function([model.input], tensor_grad)
-	for chunk in chunks:
-		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
-		#_gradient = fn([X[chunk]])[0]	
-		#print ("tensor grad", tensor_grad, X.shape)
-		#print ("\t", _gradient.shape)
-		gradient[chunk] = _gradient
+	if not on_weight:	
+		grad_shape = tuple([num] + [int(v) for v in tensor_grad[0].shape[1:]])
+		print ("Grad shape", grad_shape)
+		print (tensor_grad)	
+		gradient = np.zeros(grad_shape)
+		#fn = K.function([model.input], tensor_grad)
+		for chunk in chunks:
+			_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
+			#_gradient = fn([X[chunk]])[0]	
+			#print ("tensor grad", tensor_grad, X.shape)
+			#print ("\t", _gradient.shape)
+			gradient[chunk] = _gradient
 	
-	gradient = np.abs(gradient)
-	#print ("Gradient", gradient)
-	reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
-	norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
-	#print ("Norm", norm_gradient)
-	#print (type(norm_gradient))
-	print (norm_gradient.shape)
-	mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
-	#print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
-	ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
+		gradient = np.abs(gradient)
+		#print ("Gradient", gradient)
+		reshaped_gradient = gradient.reshape(gradient.shape[0],-1) # flatten
+		norm_gradient = norm_scaler.fit_transform(reshaped_gradient) # normalised
+		#print ("Norm", norm_gradient)
+		#print (type(norm_gradient))
+		print (norm_gradient.shape)
+		mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
+		#print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
+		ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
+	else: # on a weight variable
+		gradients = []
+		for chunk in chunks:
+			_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
+			gradients.append(_gradient)
 
+		gradient = np.sum(np.asarray(gradients), axis = 0)
+		ret_gradient = np.abs(gradient)
+		
 	#K.clear_session()
 	#s = tf.InteractiveSession()
 	#K.set_session(s)
-	reset_keras([tensor_grad])
+	if not wo_reset:
+		reset_keras([tensor_grad])
 	return ret_gradient 
 			
-def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_batch = False):
+def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_batch = False, wo_reset = False):
 	"""
 	compute gradients for the loss
 	"""
@@ -167,7 +175,8 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_
 	#print (gradient[:10])
 	#import sys; sys.exit()	
 	gradient = np.abs(gradient)
-	reset_keras([gradient, loss_tensor, y_tensor])
+	if not wo_reset:
+		reset_keras([gradient, loss_tensor, y_tensor])
 
 	return gradient
 	
@@ -1142,8 +1151,8 @@ def localise_offline_v3(
 		cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
 		## key: more influential to changed behaviour and less influential to unchanged behaviour
 		## +1 to the denominator to prevent divide-by-zero
-		print ("+++", idx_to_tl, ks_2samp(cost_from_chgd[:,0], cost_from_unchgd[:,0]))
-		print ("---", idx_to_tl, ks_2samp(cost_from_chgd[:,1], cost_from_unchgd[:,1]))
+		#print ("+++", idx_to_tl, ks_2samp(cost_from_chgd[:,0], cost_from_unchgd[:,0]))
+		#print ("---", idx_to_tl, ks_2samp(cost_from_chgd[:,1], cost_from_unchgd[:,1]))
 		costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
 		shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']
 
@@ -1550,7 +1559,6 @@ def localise_by_gradient_v2(
 	t3 = time.time()
 	print ("Time for computing total costs: {}".format(t3 - t0))
 
-	# compute pareto front
 	indices_to_tl = list(total_cands.keys())
 	costs_and_keys = [([idx_to_tl, np.unravel_index(local_i, total_cands[idx_to_tl]['shape'])], c) 
 		for idx_to_tl in indices_to_tl 

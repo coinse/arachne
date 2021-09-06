@@ -5,14 +5,15 @@ import pandas as pd
 import pickle
 import tqdm
 
-def get_weight_and_cost(loc_which, seed, loc_file, target_weights, method = 'max'):
+def get_weight_and_cost(loc_which, seed, loc_file, target_weights, gts, method = 'max'):
 	"""
 	"""
 	from scipy.stats import rankdata
 	
 	with open(loc_file, 'rb') as f:
 		locs = pickle.load(f)
-	
+
+	pairs = {}	
 	if loc_which == 'localiser':
 		new_locs = []
 		for loc in tqdm.tqdm(locs):
@@ -23,20 +24,23 @@ def get_weight_and_cost(loc_which, seed, loc_file, target_weights, method = 'max
 		
 		costs = [vs[1] for vs in new_locs]
 		indices = [vs[0] for vs in new_locs]
-		
-		ret_lst = compute_pareto(np.asarray(costs), np.asarray(indices))
-		
-		pairs = {}
-		for i,r in enumerate(ret_lst):
-			#rint (indices[i])
-			pairs[r] = i+1 # 1 ~ num
-			
+	
+		ret_lst, ret_front_lst = compute_pareto(np.asarray(costs), np.asarray(indices), gts)
+		#for i,r in enumerate(ret_lst):
+		#	#rint (indices[i])
+		#	pairs[r] = i+1 # 1 ~ num
+		###
+		arank = 0
+		for i,rs in enumerate(ret_front_lst):
+			arank += len(rs)
+			for r in rs:
+				pairs[r] = arank
+		###
 	elif loc_which == 'gradient_loss':
 		costs = [-vs[-1] for vs in locs]
 		ranks = rankdata(costs, method = method)
 		indices = [vs[0] for vs in locs]
 		
-		pairs = {}
 		for i,r in enumerate(ranks):
 			pairs[tuple(indices[i])] = r
 	else:
@@ -44,13 +48,12 @@ def get_weight_and_cost(loc_which, seed, loc_file, target_weights, method = 'max
 		nindices = np.arange(len(locs))
 		np.random.shuffle(nindices)
 		
-		pairs = {}
 		for i,aloc in enumerate(nindices):
 			pairs[tuple(locs[aloc])] = i+1 # 1 ~ num
 	
 	return pairs
 
-def compute_pareto(costs, curr_nodes_to_lookat):
+def compute_pareto(costs, curr_nodes_to_lookat, gts):
 	ret_lst = []
 	ret_front_lst = []
 	
@@ -58,6 +61,7 @@ def compute_pareto(costs, curr_nodes_to_lookat):
 	num_total = len(costs)
 	import time
 	t1 = time.time()
+	founds = np.asarray([False] * len(gts))
 	while len(curr_nodes_to_lookat) > 0:
 		t1 = time.time()
 		_costs = costs.copy()
@@ -70,22 +74,29 @@ def compute_pareto(costs, curr_nodes_to_lookat):
 			is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
 			_costs = _costs[nondominated_point_mask]
 			next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
-			
-		current_ret = [tuple(v) for v in np.asarray(curr_nodes_to_lookat)[is_efficient]]
+		
+		current_ret = [tuple(v) for v in curr_nodes_to_lookat[is_efficient]]
 		ret_lst.extend(current_ret)
-			
 		ret_front_lst.append(current_ret)
-		# remove selected items (non-dominated ones)
-		curr_nodes_to_lookat = np.delete(curr_nodes_to_lookat, is_efficient, 0)
-		costs = np.delete(costs, is_efficient, 0)
+
+		to_look_indices = np.where(founds == False)[0]
+		for idx in to_look_indices:
+			founds[idx] = gts[idx] in current_ret
+		
+		if all(founds):
+			break 
+		else:
+			# remove selected items (non-dominated ones)
+			curr_nodes_to_lookat = np.delete(curr_nodes_to_lookat, is_efficient, 0)
+			costs = np.delete(costs, is_efficient, 0)
 	
-		t2 = time.time()
-		print ("For computing pareto front", t2 - t1)
-		print ("\tremain: {} out of {}: {} ({})".format(len(costs), num_total, num_total - len(costs), len(current_ret)))
-		if len(ret_lst):
-			break		
-	#sys.exit()
-	return ret_lst
+			t2 = time.time()
+			print ("For computing pareto front", t2 - t1)
+			print ("\tremain: {} out of {}: {} ({})".format(len(costs), num_total, num_total - len(costs), len(current_ret)))
+			#if len(ret_lst):
+			#	break		
+			#sys.exit()
+	return ret_lst, ret_front_lst
 
 if __name__ == "__main__":
 	import argparse
@@ -137,7 +148,7 @@ if __name__ == "__main__":
 		##
 
 		curr_loc_file = os.path.join(args.loc_dir, loc_file.format(seed))
-		pairs = get_weight_and_cost(args.loc_which, seed, curr_loc_file, target_weights, method = 'max')
+		pairs = get_weight_and_cost(args.loc_which, seed, curr_loc_file, target_weights, gts, method = 'max')
 		df = pd.DataFrame(list(pairs.items()))
 		pairfile = os.path.join(dest, "{}.pairs.csv".format(seed))
 		print (pairfile)	
@@ -146,7 +157,8 @@ if __name__ == "__main__":
 		print ("For {}".format(seed))
 		ranks = []
 		for gt in gts:
-			output = df.loc[list(map(comp, df[0].values, [gt]*len(df[0])))].index.values
+			#output = df.loc[list(map(comp, df[0].values, [gt]*len(df[0])))].index.values
+			output = df.loc[list(map(comp, df[0].values, [gt]*len(df[0])))][1].values
 			if len(output) > 0:
 				rank = output[0]	
 				ranks.append(rank)

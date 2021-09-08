@@ -34,22 +34,29 @@ def get_weight_and_cost(loc_which, seed, loc_file, target_weights, gts, method =
 		for i,rs in enumerate(ret_front_lst):
 			arank += len(rs)
 			for r in rs:
-				pairs[r] = arank
+				pairs[r[0]] = (arank,r[1])
 		###
 	elif loc_which == 'gradient_loss':
 		costs = [-vs[-1] for vs in locs]
 		ranks = rankdata(costs, method = method)
 		indices = [vs[0] for vs in locs]
 		
+		founds = np.asarray([False] * len(gts))
 		for i,r in enumerate(ranks):
-			pairs[tuple(indices[i])] = r
+			pairs[tuple(indices[i])] = [r, costs[i]]
+
+			to_look_indices = np.where(founds == False)[0]
+			for idx in to_look_indices:
+				founds[idx] = gts[idx] == tuple(indices[i])
+			
+			if all(founds): break
 	else:
 		np.random.seed(seed)
 		nindices = np.arange(len(locs))
 		np.random.shuffle(nindices)
 		
 		for i,aloc in enumerate(nindices):
-			pairs[tuple(locs[aloc])] = i+1 # 1 ~ num
+			pairs[tuple(locs[aloc])] = [i+1, -1.] # 1 ~ num
 	
 	return pairs
 
@@ -75,13 +82,14 @@ def compute_pareto(costs, curr_nodes_to_lookat, gts):
 			_costs = _costs[nondominated_point_mask]
 			next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
 		
-		current_ret = [tuple(v) for v in curr_nodes_to_lookat[is_efficient]]
+		#current_ret = [tuple(v) for v in curr_nodes_to_lookat[is_efficient]]
+		current_ret = [[tuple(v),c] for v,c in zip(curr_nodes_to_lookat[is_efficient], costs[is_efficient])]
 		ret_lst.extend(current_ret)
 		ret_front_lst.append(current_ret)
 
 		to_look_indices = np.where(founds == False)[0]
 		for idx in to_look_indices:
-			founds[idx] = gts[idx] in current_ret
+			founds[idx] = gts[idx] in [v[0] for v in current_ret]
 		
 		if all(founds):
 			break 
@@ -153,7 +161,7 @@ if __name__ == "__main__":
 		pairfile = os.path.join(dest, "{}.pairs.csv".format(seed))
 		print (pairfile)	
 		df.to_csv(pairfile, sep = ";", header = False, index = False)
-		
+		print (df)	
 		print ("For {}".format(seed))
 		ranks = []
 		for gt in gts:

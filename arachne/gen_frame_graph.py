@@ -127,7 +127,7 @@ def build_partially_fronzen_model(mdl, X, indices_to_tls, indices_to_tneurons):
 	return fn, t_ws, ys
 
 
-def build_k_frame_model(mdl, X, indices_to_tls):
+def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 	"""
 	"""
 	import tensorflow as tf
@@ -177,12 +177,12 @@ def build_k_frame_model(mdl, X, indices_to_tls):
 
 		network_dict['new_output_tensor_of'].update({mdl.layers[min_idx_to_tl-1].name: x})
 
-	print (network_dict['new_output_tensor_of'].keys())
 	t_ws = []
-	#for layer in model.layers[1:]:
 	for idx_to_l in range(min_idx_to_tl, num_layers):
+		#print ("================={}=================".format(idx_to_l))
 		layer = mdl.layers[idx_to_l]
 		layer_name = layer.name
+		#print ("\tLayer:", layer_name)
 		
 		# Determine input tensors
 		layer_input = [network_dict['new_output_tensor_of'][layer_aux] 
@@ -194,43 +194,53 @@ def build_k_frame_model(mdl, X, indices_to_tls):
 			
 		# Insert layer if name matches the regular expression
 		if idx_to_l in indices_to_tls:
+			#print ('In here')
 			l_class_name = type(layer).__name__
 			#new_layer = insert_layer_factory(layer_name) ## => currenlty, support only conv2d and dense layers
 			###
 			if is_target(l_class_name, targeting_clname_pattns): # is our target (dense and conv2d)
 				if run_localise.is_FC(l_class_name):
+					#print ("In fc")
 					w,b = layer.get_weights()
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)    
 					t_b = tf.constant(b)
 					
 					x = tf.add(tf.matmul(layer_input, t_w), t_b, name = layer_name)
-					
+					if act_func is not None:
+						x = act_func(x)
 					t_ws.append(t_w)
-				else: 
+				else:
+					#print ("In CONV2D")
+					#print (layer)
+					#print (layer.get_config())
 					# should be conv2d, if not, then something is wrong
 					assert run_localise.is_C2D(l_class_name), "{}".format(l_class_name)
 
 					w,b = layer.get_weights()
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)
-					t_b = tf.constant(b)
+					t_b = tf.constant(b, dtype = b.dtype)
 					
 					x = tf.nn.conv2d(layer_input, 
-							t_w, 
+							t_w,
 							strides = list(layer.get_config()['strides'])*2, 
 							padding = layer.get_config()['padding'].upper(), 
 							data_format = 'NCHW',  
 							name = layer_name)
-					
-					x = tf.nn.bias_add(x, t_b, data_format = 'NCHW')	
+					x = tf.nn.bias_add(x, t_b, data_format = 'NCHW')
+					if act_func is not None: # tf.nn.relu
+						x = act_func(x)
 					t_ws.append(t_w)
 			else:
 				msg = "{}th layer {}({}) is not our target".format(idx_to_l, layer_name, l_class_name)
 				assert False, msg
 		else:
+			#print ('LAYER', layer, layer.name, layer.input)
+			#print ('layer input', layer_input)
 			x = layer(layer_input)
 
 		# Set new output tensor (the original one, or the one of the replaced layer)
 		network_dict['new_output_tensor_of'].update({layer_name: x}) # x is the output of the layer "layer_name" (current one)
+		#print ("\t", "--", network_dict['new_output_tensor_of'])
 		# Save tensor in output list if it is output in initial model
 		#if layer_name in model.output_names:
 		#    model_outputs.append(x)

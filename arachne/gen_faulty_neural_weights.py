@@ -3,7 +3,7 @@ import utils.data_util as data_util
 import numpy as np
 from run_localise import compute_gradient_to_output
 
-BATCH_SIZE = 256
+BATCH_SIZE = 5096
 
 def return_chunks(num):
 	num_split = int(np.round(num/BATCH_SIZE))
@@ -12,7 +12,7 @@ def return_chunks(num):
 	chunks = np.array_split(np.arange(num), num_split)
 	return chunks
 
-def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, batch_size = None):
+def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, batch_size = None, act_func = None):
 	from tensorflow.keras.models import load_model, Model 
 	from gen_frame_graph import build_k_frame_model
 	from run_localise import get_target_weights
@@ -21,9 +21,6 @@ def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, 
 	target_weights = get_target_weights(mdl, mdl_path, 
 		indices_to_target = indices_to_target, target_all = target_all)
 	
-	print (target_weights.keys())
-	print ([v[0].shape for v in target_weights.values()])
-	print (X.shape)
 	if batch_size is None:
 		k_fn_mdl, _, _  = build_k_frame_model(mdl, X, list(sorted(target_weights.keys())))
 		k_fn_mdl_lst = [k_fn_mdl]
@@ -32,9 +29,10 @@ def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, 
 		chunks = return_chunks(num)
 		k_fn_mdl_lst = []
 		for chunk in chunks:
-			k_fn_mdl, _, _  = build_k_frame_model(mdl, X[chunk], list(sorted(target_weights.keys())))
+			k_fn_mdl, _, _  = build_k_frame_model(mdl, X[chunk], list(sorted(target_weights.keys())), act_func = act_func)
+			#a_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in target_weights.keys()] + [data_util.format_label(y,43)[chunk]])
+			#print ("++", np.sum(np.argmax(a_pred_probas, axis = 1) == y[chunk])/len(chunk))
 			k_fn_mdl_lst.append(k_fn_mdl)
-	#return k_fn_mdl, target_weights
 	return k_fn_mdl_lst, target_weights
 
 
@@ -271,18 +269,28 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 def compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls):
 	"""
 	"""
+	from functools import reduce
 	if len(k_fn_mdl_lst) == 1:
 		k_fn_mdl = k_fn_mdl_lst[0]
 		pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys])
 	else:
 		num = len(ys)
 		chunks = return_chunks(num)
-		pred_probas_lst = []
-		for k_fn_mdl in k_fn_mdl_lst:
-			a_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys[chunks]])
-			pred_probas_lst.append(a_pred_probas)
-		pred_probas = np.append(pred_probas_lst)	
+		pred_probas = None
+		for k_fn_mdl, chunk in zip(k_fn_mdl_lst, chunks):
+			a_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys[chunk]])
+			#print ("bfre", a_pred_probas.shape)
+			#print ("\t", np.argmax(ys[chunk], axis = 1))
+			#print ("\t", np.sum(np.argmax(a_pred_probas,axis=1) == np.argmax(ys[chunk],axis=1))/len(chunk))
+			#print (np.unique(np.argmax(a_pred_probas,axis=1)))
+			#print (np.unique(np.argmax(ys[chunk])))
+			if pred_probas is None:
+				pred_probas = a_pred_probas
+			else:
+				pred_probas = np.append(pred_probas, a_pred_probas, axis = 0)
+				#print ("aftr", pred_probas.shape)
 	predictions = np.argmax(pred_probas, axis = 1)
+	#print ("Final", predictions.shape)
 	return predictions
 
 #def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False, test_mdl = None, test_ys = None):
@@ -295,19 +303,10 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 
 	# initial prediction
 	indices_to_tls = sorted(list(target_weights.keys()))
-	#if len(k_fn_mdl_lst) == 1:
-	#	k_fn_mdl = k_fn_mdl_lst[0]
-	#	init_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys])
-	#else:
-	#	num = len(ys)
-	#	chunks = return_chunks(num)
-	#	init_pred_probas_lst = []
-	#	for k_fn_mdl in k_fn_mdl_lst:
-	#		a_init_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys[chunks]])
-	#		init_pred_probas_lst.append(a_init_pred_probas)
-	#	init_pred_probas = np.append(init_pred_probas_lst)	
-	#init_predictions = np.argmax(init_pred_probas, axis = 1)
 	init_predictions = compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls)
+	print ("Init predcitions")
+	print (np.sum(init_predictions == np.argmax(ys,1))/len(ys))
+	print ("=====")
 	# 
 	indices_to_sel_w_tls = np.asarray([vs[0] for vs in selected_neural_weights])
 	indices_to_uniq_sel_w_tls = np.unique(indices_to_sel_w_tls)
@@ -472,6 +471,7 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 if __name__ == "__main__":
 	import argparse
 	import pandas as pd
+	import tensorflow as tf
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-datadir", type = str)
@@ -491,20 +491,51 @@ if __name__ == "__main__":
 
 	num_label = args.num_label
 
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist')
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist', with_hist = False)
+	##
+	#indices = np.arange(len(test_data[1]))
+	#np.random.shuffle(indices)
+	#train_data[0] = test_data[0][indices]
+	#train_data[1] = test_data[1][indices]
+	##
+
+	##
+	#from tensorflow.keras.models import load_model
+	#mdl = load_model(args.model_path, compile = False)
+	#print (np.sum(np.argmax(mdl.predict(train_data[0]),axis=1) == train_data[1])/len(train_data[1]))
+	#print (np.sum(np.argmax(mdl.predict(train_data[0][:4903]),axis=1) == train_data[1][:4903])/len(train_data[1][:4903]))
+	##
 
 	#k_fn_mdl, target_weights = generate_base_mdl(args.model_path, train_data[0], 
 	#	indices_to_target = None, target_all = bool(args.target_all))
 	k_fn_mdl_lst, target_weights = generate_base_mdl(args.model_path, train_data[0], 
 		indices_to_target = None, target_all = bool(args.target_all), 
-		batch_size = BATCH_SIZE if args.which_data == 'GTSRB' else None)
+		batch_size = BATCH_SIZE if args.which_data == 'GTSRB' else None,
+		act_func = tf.nn.relu if args.which_data == 'GTSRB' else None)
+	
 	####
 	#k_fn_mdl_test, _ = generate_base_mdl(args.model_path, test_data[0],
 	#	indices_to_target = None, target_all = bool(args.target_all))
 	####
 	num_sample = args.num_sample
 	indices_to_target_layers = list(target_weights.keys())
-	#selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
+	print ("Indices", indices_to_target_layers)
+
+#	num = len(train_data[1])
+#	chunks = return_chunks(num)
+#	#
+#	new_ys = data_util.format_label(train_data[1], num_label)
+#	#a_pred_probas, _ = k_fn_mdl_lst[0]([target_weights[idx][0] for idx in indices_to_target_layers] + [new_ys])
+#	#print (np.sum(np.argmax(a_pred_probas, axis = 1) == train_data[1])/len(new_ys))
+#	#
+#	print ("Length", len(k_fn_mdl_lst), len(chunks))
+#	for m,chunk in zip(k_fn_mdl_lst,chunks):
+#		print (chunk)
+#		a_pred_probas, _ = m([target_weights[idx][0] for idx in indices_to_target_layers] + [new_ys[chunk]])
+#		print (a_pred_probas.shape, len(chunk))
+#		print (np.sum(np.argmax(a_pred_probas, axis = 1) == train_data[1][chunk])/len(chunk))
+#	sys.exit()
+#	#selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
 	if args.which_data == 'fashion_mnist':
 		selected_neural_weights = random_sample_weights(args.model_path, train_data[0].reshape(train_data[0].shape[0],1,train_data[0].shape[-1]), indices_to_target_layers, num_sample = num_sample)
 	else:
@@ -518,6 +549,10 @@ if __name__ == "__main__":
 	else:
 		new_ys = train_data[1]
 
+#	print ("====YS====")
+#	print (np.argmax(new_ys[:43], axis = 1), new_ys[0])
+#	print (set(np.argmax(new_ys, axis = 1)))
+#	print ("=========")
 	#deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(
 	#	k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
 	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(

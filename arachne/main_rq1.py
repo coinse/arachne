@@ -26,7 +26,7 @@ def return_target_fault_id(afile, seed):
 def return_target_mdl_and_gt_path(afile, seed, which_data):
 	"""
 	"""
-	which_keys = {'cifar10':'cifar', 'fashion_mnist':'fmnist'}
+	which_keys = {'cifar10':'cifar', 'fashion_mnist':'fmnist', 'GTSRB':'gtsrb'}
 	num_sample = 1
 	fault_id = return_target_fault_id(afile, seed)
 	if fault_id is None:
@@ -36,9 +36,16 @@ def return_target_mdl_and_gt_path(afile, seed, which_data):
 	if which_data == 'cifar10':
 		target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_90p_seed{}.h5'	
 		target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
-	else: #fmnist_simple_seed0.h5
+	#else: #fmnist_simple_seed0.h5
+	elif which_data == 'fashion_mnist':
 		target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}_simple_seed{}.h5'
 		target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
+	elif which_data == 'GTSRB':#data/models/faulty_models/by_tweak/chg/0_001/mv/GTSRB/1/gtsrb.model.0.wh.0_seed20.h5 
+		target_mdl_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/{}.model.0.wh.0_seed{}.h5'
+		target_mdl_path = target_mdl_path_fm.format(which_data, num_sample, which_key, fault_id)
+	else:
+		print ("{} not supported".format(which_data))
+		sys.exit()
 	target_gt_path_fm = 'data/models/faulty_models/by_tweak/chg/0_001/mv/{}/{}/faulty_nws.{}.pkl'
 	target_gt_path = target_gt_path_fm.format(which_data, num_sample, fault_id)
 

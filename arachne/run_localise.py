@@ -116,12 +116,18 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 		#print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
 		ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
 	else: # on a weight variable
-		gradients = []
+		#gradients = []
+		gradient = None
 		for chunk in chunks:
 			_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
-			gradients.append(_gradient)
+			if gradient is None:
+				gradient = _gradient
+			else:
+				gradient += _gradient
+			#gradients.append(_gradient)
 
-		gradient = np.sum(np.asarray(gradients), axis = 0)
+		## due to memory error
+		#gradient = np.sum(np.asarray(gradients), axis = 0)
 		ret_gradient = np.abs(gradient)
 		
 	#K.clear_session()

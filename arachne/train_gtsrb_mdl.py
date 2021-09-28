@@ -212,10 +212,18 @@ args = parser.parse_args()
 
 train_data, test_data = data_util.load_data('GTSRB', args.datadir, with_hist = bool(args.w_hist))
 
+sys.exit()
+indices = np.arange(len(train_data[0]))
+np.random.shuffle(indices)
+
+train_data[0] = train_data[0][indices]
+train_data[1] = train_data[1][indices]
+
 print (train_data[0].shape)
+os.makedirs(args.dest, exist_ok = True)
 destfile = os.path.join(args.dest, "gtsrb.model.{}.wh.{}.h5".format(args.mdlkey, args.w_hist))
 
-gen_and_train_model(train_data[0], data_util.format_label(train_data[1], 43), 
+gen_and_train_simple_model(train_data[0], data_util.format_label(train_data[1], 43), 
 	test_data[0], data_util.format_label(test_data[1], 43), 
 	destfile, 
 	num_epoch = 5000, patience = 100, batch_size = 64)

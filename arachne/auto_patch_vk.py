@@ -158,7 +158,7 @@ def patch(
 
 	if not only_loc:
 		indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
-		#check whether gien predef_indices_to_chgd to wrong is actually correct
+		#check whether given predef_indices_to_chgd to wrong is actually correct
 		if predef_indices_to_chgd is not None:  # Since, here, we asssume an ideal model
 			diff = set(predef_indices_to_chgd) - set(indices_to_target['wrong'])
 			print (len(predef_indices_to_chgd), len(indices_to_target['wrong']))
@@ -232,7 +232,7 @@ def patch(
 	import pandas as pd
 	if loc_method == 'gradient_loss': # here, top n is not the number of inpouts, arather it is the number of neural weights to fix
 		if not only_loc: # for RQ2 
-			#### should fix this 
+			#### should fix this -> should be the average number of pareto-front size
 			top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
 		else:
 			# retrieve all

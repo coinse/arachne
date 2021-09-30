@@ -108,7 +108,8 @@ class Searcher(object):
 
 		###
 		from gen_frame_graph import build_k_frame_model
-		# fn, t_ws (for weights), ys (for labels) 
+		# fn, t_ws (for weights), ys (for labels)
+		print ("INPUT FORMAT", self.inputs.shape) 
 		self.k_fn_mdl, _, _  = build_k_frame_model(self.mdl, self.inputs, self.indices_to_target_layers)
 	
 
@@ -406,8 +407,12 @@ class Searcher(object):
 
 		import time
 		t1 = time.time()
-		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
-		predictions, losses_of_all = self.k_fn_mdl(deltas_as_lst + [labels])
+		#deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
+		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers if idx_to_tl in deltas.keys()]
+		#predictions, losses_of_all = self.k_fn_mdl(deltas_as_lst + [labels])
+		predictions = self.k_fn_mdl(deltas_as_lst + [labels])
+		print (predictions[0].shape)
+		import sys; sys.exit()
 		#
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)

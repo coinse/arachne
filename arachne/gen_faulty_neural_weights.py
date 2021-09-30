@@ -491,6 +491,7 @@ if __name__ == "__main__":
 
 	num_label = args.num_label
 
+	#train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = False, with_hist = False)#args.which_data == 'fashion_mnist', with_hist = False)
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist', with_hist = False)
 	##
 	#indices = np.arange(len(test_data[1]))
@@ -512,7 +513,6 @@ if __name__ == "__main__":
 		indices_to_target = None, target_all = bool(args.target_all), 
 		batch_size = BATCH_SIZE if args.which_data == 'GTSRB' else None,
 		act_func = tf.nn.relu if args.which_data == 'GTSRB' else None)
-	
 	####
 	#k_fn_mdl_test, _ = generate_base_mdl(args.model_path, test_data[0],
 	#	indices_to_target = None, target_all = bool(args.target_all))

@@ -753,7 +753,7 @@ def sample_input_for_loc_by_rd(
 		_, sampled_indices_to_unchgd = sample_input_for_loc_sophis(
 			indices_to_chgd, 
 			indices_to_unchgd, 
-			predictions, init_predictions, len(indices_to_target))
+			predictions, init_predictions)#, len(indices_to_target))
 
 		return indices_to_chgd, sampled_indices_to_unchgd
 
@@ -774,18 +774,17 @@ def sample_input_for_loc_sophis(
 	_indices = np.zeros(len(indices_to_unchgd) + len(indices_to_chgd))
 	_indices[:len(indices_to_unchgd)] = indices_to_unchgd
 	_indices[len(indices_to_unchgd):] = indices_to_chgd
-	# checking]
+	###  checking  ###
 	_indices_to_unchgd = np.where(pred_labels == init_pred_labels)[0]; _indices_to_unchgd.sort()
 	indices_to_unchgd = np.asarray(indices_to_unchgd); indices_to_unchgd.sort()
 	_indices_to_chgd = np.where(pred_labels != init_pred_labels)[0]; _indices_to_chgd.sort()
 	indices_to_chgd = np.asarray(indices_to_chgd); indices_to_chgd.sort()
-
 	assert all(indices_to_unchgd == _indices[_indices_to_unchgd])
-	assert all(indices_to_chgd == _indices[_indices_to_chgd])
-	# checking end
+	assert all(indices_to_chgd == np.sort(_indices[_indices_to_chgd]))
+	###  checking end  ###
 
 	# here, only the labels of the initial predictions are considered
-	uniq_labels = sorted(list(set(init_pred_labels[_indices_to_unchgd])))
+	uniq_labels = np.unique(init_pred_labels[_indices_to_unchgd]); uniq_labels.sort()
 	grouped_by_label = {uniq_label:[] for uniq_label in uniq_labels}
 	for idx in _indices_to_unchgd:	
 		pred_label = pred_labels[idx]
@@ -802,7 +801,8 @@ def sample_input_for_loc_sophis(
 	###
 
 	print ("Sampled", [(k, len(vs)) for k,vs in grouped_by_label.items()])
-	num_unchgd = len(_indices_to_unchgd)
+	num_unchgd = len(indices_to_unchgd)
+	num_chgd = len(indices_to_chgd)
 	sampled_indices_to_unchgd = []
 	num_total_sampled = 0
 	for uniq_label,vs in grouped_by_label.items():

@@ -361,6 +361,9 @@ def patch(
 	print ("Patch target layers", indices_to_ptarget_layers)
 	#import sys; sys.exit()
 
+	#if which == 'simple_fm': # might have to find the way to solve this beforehand (currenlty, different format for loc and this)
+	#	X = np.reshape(X, (X.shape[0], 1, X.shape[-1]))
+	#	print ("Input reshaped to"., )
 	if search_method == 'DE':
 		# searcher = de.DE_searcher(
 		# 	X, y,

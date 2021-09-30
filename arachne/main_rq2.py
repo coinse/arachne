@@ -4,7 +4,7 @@ RQ2 script
 import argparse
 import os, sys
 import utils.data_util as data_util
-import auto_patch
+import auto_patch_vk as auto_patch
 import time
 import numpy as np
 import gc
@@ -74,10 +74,10 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	path_to_keras_model = args.path_to_keras_model,
 	predef_indices_to_chgd = predef_indices_to_wrong,
 	seed = args.seed, 
-	patch_aggr = args.patch_aggr) #True)
-
-os.replace(patched_model_name.replace("None", "model") + ".json", 
-	os.path.join(args.dest, patched_model_name.replace("None", "model") + ".json"))
+	patch_aggr = args.patch_aggr, #) #True)
+	target_all = True)
+os.replace(patched_model_name.replace("None", "model"), 
+	os.path.join(args.dest, patched_model_name.replace("None", "model")))
 
 t2 = time.time()
 print ("Time for patching: %f" % (t2 - t1))

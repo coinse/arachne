@@ -85,7 +85,8 @@ def patch(
 	only_loc = False,
 	patch_aggr = None, 
 	target_all = False,
-	loc_file = None):
+	loc_file = None,
+	batch_size = None):
 	"""
 	only_loc = True:
 		Ret(list, list):
@@ -391,6 +392,7 @@ def patch(
 			initial_predictions = None, #predictions,
 			path_to_keras_model = path_to_keras_model,
 			patch_aggr = patch_aggr,
+			batch_size = batch_size,
 			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
 
 		places_to_fix = indices_to_places_to_fix

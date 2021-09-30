@@ -29,6 +29,7 @@ class DE_searcher(Searcher):
 		path_to_keras_model = None,
 		#is_empty_one = False,
 		patch_aggr = None,
+		batch_size = None,
 		at_indices = None):
 
 		"""
@@ -45,6 +46,7 @@ class DE_searcher(Searcher):
 				#which = which,
 				path_to_keras_model = path_to_keras_model,
 				#is_empty_one = is_empty_one,
+				batch_size = batch_size,
 				at_indices = at_indices)
 
 		# fitness computation related initialisation

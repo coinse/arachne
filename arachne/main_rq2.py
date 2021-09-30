@@ -29,6 +29,7 @@ parser.add_argument("-dest", action = "store", default = ".")
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = int)
 parser.add_argument("-w_hist", type = int, default = 0)
 parser.add_argument("-num_label", type = int, default = 10)
+parser.add_argument("-batch_size", type = int, default = None)
 
 args = parser.parse_args()
 
@@ -75,7 +76,9 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	predef_indices_to_chgd = predef_indices_to_wrong,
 	seed = args.seed, 
 	patch_aggr = args.patch_aggr, #) #True)
+	batch_size = args.batch_size,
 	target_all = True)
+
 os.replace(patched_model_name.replace("None", "model"), 
 	os.path.join(args.dest, patched_model_name.replace("None", "model")))
 

@@ -8,6 +8,7 @@ class Searcher(object):
 	np = __import__('numpy')
 	os = __import__('os')
 	importlib = __import__('importlib')
+	kfunc_util = __import__('utilss.kfunc_util')
 	#model_util = importlib.import_module('utils.model_util')
 	#apricot_rel_util = importlib.import_module('utils.apricot_rel_util')
 	#torch_rel_util = importlib.import_module('utils.torch_rel_util')
@@ -35,7 +36,8 @@ class Searcher(object):
 		#empty_graph = None,
 		#which = None,
 		path_to_keras_model = None,
-		at_indices = None):
+		at_indices = None, 
+		batch_size = None):
 
 		"""
 		"""
@@ -65,9 +67,11 @@ class Searcher(object):
 		#self.which = which
 		#self.tensors = self.set_target_tensor_names(tensor_name_file)
 		self.indices_to_target_layers = indices_to_target_layers
-
+		
 		##
-		self.set_base_model()
+		self.batch_size = batch_size
+		#self.set_base_model()
+		self.set_base_model_v2()
 		self.set_target_weights()
 		##
 
@@ -111,6 +115,17 @@ class Searcher(object):
 		# fn, t_ws (for weights), ys (for labels) 
 		self.k_fn_mdl, _, _  = build_k_frame_model(self.mdl, self.inputs, self.indices_to_target_layers)
 	
+	def set_base_model_v2(self):
+		"""
+		Generate an empyt graph frame for current searcher
+		"""
+		from tensorflow.keras.models import load_model
+		mdl = load_model(self.path_to_keras_model)
+		self.mdl = mdl
+		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
+		self.k_fn_mdl_lst = self.kfunc_util.generate_base_mdl(	
+			self.mdl, self.inputs, indices_to_tls = self.indices_to_target_layers, batch_size = self.batch_size)
+
 
 	def set_target_weights(self):
 		"""
@@ -400,14 +415,17 @@ class Searcher(object):
 		"""
 		"""
 		import tensorflow as tf
-		#t0 = time.time()
-		inputs = self.inputs
-		labels = self.labels
-
 		import time
+		#t0 = time.time()
+		#inputs = self.inputs
+		labels = self.labels
 		t1 = time.time()
 		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
-		predictions, losses_of_all = self.k_fn_mdl(deltas_as_lst + [labels])
+		#predictions, losses_of_all = self.k_fn_mdl(deltas_as_lst + [labels])
+		#**
+		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, labels, deltas_as_lst)
+		losses_of_all = self.kfunc_util.compute_losses(self.k_fn_mdl_lst, labels, deltas_as_lst)
+		#**
 		#
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
@@ -459,7 +477,10 @@ class Searcher(object):
 		#predictions = self.mdl.predict(self.inputs)
 		## v2
 		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
-		predictions, _ = self.k_fn_mdl(deltas_as_lst + [self.labels])
+		#predictions, _ = self.k_fn_mdl(deltas_as_lst + [self.labels])
+		## **
+		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, self.labels, deltas_as_lst)
+		## **
 		##
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)

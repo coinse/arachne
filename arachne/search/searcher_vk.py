@@ -438,6 +438,9 @@ class Searcher(object):
 		#import sys; sys.exit()
 		#**
 		#
+		if len(predictions.shape) > len(labels.shape) and predictions.shape[1] == 1:
+			predictions = self.np.squeeze(predictions, axis = 1)
+
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
 		#print (correct_predictions.shape, self.np.sum(correct_predictions))
@@ -491,6 +494,8 @@ class Searcher(object):
 		#predictions, _ = self.k_fn_mdl(deltas_as_lst + [self.labels])
 		## **
 		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, self.labels, deltas_as_lst, batch_size = self.batch_size)
+		if len(predictions.shape) > len(self.labels.shape) and predictions.shape[1] == 1:
+			predictions = self.np.squeeze(predictions, axis = 1)
 		## **
 		##
 		correct_predictions = self.np.argmax(predictions, axis = 1)

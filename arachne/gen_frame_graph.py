@@ -258,8 +258,10 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 
 	ys = tf.placeholder(dtype = tf.float32, shape = (None, num_label))
 	pred_probs = tf.math.softmax(network_dict['new_output_tensor_of'][last_layer_name]) # softmax
+	if len(ys.shape) != len(pred_probs.shape):
+		if pred_probs.shape[1] == 1:
+			pred_probs = tf.squeeze(pred_probs, axis = 1)
 	loss_op = tf.keras.metrics.categorical_crossentropy(ys, pred_probs)
-
 	fn = K.function(t_ws + [ys], [network_dict['new_output_tensor_of'][last_layer_name], loss_op])
 	#fn = K.function(t_ws + [ys], [network_dict['new_output_tensor_of'][last_layer_name]])	
 	#fn = K.function(t_ws + [ys], [loss_op])

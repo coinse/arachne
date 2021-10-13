@@ -8,7 +8,7 @@ class Searcher(object):
 	np = __import__('numpy')
 	os = __import__('os')
 	importlib = __import__('importlib')
-	kfunc_util = __import__('utilss.kfunc_util')
+	kfunc_util = importlib.import_module('utils.kfunc_util')
 	#model_util = importlib.import_module('utils.model_util')
 	#apricot_rel_util = importlib.import_module('utils.apricot_rel_util')
 	#torch_rel_util = importlib.import_module('utils.torch_rel_util')
@@ -422,11 +422,17 @@ class Searcher(object):
 		labels = self.labels
 		t1 = time.time()
 		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers if idx_to_tl in deltas.keys()] 
-		#predictions, losses_of_all = self.k_fn_mdl(deltas_as_lst + [labels])
+		#predictions_o, losses_of_all_o = self.k_fn_mdl_lst[0](deltas_as_lst + [labels])
 		#**
-		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, labels, deltas_as_lst)
-		losses_of_all = self.kfunc_util.compute_losses(self.k_fn_mdl_lst, labels, deltas_as_lst)
-		import sys; sys.exit()
+		#predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
+		#losses_of_all = self.kfunc_util.compute_losses(self.k_fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
+		predictions, losses_of_all = self.kfunc_util.compute_preds_and_losses(self.k_fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
+		#print (predictions.shape, predictions_o.shape)
+		#print (losses_of_all.shape, losses_of_all_o.shape)
+		#print (losses_of_all[0], losses_of_all_o[0])
+		#print (all((predictions == predictions_o).flatten()))
+		#print (all((losses_of_all == losses_of_all_o).flatten()))
+		#import sys; sys.exit()
 		#**
 		#
 		correct_predictions = self.np.argmax(predictions, axis = 1)
@@ -481,7 +487,7 @@ class Searcher(object):
 		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
 		#predictions, _ = self.k_fn_mdl(deltas_as_lst + [self.labels])
 		## **
-		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, self.labels, deltas_as_lst)
+		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, self.labels, deltas_as_lst, batch_size = self.batch_size)
 		## **
 		##
 		correct_predictions = self.np.argmax(predictions, axis = 1)

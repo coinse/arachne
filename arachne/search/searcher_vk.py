@@ -37,7 +37,8 @@ class Searcher(object):
 		#which = None,
 		path_to_keras_model = None,
 		at_indices = None, 
-		batch_size = None):
+		batch_size = None, 
+		act_func = None):
 
 		"""
 		"""
@@ -70,6 +71,7 @@ class Searcher(object):
 		
 		##
 		self.batch_size = batch_size
+		self.act_func = act_func # will be latter used for GTSRB
 		#self.set_base_model()
 		self.set_base_model_v2()
 		self.set_target_weights()
@@ -125,7 +127,8 @@ class Searcher(object):
 		self.mdl = mdl
 		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
 		self.k_fn_mdl_lst = self.kfunc_util.generate_base_mdl(	
-			self.mdl, self.inputs, indices_to_tls = self.indices_to_target_layers, batch_size = self.batch_size)
+			self.mdl, self.inputs, indices_to_tls = self.indices_to_target_layers, 
+			batch_size = self.batch_size, act_func = self.act_func)
 
 
 	def set_target_weights(self):

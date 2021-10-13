@@ -10,6 +10,7 @@ import time
 import os
 import search.other_localisers as other_localisers
 from gen_frame_graph import generate_empty_graph
+import tensorflow as tf
 
 # def where_to_fix_from_bl(
 # 	indices_to_wrong,
@@ -255,8 +256,8 @@ def patch(
 		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-			pickle.dump(indices_w_costs, f)
+		#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		#	pickle.dump(indices_w_costs, f)
 		
 	elif loc_method == 'old_localiser': # will be deleted 
 		if loc_file is None or not (os.path.exists(loc_file)):
@@ -393,6 +394,7 @@ def patch(
 			path_to_keras_model = path_to_keras_model,
 			patch_aggr = patch_aggr,
 			batch_size = batch_size,
+			act_func = tf.nn.relu if which == 'GTSRB' else None,
 			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
 
 		places_to_fix = indices_to_places_to_fix

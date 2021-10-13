@@ -197,7 +197,7 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 			
 		# Insert layer if name matches the regular expression
 		if idx_to_l in indices_to_tls:
-			print ('In here', idx_to_l)
+			#print ('In here', idx_to_l)
 			l_class_name = type(layer).__name__
 			#new_layer = insert_layer_factory(layer_name) ## => currenlty, support only conv2d and dense layers
 			###
@@ -207,14 +207,14 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 					w,b = layer.get_weights()
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)    
 					t_b = tf.constant(b)
-					print ("dot", layer_input.shape, t_w.shape, t_b.shape, tf.tensordot(layer_input, t_w, [[len(layer_input.shape)-1],[0]]).shape)
+					#print ("dot", layer_input.shape, t_w.shape, t_b.shape, tf.tensordot(layer_input, t_w, [[len(layer_input.shape)-1],[0]]).shape)
 					x = tf.add(tf.tensordot(layer_input, t_w, [[len(layer_input.shape)-1],[0]]), t_b, name = layer_name) # this is a neat way, but the probelm is memory explosion...
-					print ("X", x.shape)
-					print (len(layer_input.shape))
+					#print ("X", x.shape)
+					#print (len(layer_input.shape))
 					#x = tf.add(tf.matmul(layer_input, t_w), t_b, name = layer_name)
 					if act_func is not None:
 						x = act_func(x)
-					print ("x", x)
+					#print ("x", x)
 					t_ws.append(t_w)
 				else:
 					#print ("In CONV2D")
@@ -260,22 +260,21 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 	pred_probs = tf.math.softmax(network_dict['new_output_tensor_of'][last_layer_name]) # softmax
 	loss_op = tf.keras.metrics.categorical_crossentropy(ys, pred_probs)
 
-	#fn = K.function(t_ws + [ys], [network_dict['new_output_tensor_of'][last_layer_name], loss_op])
+	fn = K.function(t_ws + [ys], [network_dict['new_output_tensor_of'][last_layer_name], loss_op])
 	#fn = K.function(t_ws + [ys], [network_dict['new_output_tensor_of'][last_layer_name]])	
-	fn = K.function(t_ws + [ys], [loss_op])
-	print (loss_op)
-	print ("========")
-	print (network_dict['new_output_tensor_of'][last_layer_name])
-	print ("\n")
-	for t in t_ws + [ys]:
-		print (t)
-	
-	print ("++++++")
-	for k,v in network_dict['new_output_tensor_of'].items():
-		print (k, v)
-	print ("-----")
-	for k,v in network_dict['input_layers_of'].items():
-		print (k, v)
+	#fn = K.function(t_ws + [ys], [loss_op])
+#	print (loss_op)
+#	print ("========")
+#	print (network_dict['new_output_tensor_of'][last_layer_name])
+#	print ("\n")
+#	for t in t_ws + [ys]:
+#		print (t)
+#	print ("++++++")
+#	for k,v in network_dict['new_output_tensor_of'].items():
+#		print (k, v)
+#	print ("-----")
+#	for k,v in network_dict['input_layers_of'].items():
+#		print (k, v)
 	return fn, t_ws, ys
 	
 

@@ -256,7 +256,7 @@ def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = Tru
 
 	return misclfds
 
-def get_misclf_indices_balanced(misclf_indices_file):
+def get_misclf_indices_balanced(misclf_indices_file, idx = 0):
 	"""
 	"""
 	import pandas as pd 
@@ -274,8 +274,8 @@ def get_misclf_indices_balanced(misclf_indices_file):
 		#np.random.shuffle(indices_to_misclf)
 		if len(indices_to_misclf) >= 2:
 			indices_1, indices_2 = np.array_split(indices_to_misclf, 2)
-			ret_misclfds[misclf_type] = indices_1
-		else:
+			ret_misclfds[misclf_type] = indices_1 if idx == 0 else indices_2
+		else: # a single input
 			ret_misclfds[misclf_type] = indices_to_misclf
 
 	return ret_misclfds
@@ -290,6 +290,28 @@ def sort_keys_by_cnt(misclfds):
 		
 	sorted_keys = [v[0] for v in sorted(cnts, key = lambda v:v[1], reverse = True)]
 	return sorted_keys
+
+
+def gen_data_for_rq3(misclf_indices_file, top_n, idx = 0):
+	"""
+	"""
+	idx = idx if idx == 0 else 1 # only 0 or 1
+	target_idx = idx; eval_idx = np.abs(1 - target_idx)
+	misclfds_idx_target = get_misclf_indices_balanced(misclf_indices_file, idx = target_idx)
+	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) # for patch generation 
+	if top_n < len(sorted_keys):
+		misclf_key = sorted_keys[top_n]
+		misclf_indices = misclfds_idx_target[misclf_key]
+
+		misclfds_idx_eval = get_misclf_indices_balanced(misclf_indices_file, idx = eval_idx)
+		new_data_indices = []; new_test_indices = []
+		for sorted_k in sorted_keys:
+			new_data_indices.extend(misclfds_idx_target[sorted_k])
+			new_test_indices.extend(misclfds_idx_eval[sorted_k])
+		
+		return (misclf_indices, new_data_indices, new_test_indices)
+	else:
+		return len(sorted_keys)
 
 
 

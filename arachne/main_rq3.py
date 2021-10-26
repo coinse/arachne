@@ -8,6 +8,7 @@ import auto_patch_vk as auto_patch
 import time
 import numpy as np
 import gc
+from collections.abc import Iterable 
 
 parser = argparse.ArgumentParser()
 
@@ -41,21 +42,26 @@ test_X,test_y = test_data
 
 iter_num = args.iter_num
 num_label = args.num_label 
+top_n = args.seed # to target a unique type of misbehaviour per run
 
 # miclfds: key = (true label, predicted label), values: indices to the misclassified inputs 
 #misclfds = data_util.get_misclf_indices(args.target_indices_file, 
 #	target_indices = None, 
 #	use_all = True) 
 misclfds = data_util.get_misclf_indices_balanced(args.target_indices_file)
-#num_entire_misclfs = np.sum([len(vs) for vs in misclfds.values()])
-
 sorted_keys = data_util.sort_keys_by_cnt(misclfds)
-top_n = args.seed # to target a unique type of misbehaviour per run
 misclf_key = sorted_keys[top_n]
-
 indices = misclfds[misclf_key]
 
-print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
+outs = data_util.gen_data_for_rq3(args.target_indices_file, top_n, idx = 0)
+if not isinstance(outs, Iterable):
+	print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))
+	sys.exit()
+else:
+	(indices, new_test_indices, _) = outs
+	test_data = (test_X[new_test_indices], test_y[new_test_indices])
+
+print ("Processing: {}".format("{}-{}".format(misclf_key[0], misclf_key[1])))
 #num_of_sampled_correct = num_test - num_entire_misclfs
 #print ("The number of correct samples: {}".format(num_of_sampled_correct))
 
@@ -64,8 +70,7 @@ print ("Processing: {}".format("{}-{}".format(misclf_key[0],misclf_key[1])))
 t1 = time.time()
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 	num_label,
-	#train_data,
-	test_data,
+	test_data, #train_data,
 	args.tensor_name_file,
 	max_search_num = iter_num, 
 	search_method = 'DE',

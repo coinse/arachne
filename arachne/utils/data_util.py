@@ -261,7 +261,7 @@ def get_misclf_indices_balanced(misclf_indices_file):
 	"""
 	import pandas as pd 
 
-	df = pd.read_csv(misclf_indices_file)
+	df = pd.read_csv(misclf_indices_file, index_col = 'index')
 	misclf_types = np.unique(df[["true","pred"]].values, axis = 1)
 	ret_misclfds = {}
 	

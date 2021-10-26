@@ -22,6 +22,7 @@ def get_weights(model):
 	
 	return kernel_and_bias_pairs
 
+
 def run_model(mdl, X, y, which_data):
 	"""
 	"""
@@ -37,42 +38,32 @@ def run_model(mdl, X, y, which_data):
 	
 	aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
 	return aft_pred_df
+
+def gen_and_run_model(mdl, path_to_patch, X, y, num_label, input_reshape = False, need_act = False, batch_size = None):
+	"""
+	"""
+	import pandas as pd
+	import utils.kfunc_util as kfunc_util
+	import utils.data_util as data_util
 	
+	act_func = tf.nn.relu if need_act else None
+	patch = pd.read_pickle(path_to_patch)
 
-def gen_and_run_model(which, X, y, num_label, model, kernel_and_bias_pairs, 
-	sess = None, is_train = False, indices = None, use_raw = False):
-	"""
-	"""
-	import tensorflow as tf
-	empty_graph = generate_empty_graph(which, 
-		X, 
-		num_label, 
-		path_to_keras_model = model, 
-		w_gather = False,
-		is_train = is_train,
-		indices = indices,
-		use_raw = use_raw)
-		
-	if sess is None:
-		sess = tf.Session(graph = empty_graph)	
+	k_fn_mdl_lst = kfunc_util.generate_base_mdl(
+		mdl, X, indices_to_tls = list(patch.keys()), batch_size = batch_size, act_func = act_func)
 
-	y = np.eye(num_label)[y]
-	sess, (predictions, correct_predictions) = model_util.predict(
-		None, y, num_label,
-		predict_tensor_name = "predc", 
-		corr_predict_tensor_name = "correct_predc",
-		indices_to_slice_tensor_name = None,
-		sess = sess, 
-		empty_graph = empty_graph,
-		plchldr_feed_dict =  {'fw3:0':np.float32(kernel_and_bias_pairs[-1][0]), 'fb3:0':kernel_and_bias_pairs[-1][1]},
-		use_pretr_front = True,
-		compute_loss = False)
-
+	formated_y = data_util.format_label(y, num_label)	
+	predictions = kfunc_util.compute_kfunc(k_fn_mdl_lst, formated_y, list(patch.values()), batch_size = batch_size)[0]	
 	pred_labels = np.argmax(predictions, axis = 1)
-	num = len(correct_predictions)
-	corr_cnt = np.sum(correct_predictions)
 
-	return pred_labels, corr_cnt, num, sess
+	aft_preds = []
+	aft_preds_column = ['index', 'true', 'pred', 'flag']
+	for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
+		aft_preds.append([i, true_label, pred_label, true_label == pred_label])
+	
+	aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
+	return aft_pred_df
+	
 
 
 def record_predcs(y, pred_labels, filename, target_indices):

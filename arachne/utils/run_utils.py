@@ -22,8 +22,24 @@ def get_weights(model):
 	
 	return kernel_and_bias_pairs
 
+def run_model(mdl, X, y, which_data):
+	"""
+	"""
+	import pandas as pd
 
-def run_model(which, X, y, num_label, model, kernel_and_bias_pairs, 
+	predcs = mdl.predict(X) if which_data != 'fashion_mnist' else mdl.predict(X).reshape(len(X),-1)
+	pred_labels = np.argmax(predcs, axis = 1)
+	
+	aft_preds = []
+	aft_preds_column = ['index', 'true', 'pred', 'flag']
+	for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
+		aft_preds.append([i, true_label, pred_label, true_label == pred_label])
+	
+	aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
+	return aft_pred_df
+	
+
+def gen_and_run_model(which, X, y, num_label, model, kernel_and_bias_pairs, 
 	sess = None, is_train = False, indices = None, use_raw = False):
 	"""
 	"""

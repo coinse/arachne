@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
 	c10_mdl_path = "data/models/cifar_simple_90p.h5"
 	fm_mdl_path = "data/models/fmnist_simple.h5"
-	gtsrb_mdl_path = "data/models/GTSRB/gtsrb.model.0.wh.0.h5"
+	gtsrb_mdl_path = "data/models/GTSRB_NEW/simple/gtsrb.model.0.wh.0.h5"
 
 	if args.which_data == 'cifar10':
 		target_weights = get_target_weights(None, c10_mdl_path, indices_to_target = None, target_all = True)
@@ -145,7 +145,7 @@ if __name__ == "__main__":
 	dest = os.path.join(args.loc_dir, "pairs/{}".format(args.loc_which))
 	os.makedirs(dest, exist_ok = True)
 	comp = lambda a,b: a == b
-	for seed in tqdm.tqdm(range(40)): #40)): # 40 for cifar10 and 31 for fm
+	for seed in tqdm.tqdm(range(35)): #40)): # 40 for cifar10 and 31 for fm, 35 for GTSRB
 		## get gt
 		_, gt_file = return_target_mdl_and_gt_path(args.fid_file, seed, args.which_data)
 		print (gt_file)

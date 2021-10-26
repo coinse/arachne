@@ -21,6 +21,7 @@ parser.add_argument("-w", type = str, default = None, help = "model.misclf-test.
 parser.add_argument("-which", type = str, default = "simple_cm", help = "cnn1,cnn2,cnn3,simple_fm,simple_cm")
 parser.add_argument("-val_index_file", type = str, default = None)
 parser.add_argument("-which_data", type = str, default = 'cifar10', help = "cifar10, fashion_mnist")
+parser.add_argument("-num_label", type = int, default = 10)
 
 args = parser.parse_args()
 
@@ -32,10 +33,10 @@ train_X,train_y = train_data
 X,y = test_data
 indices = np.arange(len(y))
 
-num_label = 10
+num_label = args.num_label
 
 if HAS_RUN_ON_TEST:
-	msg = "should give an index file of test data for those used for training"
+	msg = "should give an index file of test data for those used for generating patches"
 	assert args.val_index_file is not None, msg
 	index_file =  args.val_index_file
 	

@@ -157,7 +157,7 @@ def patch(
 
 	correct_predictions = np.argmax(predictions, axis = 1)
 	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
-
+	print ("The predictions", correct_predictions.shape)
 	if not only_loc:
 		indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
 		#check whether given predef_indices_to_chgd to wrong is actually correct

@@ -840,6 +840,7 @@ def compute_FI_and_GL(
 	print ('Total {} layers are targeted'.format(len(target_weights)))
 	t0 = time.time()
 	## slice inputs
+	print (X.shape, indices_to_target)
 	print (X.shape, np.max(indices_to_target), len(indices_to_target))
 	target_X = X[indices_to_target]
 	target_y = y[indices_to_target]
@@ -1134,6 +1135,7 @@ def localise_offline_v3(
 	from scipy.stats import ks_2samp
 	loc_start_time = time.time()
 
+	print ("indices to chgd, unchgd", indices_to_chgd, indices_to_unchgd)
 	# compute FI and GL with changed inputs
 	total_cands_chgd = compute_FI_and_GL(
 		X, y,

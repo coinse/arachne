@@ -48,18 +48,18 @@ top_n = args.seed # to target a unique type of misbehaviour per run
 #misclfds = data_util.get_misclf_indices(args.target_indices_file, 
 #	target_indices = None, 
 #	use_all = True) 
-misclfds = data_util.get_misclf_indices_balanced(args.target_indices_file)
-sorted_keys = data_util.sort_keys_by_cnt(misclfds)
-misclf_key = sorted_keys[top_n]
-indices = misclfds[misclf_key]
-
+#misclfds = data_util.get_misclf_indices_balanced(args.target_indices_file)
+#sorted_keys = data_util.sort_keys_by_cnt(misclfds)
+#misclf_key = sorted_keys[top_n]
+#indices = misclfds[misclf_key]
 outs = data_util.gen_data_for_rq3(args.target_indices_file, top_n, idx = 0)
 if not isinstance(outs, Iterable):
 	print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))
 	sys.exit()
 else:
-	(indices, new_test_indices, _) = outs
+	(misclf_key, abs_indices, new_test_indices, _) = outs
 	test_data = (test_X[new_test_indices], test_y[new_test_indices])
+	indices = [new_test_indices.index(idx) for idx in abs_indices]
 
 print ("Processing: {}".format("{}-{}".format(misclf_key[0], misclf_key[1])))
 #num_of_sampled_correct = num_test - num_entire_misclfs

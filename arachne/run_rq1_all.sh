@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in {0..29}
+for i in 0 2 3 4 5 6 7 9 14 15 19 21 22 23 26 27 29 # {0..29}
 do
 	./rq1.sh data/cm/ cifar10 new_loc/ localiser 1 $i > logs/new_loc/rq1.cifar10.$i.out &
 	wait $!

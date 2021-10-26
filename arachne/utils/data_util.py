@@ -256,12 +256,10 @@ def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = Tru
 
 	return misclfds
 
-def get_misclf_indices_balanced(misclf_indices_file, idx = 0):
-	"""
-	"""
-	import pandas as pd 
 
-	df = pd.read_csv(misclf_indices_file, index_col = 'index')
+def get_misclf_indices_balanced(df, idx = 0):
+	"""
+	"""
 	misclf_types = np.unique(df[["true","pred"]].values, axis = 1)
 	ret_misclfds = {}
 	
@@ -295,21 +293,39 @@ def sort_keys_by_cnt(misclfds):
 def gen_data_for_rq3(misclf_indices_file, top_n, idx = 0):
 	"""
 	"""
+	import pandas as pd
+	
 	idx = idx if idx == 0 else 1 # only 0 or 1
 	target_idx = idx; eval_idx = np.abs(1 - target_idx)
-	misclfds_idx_target = get_misclf_indices_balanced(misclf_indices_file, idx = target_idx)
-	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) # for patch generation 
+	
+	df = pd.read_csv(misclf_indices_file, index_col = 'index')
+	misclf_df = df.loc[df.true != df.pred]
+	misclfds_idx_target = get_misclf_indices_balanced(misclf_df, idx = target_idx)
+	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) # for patch generation
+
+	misclfds_idx_eval = get_misclf_indices_balanced(misclf_df, idx = eval_idx)
+
+	indices_to_corr = df.loc[df.true == df.pred].sort_values(by=['true']).index.values
+	indices_to_corr_target = [_idx for i,_idx in enumerate(indices_to_corr) if i % 2 == target_idx]
+	indices_to_corr_eval = [_idx for i,_idx in enumerate(indices_to_corr) if i % 2 == eval_idx]
+
+	np.random.seed(0)
 	if top_n < len(sorted_keys):
 		misclf_key = sorted_keys[top_n]
 		misclf_indices = misclfds_idx_target[misclf_key]
 
-		misclfds_idx_eval = get_misclf_indices_balanced(misclf_indices_file, idx = eval_idx)
 		new_data_indices = []; new_test_indices = []
 		for sorted_k in sorted_keys:
 			new_data_indices.extend(misclfds_idx_target[sorted_k])
 			new_test_indices.extend(misclfds_idx_eval[sorted_k])
-		
-		return (misclf_indices, new_data_indices, new_test_indices)
+			
+		new_data_indices += indices_to_corr_target
+		new_test_indices += indices_to_corr_eval
+
+		np.random.shuffle(new_data_indices)
+		np.random.shuffle(new_test_indices)	
+
+		return (misclf_key, misclf_indices, new_data_indices, new_test_indices)
 	else:
 		return len(sorted_keys)
 

@@ -256,6 +256,30 @@ def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = Tru
 
 	return misclfds
 
+def get_misclf_indices_balanced(misclf_indices_file):
+	"""
+	"""
+	import pandas as pd 
+
+	df = pd.read_csv(misclf_indices_file)
+	misclf_types = np.unique(df[["true","pred"]].values, axis = 1)
+	ret_misclfds = {}
+
+	for misclf_type in misclf_types:
+		misclf_type = tuple(misclf_type)
+		true_label, pred_label = misclf_type
+		indices_to_misclf = df.loc[
+			(df.true == true_label) & (df.pred == pred_label)].index.values
+
+		np.random.shuffle(indices_to_misclf)
+		if len(indices_to_misclf) >= 2:
+			indices_1, indices_2 = np.array_split(indices_to_misclf, 2)
+			ret_misclfds[misclf_type] = indices_1
+		else:
+			ret_misclfds[misclf_type] = indices_to_misclf
+
+	return ret_misclfds
+
 
 def sort_keys_by_cnt(misclfds):
 	"""

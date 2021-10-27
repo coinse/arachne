@@ -64,7 +64,7 @@ parser.add_argument("-top_n", type = int, default = 1, help = "required for rq3"
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
-HAS_RUN_ON_TEST = bool(args.on_test)
+#HAS_RUN_ON_TEST = bool(args.on_test)
 
 train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = False)
 train_X,train_y = train_data
@@ -76,8 +76,10 @@ num_label = args.num_label
 if args.rq == 2:
 	pass
 elif args.rq == 3:
-	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'n':args.top_n}
-	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(params)
+	#params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'n':args.top_n}
+	#(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(params)
+	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
+		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
 	used_X, used_y = used_data
 	eval_X, eval_y = eval_data 
 else:

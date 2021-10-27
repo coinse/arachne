@@ -290,7 +290,7 @@ def sort_keys_by_cnt(misclfds):
 	return sorted_keys
 
 
-def gen_data_for_rq3(misclf_indices_file, top_n, idx = 0):
+def gen_data_for_rq3(pred_file, top_n, idx = 0):
 	"""
 	"""
 	import pandas as pd
@@ -298,7 +298,7 @@ def gen_data_for_rq3(misclf_indices_file, top_n, idx = 0):
 	idx = idx if idx == 0 else 1 # only 0 or 1
 	target_idx = idx; eval_idx = np.abs(1 - target_idx)
 	
-	df = pd.read_csv(misclf_indices_file, index_col = 'index')
+	df = pd.read_csv(pred_file, index_col = 'index')
 	misclf_df = df.loc[df.true != df.pred]
 	misclfds_idx_target = get_misclf_indices_balanced(misclf_df, idx = target_idx)
 	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) # for patch generation
@@ -328,6 +328,21 @@ def gen_data_for_rq3(misclf_indices_file, top_n, idx = 0):
 		return (misclf_key, misclf_indices, new_data_indices, new_test_indices)
 	else:
 		return len(sorted_keys)
+
+
+def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
+	"""
+	"""
+	import pandas as pd
+	df = pd.read_csv(pred_file, index_col = 'index')
+	misclf_df = df.loc[df.true != df.pred]
+	num_to_sample = int(len(misclf_df) * percent)
+
+	np.random.seed(seed)
+	indices_to_misclf = np.random.choice(
+		misclf_df.index.values, num_to_sample if num_to_sample >= 1 else 1, replace=False)
+	
+	return indices_to_misclf
 
 
 

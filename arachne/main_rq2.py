@@ -35,24 +35,25 @@ args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
 
-# get the indices to incorrect inputs, which will be considered as changed inputs 
-if args.target_indices_file is not None:
-	import pandas as pd
-	df = pd.read_csv(args.target_indices_file)
-	indices = df['index'].values
-	np.random.seed(args.seed)
-else:
-	predef_indices_to_wrong	= None
-
-num_wrong_inputs_to_patch = int(len(indices) * 0.1) # for RQ2
-if num_wrong_inputs_to_patch > 10: # just random number, actually, I already know that there are more than ten;; but not for GTSRB
-	predef_indices_to_wrong = np.random.choice(indices, num_wrong_inputs_to_patch, replace = False)
-else:# GTSRB... we may generate more simple model for GTSRB (-> we might have to look why the trainig for GTSRB works so well)
-	# maybe, we can compare the variations of input images with the same label and check whether the similarity or the difference to
-	# the other images are greater in GTSRB. If it is, it explains why the model trained for GTSBR achieve so high accuracy
-	predef_indices_to_wrong = indices
-
+## get the indices to incorrect inputs, which will be considered as changed inputs 
+#if args.target_indices_file is not None:
+	#import pandas as pd
+	#df = pd.read_csv(args.target_indices_file)
+	#indices = df['index'].values
+	#np.random.seed(args.seed)
+#else:
+	#predef_indices_to_wrong	= None
+#
+#num_wrong_inputs_to_patch = int(len(indices) * 0.1) # for RQ2
+#if num_wrong_inputs_to_patch > 10: # just random number, actually, I already know that there are more than ten;; but not for GTSRB
+	#predef_indices_to_wrong = np.random.choice(indices, num_wrong_inputs_to_patch, replace = False)
+#else:# GTSRB... we may generate more simple model for GTSRB (-> we might have to look why the trainig for GTSRB works so well)
+	## maybe, we can compare the variations of input images with the same label and check whether the similarity or the difference to
+	## the other images are greater in GTSRB. If it is, it explains why the model trained for GTSBR achieve so high accuracy
+	#predef_indices_to_wrong = indices
+predef_indices_to_wrong = data_util.get_misclf_for_rq2(args.target_indices_file, percent = 0.1, seed = args.seed)
 train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
+
 #num_train = len(train_data[1])
 #num_entire_misclfs = len(indices)
 #num_entire_corrclfs = num_train - num_entire_misclfs
@@ -65,7 +66,7 @@ iter_num = args.iter_num
 t1 = time.time()
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 	num_label,
-	train_data,
+	test_data,#train_data,
 	args.tensor_name_file,
 	max_search_num = iter_num, 
 	search_method = 'DE',

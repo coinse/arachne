@@ -99,6 +99,8 @@ if __name__ == "__main__":
 	parser.add_argument("-new_loc", type = int, default = 0)
 	parser.add_argument("-target_all", type = int, default = 1)
 	parser.add_argument("-w_hist", type = int, default = 0)
+	parser.add_argument("-on_test", action = "store_true", 
+		help = 'if given, localise based on the behaviour difference on the test data')
 	# 
 	#parser.add_argument("-gt_file", type = str, default = None)
 	# to retrieve those 
@@ -118,6 +120,8 @@ if __name__ == "__main__":
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data
+	# set X and y for the localisation 
+	X,y = train_X, train_y if not args.on_test else test_X, test_y
 
 	init_pred_df = read_and_add_flag(args.init_pred_file)
 	if args.aft_pred_file is None:
@@ -125,12 +129,12 @@ if __name__ == "__main__":
 		from tensorflow.keras.models import load_model
 
 		faulty_mdl = load_model(path_to_faulty_model, compile = False)
-		predcs = faulty_mdl.predict(train_X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(train_X).reshape(len(train_X),-1)
+		predcs = faulty_mdl.predict(X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(X).reshape(len(X),-1)
 		pred_labels = np.argmax(predcs, axis = 1)
 	
 		aft_preds = []
 		aft_preds_column = ['index', 'true', 'pred', 'flag']
-		for i, (true_label, pred_label) in enumerate(zip(train_y, pred_labels)):
+		for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
 			aft_preds.append([i, true_label, pred_label, true_label == pred_label])
 		aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
 	else:
@@ -158,7 +162,7 @@ if __name__ == "__main__":
 	if bool(args.new_loc): # temp
 		output = run_localise.localise_offline(
 			args.num_label,
-			train_data,
+			train_data if not args.on_test else test_data,
 			args.tensor_name_file,
 			path_to_keras_model = path_to_faulty_model, #args.path_to_keras_model,
 			predef_indices_to_wrong = indices_to_chgd, #indices_to_wrong,
@@ -183,7 +187,7 @@ if __name__ == "__main__":
 	else:
 		indices_to_places_to_fix, entire_k_and_cost = auto_patch.patch(
 			args.num_label,
-			train_data, 
+			train_data if not args.on_test else test_data,
 			args.tensor_name_file,
 			which = args.which,
 			loc_method = args.loc_method, 

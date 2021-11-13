@@ -235,7 +235,12 @@ def patch(
 	if loc_method == 'gradient_loss': # here, top n is not the number of inpouts, arather it is the number of neural weights to fix
 		if not only_loc: # for RQ2 
 			#### should fix this -> should be the average number of pareto-front size
-			top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
+			if which == 'simple_fm':
+				top_n = int(np.round(7.6))
+			elif which == 'simple_cm':
+				top_n = int(np.round(11.6))
+			else: # GTSRB
+				top_n = int(np.round(14.3))
 		else:
 			# retrieve all
 			top_n = -1
@@ -249,7 +254,7 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		loc_dest = os.path.join("new_loc/{}/grad".format(which))
+		loc_dest = os.path.join("new_loc/{}/grad/on_test".format(which))
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
@@ -297,14 +302,14 @@ def patch(
 			print ("Places to fix", indices_to_places_to_fix)
 
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join("new_loc/{}/c_loc/temp".format(which))
+			loc_dest = os.path.join("new_loc/{}/c_loc/on_tst/rq3".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
 			
 			print ("Saved to", destfile)
-			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-				pickle.dump(front_lst, f)
+			#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			#	pickle.dump(front_lst, f)
 				
 		else: # since I dont' want to localise again
 			import pandas as pd
@@ -313,7 +318,12 @@ def patch(
 			
 	else: # randomly select
 		if not only_loc:
-			top_n = int(np.round(13.3)) if which == 'simple_cm' else int(np.round(7.8))
+			if which == 'simple_fm':
+				top_n = int(np.round(7.6))
+			elif which == 'simple_cm':
+				top_n = int(np.round(11.6))
+			else: # GTSRB
+				top_n = int(np.round(14.3))
 			num_random_sample = top_n 
 		else:
 			num_random_sample = -1
@@ -321,7 +331,7 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-		loc_dest = os.path.join("new_loc/{}/random".format(which))	
+		loc_dest = os.path.join("new_loc/{}/random/on_test".format(which))	
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 

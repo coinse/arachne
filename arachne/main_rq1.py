@@ -121,9 +121,11 @@ if __name__ == "__main__":
 	num_train = len(train_y)
 	test_X, test_y = test_data
 	# set X and y for the localisation 
-	X,y = train_X, train_y if not args.on_test else test_X, test_y
+	X,y = train_data if not args.on_test else test_data
 
 	init_pred_df = read_and_add_flag(args.init_pred_file)
+	init_acc = np.sum(init_pred_df.true == init_pred_df.pred)/len(init_pred_df)
+
 	if args.aft_pred_file is None:
 		#assert path_to_faulty_model is not None, "Neither aft_pred_file nor path_to_faulty_model is given"
 		from tensorflow.keras.models import load_model
@@ -131,7 +133,11 @@ if __name__ == "__main__":
 		faulty_mdl = load_model(path_to_faulty_model, compile = False)
 		predcs = faulty_mdl.predict(X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(X).reshape(len(X),-1)
 		pred_labels = np.argmax(predcs, axis = 1)
-	
+		
+		corr_predictions = pred_labels == y	
+		acc = np.sum(corr_predictions)/corr_predictions.shape[0]
+		print ("Acc: {} -> {}".format(init_acc, acc))
+
 		aft_preds = []
 		aft_preds_column = ['index', 'true', 'pred', 'flag']
 		for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
@@ -139,6 +145,7 @@ if __name__ == "__main__":
 		aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
 	else:
 		aft_pred_df = read_and_add_flag(args.aft_pred_file)
+	
 	combined_df = combine_init_aft_predcs(init_pred_df, aft_pred_df)
 
 	## this should be changed... 
@@ -148,7 +155,8 @@ if __name__ == "__main__":
 	chgds = combined_df.loc[combined_df.pred != combined_df.new_pred] # all
 	unchgds = combined_df.loc[combined_df.pred == combined_df.new_pred]
 	assert len(brokens) + len(patcheds) == len(chgds), "{} vs {}".format(len(brokens) + len(patcheds), len(chgds))
-	
+	print ("chgds: {}, unchgds:{}".format(len(chgds), len(unchgds)))
+	sys.exit()	
 	# currently, we are using only the ones that are broken
 	#indices_to_wrong = brokens.index.values
 	#print ("Indices to wrong", indices_to_wrong)

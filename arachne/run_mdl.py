@@ -19,14 +19,25 @@ def compare(init_pred_df, aft_pred_df):
 
 def get_data_for_evaluation(**kwargs):
 	"""
+	for this, we will look at h
 	"""
 	index_file = kwargs['file']
 	assert index_file.endswith(".csv"), index_file
 	rq = kwargs['rq']
 	data_X = kwargs['X']; data_y = kwargs['y']
+	# for rq2 (reproduce the random selection of misclassified inputs)
+	seed = kwargs['seed']
 	
-	if rq == 2:
-		pass
+	if rq == 2: # sam
+		# index_file = prediction file
+		# here, we need an indices to the targets that we tried to correct
+		# used data -> all correct inputs in the test data and 10% of the misclassified inputs
+		predef_indices_to_wrong = data_util.get_misclf_for_rq2(
+			index_file, percent = 0.1, seed = seed)
+		
+		# used data = test data (we don't have a pure eval data)
+		used_data = (data_X, data_y)
+		return (predef_indices_to_wrong, used_data)
 	elif rq == 3:
 		top_n = kwargs['n']
 		outs = data_util.gen_data_for_rq3(index_file, top_n, idx = 0) 
@@ -74,7 +85,9 @@ indices = np.arange(len(y))
 num_label = args.num_label
 
 if args.rq == 2:
-	pass
+	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file}
+	(predef_indices_to_wrong, used_data) = get_data_for_evaluation(params)
+	used_X, used_y = used_data
 elif args.rq == 3:
 	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'n':args.top_n}
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(params)
@@ -83,7 +96,8 @@ elif args.rq == 3:
 else:
 	pass
 
-print (used_X.shape, used_y.shape, eval_X.shape, eval_y.shape)
+#print (used_X.shape, used_y.shape, eval_X.shape, eval_y.shape)
+
 #sys.exit()
 #if HAS_RUN_ON_TEST:
 	#msg = "should give an index file of test data for those used for training"
@@ -105,11 +119,12 @@ init_model = load_model(args.path_to_init_model, compile = False)
 #init_pred_df_test = run_model(init_model, X, y, args.which_data)
 #init_pred_df_train = run_model(init_model, train_X, train_y, args.which_data)
 init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data)
-init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data)
+if args.rq in [3]:
+	init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data)
 
+####
 input_reshape = args.which_data	== 'fashion_mnist'
 need_act = args.which_data == 'GTSRB'
-
 #print ("=========================Valid============================")
 #if HAS_RUN_ON_TEST:
 	#init_pred_df_val = run_model(init_model, val_X, val_y, args.which_data)
@@ -120,21 +135,20 @@ need_act = args.which_data == 'GTSRB'
 	#combined_df.to_pickle(filename)
 	#print ('For validation:')
 	#compare(init_pred_df_val, aft_pred_df_val)
+if args.rq in [3]: # for rq2, this doesn't apply 
+	print ("=========================For evaluation============================")
+	aft_pred_df_eval = gen_and_run_model(init_model, args.path_to_patch, eval_X, eval_y, num_label,
+		input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
+	combined_df = combine_init_aft_predcs(init_pred_df_eval, aft_pred_df_eval)
+	filename = os.path.join(args.dest, pred_name + ".eval.pkl")
+	combined_df.to_pickle(filename)
 
-print ("=========================For evaluation============================")
-aft_pred_df_eval = gen_and_run_model(init_model, args.path_to_patch, eval_X, eval_y, num_label,
-	input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
-combined_df = combine_init_aft_predcs(init_pred_df_eval, aft_pred_df_eval)
-filename = os.path.join(args.dest, pred_name + ".eval.pkl")
-combined_df.to_pickle(filename)
-
-print ('For test:')
-compare(init_pred_df_eval, aft_pred_df_eval)
-
+	print ('For test:')
+	compare(init_pred_df_eval, aft_pred_df_eval)
 
 print ("=========================Used for patching============================")
 aft_pred_df_used = gen_and_run_model(init_model, args.path_to_patch, used_X, used_y, num_label,
-        input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
+    input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
 combined_df = combine_init_aft_predcs(init_pred_df_used, aft_pred_df_used)
 filename = os.path.join(args.dest, pred_name + ".train.pkl")
 combined_df.to_pickle(filename)

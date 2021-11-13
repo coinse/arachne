@@ -484,6 +484,7 @@ if __name__ == "__main__":
 	parser.add_argument("-by_v", type = float, default = 0.1)
 	parser.add_argument("-num_sample", type = int, default = 1)
 	parser.add_argument("-rd", type = int, default = 0)
+	parser.add_argument("-on_test", action = "store_true")
 
 	args = parser.parse_args()
 
@@ -493,6 +494,7 @@ if __name__ == "__main__":
 
 	#train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = False, with_hist = False)#args.which_data == 'fashion_mnist', with_hist = False)
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist', with_hist = False)
+	target_data = train_data if not args.on_test else test_data
 	##
 	#indices = np.arange(len(test_data[1]))
 	#np.random.shuffle(indices)
@@ -509,7 +511,7 @@ if __name__ == "__main__":
 
 	#k_fn_mdl, target_weights = generate_base_mdl(args.model_path, train_data[0], 
 	#	indices_to_target = None, target_all = bool(args.target_all))
-	k_fn_mdl_lst, target_weights = generate_base_mdl(args.model_path, train_data[0], 
+	k_fn_mdl_lst, target_weights = generate_base_mdl(args.model_path, target_data[0],
 		indices_to_target = None, target_all = bool(args.target_all), 
 		batch_size = BATCH_SIZE if args.which_data == 'GTSRB' else None,
 		act_func = tf.nn.relu if args.which_data == 'GTSRB' else None)
@@ -521,33 +523,33 @@ if __name__ == "__main__":
 	indices_to_target_layers = list(target_weights.keys())
 	print ("Indices", indices_to_target_layers)
 
-#	num = len(train_data[1])
+#	num = len(target_data[1])
 #	chunks = return_chunks(num)
 #	#
-#	new_ys = data_util.format_label(train_data[1], num_label)
+#	new_ys = data_util.format_label(target_data[1], num_label)
 #	#a_pred_probas, _ = k_fn_mdl_lst[0]([target_weights[idx][0] for idx in indices_to_target_layers] + [new_ys])
-#	#print (np.sum(np.argmax(a_pred_probas, axis = 1) == train_data[1])/len(new_ys))
+#	#print (np.sum(np.argmax(a_pred_probas, axis = 1) == target_data[1])/len(new_ys))
 #	#
 #	print ("Length", len(k_fn_mdl_lst), len(chunks))
 #	for m,chunk in zip(k_fn_mdl_lst,chunks):
 #		print (chunk)
 #		a_pred_probas, _ = m([target_weights[idx][0] for idx in indices_to_target_layers] + [new_ys[chunk]])
 #		print (a_pred_probas.shape, len(chunk))
-#		print (np.sum(np.argmax(a_pred_probas, axis = 1) == train_data[1][chunk])/len(chunk))
+#		print (np.sum(np.argmax(a_pred_probas, axis = 1) == target_data[1][chunk])/len(chunk))
 #	sys.exit()
 #	#selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
 	if args.which_data == 'fashion_mnist':
-		selected_neural_weights = random_sample_weights(args.model_path, train_data[0].reshape(train_data[0].shape[0],1,train_data[0].shape[-1]), indices_to_target_layers, num_sample = num_sample)
+		selected_neural_weights = random_sample_weights(args.model_path, target_data[0].reshape(target_data[0].shape[0],1,target_data[0].shape[-1]), indices_to_target_layers, num_sample = num_sample)
 	else:
-		selected_neural_weights = random_sample_weights(args.model_path, train_data[0], indices_to_target_layers, num_sample = num_sample)
+		selected_neural_weights = random_sample_weights(args.model_path, target_data[0], indices_to_target_layers, num_sample = num_sample)
 
 	print ("Selected Neural Weights", selected_neural_weights)
 	from collections import Iterable
-	if not isinstance(train_data[1][0], Iterable):
-		new_ys = data_util.format_label(train_data[1], num_label)
+	if not isinstance(target_data[1][0], Iterable):
+		new_ys = data_util.format_label(target_data[1], num_label)
 		new_ys_test = data_util.format_label(test_data[1], num_label)
 	else:
-		new_ys = train_data[1]
+		new_ys = target_data[1]
 
 #	print ("====YS====")
 #	print (np.argmax(new_ys[:43], axis = 1), new_ys[0])
@@ -558,7 +560,7 @@ if __name__ == "__main__":
 	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(
 		k_fn_mdl_lst, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
 	
-	print ("Changed Accuracy: {}".format(num_aft_corr/len(train_data[1])))
+	print ("Changed Accuracy: {}".format(num_aft_corr/len(target_data[1])))
 	deltas_of_snws = pd.DataFrame.from_dict(deltas_of_snws)
 	print (deltas_of_snws)
 

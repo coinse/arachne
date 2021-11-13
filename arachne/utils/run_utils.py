@@ -45,15 +45,19 @@ def gen_and_run_model(mdl, path_to_patch, X, y, num_label, input_reshape = False
 	import pandas as pd
 	import utils.kfunc_util as kfunc_util
 	import utils.data_util as data_util
-	
+
 	act_func = tf.nn.relu if need_act else None
 	patch = pd.read_pickle(path_to_patch)
-
+	indices_to_tls = sorted(list(patch.keys()))
+	
 	k_fn_mdl_lst = kfunc_util.generate_base_mdl(
-		mdl, X, indices_to_tls = list(patch.keys()), batch_size = batch_size, act_func = act_func)
+		mdl, X, indices_to_tls = indices_to_tls, batch_size = batch_size, act_func = act_func)
 
 	formated_y = data_util.format_label(y, num_label)	
-	predictions = kfunc_util.compute_kfunc(k_fn_mdl_lst, formated_y, list(patch.values()), batch_size = batch_size)[0]	
+	predictions = kfunc_util.compute_kfunc(
+		k_fn_mdl_lst, formated_y, [patch[idx] for idx in indices_to_tls], batch_size = batch_size)[0]	
+	if len(predictions.shape) == 3:
+		predictions = np.squeeze(predictions,axis = 1)
 	pred_labels = np.argmax(predictions, axis = 1)
 
 	aft_preds = []

@@ -27,17 +27,18 @@ def get_data_for_evaluation(**kwargs):
 	data_X = kwargs['X']; data_y = kwargs['y']
 	# for rq2 (reproduce the random selection of misclassified inputs)
 	seed = kwargs['seed']
-	
+	#which_data = kwargs['which_data']
+
 	if rq == 2: # sam
 		# index_file = prediction file
 		# here, we need an indices to the targets that we tried to correct
 		# used data -> all correct inputs in the test data and 10% of the misclassified inputs
-		predef_indices_to_wrong = data_util.get_misclf_for_rq2(
+		indices_to_targeted = data_util.get_misclf_for_rq2(
 			index_file, percent = 0.1, seed = seed)
 		
 		# used data = test data (we don't have a pure eval data)
 		used_data = (data_X, data_y)
-		return (predef_indices_to_wrong, used_data)
+		return (indices_to_targeted, used_data)
 	elif rq == 3:
 		top_n = kwargs['n']
 		outs = data_util.gen_data_for_rq3(index_file, top_n, idx = 0) 
@@ -63,7 +64,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-init_mdl", "--path_to_init_model", type = str)
 parser.add_argument("-patch", "--path_to_patch", type = str)
 parser.add_argument("-datadir", type = str, default = "KangSeong/data")
-parser.add_argument("-dest", type = str, default = ".")
+parser.add_argument("-dest", type = str, default = None)
 parser.add_argument("-which", type = str, default = "simple_cm", help = "cnn1,cnn2,cnn3,simple_fm,simple_cm")
 parser.add_argument("-index_file", type = str, default = None)
 parser.add_argument("-which_data", type = str, default = 'cifar10', help = "cifar10, fashion_mnist")
@@ -72,9 +73,14 @@ parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
 parser.add_argument("-rq", type = int, default = 0, help = "should be one of: 2, 3, 4, 5 (can be extended)")
 parser.add_argument("-top_n", type = int, default = 1, help = "required for rq3")
+parser.add_argument("-seed", type = int, help = "required for rq2")
 args = parser.parse_args()
 
-os.makedirs(args.dest, exist_ok = True)
+if args.dest is None:
+	dest = os.path.join(os.path.dirname(args.path_to_patch), 'pred')
+else:
+	dest = args.dest
+os.makedirs(dest, exist_ok = True)
 #HAS_RUN_ON_TEST = bool(args.on_test)
 
 train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = False)
@@ -85,14 +91,15 @@ indices = np.arange(len(y))
 num_label = args.num_label
 
 if args.rq == 2:
-	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file}
-	(predef_indices_to_wrong, used_data) = get_data_for_evaluation(params)
+	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'seed':args.seed}
+	(indices_to_targeted, used_data) = get_data_for_evaluation(
+		X=X, y=y, rq=args.rq, file=args.index_file, seed=args.seed)#, which_data = args.which_data)
 	used_X, used_y = used_data
 elif args.rq == 3:
 	#params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'n':args.top_n}
 	#(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(params)
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
-		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
+		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n) #, which_data = args.which_data)
 	used_X, used_y = used_data
 	eval_X, eval_y = eval_data 
 else:
@@ -142,21 +149,29 @@ if args.rq in [3]: # for rq2, this doesn't apply
 	aft_pred_df_eval = gen_and_run_model(init_model, args.path_to_patch, eval_X, eval_y, num_label,
 		input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
 	combined_df = combine_init_aft_predcs(init_pred_df_eval, aft_pred_df_eval)
-	filename = os.path.join(args.dest, pred_name + ".eval.pkl")
+	filename = os.path.join(dest, pred_name + ".eval.pkl")
 	combined_df.to_pickle(filename)
 
 	print ('For test:')
 	compare(init_pred_df_eval, aft_pred_df_eval)
 
 print ("=========================Used for patching============================")
+init_model.summary()
 aft_pred_df_used = gen_and_run_model(init_model, args.path_to_patch, used_X, used_y, num_label,
     input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
 combined_df = combine_init_aft_predcs(init_pred_df_used, aft_pred_df_used)
-filename = os.path.join(args.dest, pred_name + ".train.pkl")
+filename = os.path.join(dest, pred_name + ".train.pkl")
 combined_df.to_pickle(filename)
 
 print ('For train:')
 compare(init_pred_df_used, aft_pred_df_used)
+
+if args.rq == 2:
+	target_df = combined_df.iloc[indices_to_targeted]
+	num_corrected = np.sum((target_df.true == target_df.new_pred).values)
+	total_targeted = len(indices_to_targeted)
+	print ("Out of {}, {} are corrected: {}%".format(
+		total_targeted, num_corrected, np.round(100*num_corrected/total_targeted, decimals = 2)))
 
 
 

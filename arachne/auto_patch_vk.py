@@ -87,6 +87,7 @@ def patch(
 	patch_aggr = None, 
 	target_all = False,
 	loc_file = None,
+	loc_dest = None,
 	batch_size = None):
 	"""
 	only_loc = True:
@@ -108,6 +109,8 @@ def patch(
 	random.seed(seed)
 	np.random.seed(seed)
 
+	if loc_dest is None:
+		loc_dest = "."
 	#################################################
 	################# Prepare #######################
 	#################################################
@@ -254,15 +257,15 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		loc_dest = os.path.join("new_loc/{}/grad/on_test".format(which))
+		loc_dest = os.path.join(loc_dest, "new_loc/{}/grad/on_test".format(which))
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
 		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-		#	pickle.dump(indices_w_costs, f)
+		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			pickle.dump(indices_w_costs, f)
 		
 	elif loc_method == 'old_localiser': # will be deleted 
 		if loc_file is None or not (os.path.exists(loc_file)):
@@ -275,7 +278,7 @@ def patch(
 			print ("Places to fix", indices_to_places_to_fix)
 			#import sys; sys.exit()
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join("new_loc/{}/old_loc".format(which))
+			loc_dest = os.path.join(loc_dest, "new_loc/{}/old_loc".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
@@ -302,14 +305,14 @@ def patch(
 			print ("Places to fix", indices_to_places_to_fix)
 
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join("new_loc/{}/c_loc/on_tst/rq3".format(which))
+			loc_dest = os.path.join(loc_dest, "new_loc/{}/c_loc/on_test/".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
 			
 			print ("Saved to", destfile)
-			#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-			#	pickle.dump(front_lst, f)
+			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+				pickle.dump(front_lst, f)
 				
 		else: # since I dont' want to localise again
 			import pandas as pd
@@ -331,7 +334,7 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-		loc_dest = os.path.join("new_loc/{}/random/on_test".format(which))	
+		loc_dest = os.path.join(loc_dest, "new_loc/{}/random/on_test".format(which))	
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 

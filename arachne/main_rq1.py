@@ -156,7 +156,7 @@ if __name__ == "__main__":
 	unchgds = combined_df.loc[combined_df.pred == combined_df.new_pred]
 	assert len(brokens) + len(patcheds) == len(chgds), "{} vs {}".format(len(brokens) + len(patcheds), len(chgds))
 	print ("chgds: {}, unchgds:{}".format(len(chgds), len(unchgds)))
-	sys.exit()	
+	#sys.exit()	
 	# currently, we are using only the ones that are broken
 	#indices_to_wrong = brokens.index.values
 	#print ("Indices to wrong", indices_to_wrong)
@@ -205,7 +205,8 @@ if __name__ == "__main__":
 			predef_indices_to_unchgd = indices_to_unchgd,
 			seed = args.seed,
 			target_all = bool(args.target_all),
-			only_loc = True)
+			only_loc = True,
+			loc_dest = "results/rq1")
 
 	print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
 

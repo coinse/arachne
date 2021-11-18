@@ -74,6 +74,7 @@ parser.add_argument("-batch_size", type = int, default = None)
 parser.add_argument("-rq", type = int, default = 0, help = "should be one of: 2, 3, 4, 5 (can be extended)")
 parser.add_argument("-top_n", type = int, default = 1, help = "required for rq3")
 parser.add_argument("-seed", type = int, help = "required for rq2")
+parser.add_argument("-on_both", action='store_true')
 args = parser.parse_args()
 
 if args.dest is None:
@@ -92,9 +93,15 @@ num_label = args.num_label
 
 if args.rq == 2:
 	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'seed':args.seed}
-	(indices_to_targeted, used_data) = get_data_for_evaluation(
-		X=X, y=y, rq=args.rq, file=args.index_file, seed=args.seed)#, which_data = args.which_data)
-	used_X, used_y = used_data
+	if not args.on_both:
+		(indices_to_targeted, used_data) = get_data_for_evaluation(
+			X=X, y=y, rq=args.rq, file=args.index_file, seed=args.seed)#, which_data = args.which_data)
+		used_X, used_y = used_data
+	else:
+		(indices_to_targeted, used_data) = get_data_for_evaluation(
+			X=train_X, y=train_y, rq=args.rq, file=args.index_file, seed=args.seed)
+		used_X, used_y = train_X, train_y
+		eval_X, eval_y = X,y
 elif args.rq == 3:
 	#params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'n':args.top_n}
 	#(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(params)
@@ -128,7 +135,7 @@ init_model = load_model(args.path_to_init_model, compile = False)
 #init_pred_df_test = run_model(init_model, X, y, args.which_data)
 #init_pred_df_train = run_model(init_model, train_X, train_y, args.which_data)
 init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data)
-if args.rq in [3]:
+if args.on_both or args.rq in [3]:
 	init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data)
 
 ####
@@ -144,7 +151,7 @@ need_act = args.which_data == 'GTSRB'
 	#combined_df.to_pickle(filename)
 	#print ('For validation:')
 	#compare(init_pred_df_val, aft_pred_df_val)
-if args.rq in [3]: # for rq2, this doesn't apply 
+if args.on_both or args.rq in [3]: # for rq2, this doesn't apply 
 	print ("=========================For evaluation============================")
 	aft_pred_df_eval = gen_and_run_model(init_model, args.path_to_patch, eval_X, eval_y, num_label,
 		input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)

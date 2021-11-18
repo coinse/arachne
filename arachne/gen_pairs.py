@@ -116,12 +116,13 @@ if __name__ == "__main__":
 	parser.add_argument("-loc_which", default = 'localiser', type = str, help = "localiser, gradient_loss, random")
 	parser.add_argument("-loc_dir", type = str)
 	parser.add_argument("-fid_file", type = str)
+	parser.add_argument("-on_test",action = "store_true")
 
 	args = parser.parse_args()
 
-	loc_loc_file = "c_loc/loc.all_cost.loc.{}.1.pkl"
-	loc_grad_file = "grad/loc.all_cost.loc.{}.1.grad.pkl"
-	loc_random_file = "random/loc.all_cost.loc.{}.1.random.pkl"
+	loc_loc_file = "c_loc/loc.all_cost.loc.{}.1.pkl" if not args.on_test else "c_loc/on_test/loc.all_cost.loc.{}.1.pkl"
+	loc_grad_file = "grad/loc.all_cost.loc.{}.1.grad.pkl" if not args.on_test else "grad/on_test/loc.all_cost.loc.{}.1.grad.pkl"
+	loc_random_file = "random/loc.all_cost.loc.{}.1.random.pkl" if not args.on_test else "random/on_test/loc.all_cost.loc.{}.1.random.pkl"
 
 	if args.loc_which == 'localiser':
 		loc_file = loc_loc_file

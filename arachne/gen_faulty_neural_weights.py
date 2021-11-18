@@ -118,7 +118,7 @@ def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 
 	num_prev_corr = num_init_corr
 	by = by_v # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.001 #5 #0.001 #0005
+	chg_limit = 0.005 #0.001 #5 #0.001 #0005
 	print (num_inputs * chg_limit)
 	### for testing
 	#if test_mdl is not None:
@@ -318,7 +318,7 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 
 	by = {(vs[0],tuple(vs[1])):by_v for vs in selected_neural_weights} # starting from here
 	print ("By: {}".format(by))
-	chg_limit = 0.001 #0.001 #0005
+	chg_limit = 0.001 #1 #0.001 #0005
 	print ("\t{} number of inputs should be changed".format(num_inputs * chg_limit))
 	### for testing
 	#if test_mdl is not None: # to check the generalisability of the changes (can be removed later)
@@ -560,25 +560,26 @@ if __name__ == "__main__":
 	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(
 		k_fn_mdl_lst, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
 	
-	print ("Changed Accuracy: {}".format(num_aft_corr/len(target_data[1])))
-	deltas_of_snws = pd.DataFrame.from_dict(deltas_of_snws)
-	print (deltas_of_snws)
+	if num_aft_corr is not None:
+		print ("Changed Accuracy: {}".format(num_aft_corr/len(target_data[1])))
+		deltas_of_snws = pd.DataFrame.from_dict(deltas_of_snws)
+		print (deltas_of_snws)
 
-	dest = os.path.join(args.dest, "{}/{}".format(args.which_data, num_sample))
-	os.makedirs(dest, exist_ok = True)
-	destfile = os.path.join(dest, "faulty_nws.{}.pkl".format(args.seed))
-	print ("Saved to {}".format(destfile))
+		dest = os.path.join(args.dest, "{}/{}".format(args.which_data, num_sample))
+		os.makedirs(dest, exist_ok = True)
+		destfile = os.path.join(dest, "faulty_nws.{}.pkl".format(args.seed))
+		print ("Saved to {}".format(destfile))
 	
-	deltas_of_snws.to_pickle(destfile)
+		deltas_of_snws.to_pickle(destfile)
 	
-	# model save
-	from tensorflow.keras.models import load_model
-	mdl = load_model(args.model_path, compile = False)
-	new_mdl = inject_faults_for_keras_mdl(deltas_as_lst, mdl)
+		# model save
+		from tensorflow.keras.models import load_model
+		mdl = load_model(args.model_path, compile = False)
+		new_mdl = inject_faults_for_keras_mdl(deltas_as_lst, mdl)
 	
-	mdl_key = os.path.basename(args.model_path)[:-3]
-	mdl_destfile = os.path.join(dest, "{}_seed{}.h5".format(mdl_key, args.seed))
+		mdl_key = os.path.basename(args.model_path)[:-3]
+		mdl_destfile = os.path.join(dest, "{}_seed{}.h5".format(mdl_key, args.seed))
 
-	print ("Saved to {}".format(mdl_destfile))
-	new_mdl.save(mdl_destfile)
+		print ("Saved to {}".format(mdl_destfile))
+		new_mdl.save(mdl_destfile)
 

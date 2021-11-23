@@ -26,13 +26,13 @@ def get_data_for_evaluation(**kwargs):
 	rq = kwargs['rq']
 	data_X = kwargs['X']; data_y = kwargs['y']
 	# for rq2 (reproduce the random selection of misclassified inputs)
-	seed = kwargs['seed']
 	#which_data = kwargs['which_data']
 
 	if rq == 2: # sam
 		# index_file = prediction file
 		# here, we need an indices to the targets that we tried to correct
 		# used data -> all correct inputs in the test data and 10% of the misclassified inputs
+		seed = kwargs['seed']
 		indices_to_targeted = data_util.get_misclf_for_rq2(
 			index_file, percent = 0.1, seed = seed)
 		
@@ -111,7 +111,7 @@ if args.rq == 2:
 		eval_X, eval_y = X,y
 elif args.rq == 3:
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
-		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n, seed = args.seed) 
+		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
 	used_X, used_y = used_data
 	eval_X, eval_y = eval_data 
 else:
@@ -158,6 +158,8 @@ if args.rq == 2:
 	total_targeted = len(indices_to_targeted)
 	print ("Out of {}, {} are corrected: {}%".format(
 		total_targeted, num_corrected, np.round(100*num_corrected/total_targeted, decimals = 2)))
-
+elif args.rq == 3:
+	# RQ3 spec
+	pass 
 
 

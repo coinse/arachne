@@ -1,5 +1,6 @@
 import os
 import argparse
+from re import A
 from utils import data_util
 from tensorflow.keras.models import load_model
 import numpy as np
@@ -76,8 +77,17 @@ parser.add_argument("-seed", type = int, help = "required for rq2")
 parser.add_argument("-on_both", action='store_true')
 args = parser.parse_args()
 
+if not os.path.exists(args.path_to_patch): # pattern is given instead of a concrete path
+	import glob
+	#e.g., results/rq3/on_test/fm/model.misclf-rq3.0-*.pkl
+	afiles = glob.glob(args.path_to_patch)
+	assert len(afiles) == 1, afiles 
+	path_to_patch = afiles[0]
+else:
+	path_to_patch = args.path_to_patch
+
 if args.dest is None:
-	dest = os.path.join(os.path.dirname(args.path_to_patch), 'pred')
+	dest = os.path.join(os.path.dirname(path_to_patch), 'pred')
 else:
 	dest = args.dest
 os.makedirs(dest, exist_ok = True)
@@ -109,7 +119,7 @@ else:
 	pass
 
 # get weights
-pred_name = os.path.basename(args.path_to_patch).replace("model", "pred")[:-4]
+pred_name = os.path.basename(path_to_patch).replace("model", "pred")[:-4]
 
 init_model = load_model(args.path_to_init_model, compile = False)
 init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data)
@@ -123,7 +133,7 @@ need_act = args.which_data == 'GTSRB'
 # for rq2, this doesn't apply and for RQ3, this always apply, since RQ3 is about the generaliation of patches
 if args.on_both or args.rq == 3: 
 	print ("=========================For evaluation============================")
-	aft_pred_df_eval = gen_and_run_model(init_model, args.path_to_patch, eval_X, eval_y, num_label,
+	aft_pred_df_eval = gen_and_run_model(init_model, path_to_patch, eval_X, eval_y, num_label,
 		input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
 	combined_df = combine_init_aft_predcs(init_pred_df_eval, aft_pred_df_eval)
 	filename = os.path.join(dest, pred_name + ".eval.pkl")
@@ -134,7 +144,7 @@ if args.on_both or args.rq == 3:
 
 print ("=========================Used for patching============================")
 init_model.summary()
-aft_pred_df_used = gen_and_run_model(init_model, args.path_to_patch, used_X, used_y, num_label,
+aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label,
     input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
 combined_df = combine_init_aft_predcs(init_pred_df_used, aft_pred_df_used)
 filename = os.path.join(dest, pred_name + ".train.pkl")

@@ -29,36 +29,27 @@ parser.add_argument("-patch_aggr", action = 'store', default = None, type = floa
 parser.add_argument("-w_hist", type = int, default = 0)
 parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
+parser.add_argument("-on_train", action = "store_true", help = "if given, then evaluate on the training data")
 
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
 
 train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
-train_X,train_y = train_data
-#num_train = len(train_y)
-test_X,test_y = test_data
-#num_test = len(test_y)
+target_data = test_data if not args.on_train else train_data
+target_X, target_y = target_data
 
 iter_num = args.iter_num
 num_label = args.num_label 
 top_n = args.seed # to target a unique type of misbehaviour per run
 
-# miclfds: key = (true label, predicted label), values: indices to the misclassified inputs 
-#misclfds = data_util.get_misclf_indices(args.target_indices_file, 
-#	target_indices = None, 
-#	use_all = True) 
-#misclfds = data_util.get_misclf_indices_balanced(args.target_indices_file)
-#sorted_keys = data_util.sort_keys_by_cnt(misclfds)
-#misclf_key = sorted_keys[top_n]
-#indices = misclfds[misclf_key]
 outs = data_util.gen_data_for_rq3(args.target_indices_file, top_n, idx = 0)
 if not isinstance(outs, Iterable):
 	print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))
 	sys.exit()
 else:
 	(misclf_key, abs_indices, new_test_indices, _) = outs
-	test_data = (test_X[new_test_indices], test_y[new_test_indices])
+	target_data = (target_X[new_test_indices], target_y[new_test_indices]) 
 	indices = [new_test_indices.index(idx) for idx in abs_indices]
 
 print ("Processing: {}".format("{}-{}".format(misclf_key[0], misclf_key[1])))
@@ -70,7 +61,7 @@ print ("Processing: {}".format("{}-{}".format(misclf_key[0], misclf_key[1])))
 t1 = time.time()
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 	num_label,
-	test_data, #train_data,
+	target_data,
 	args.tensor_name_file,
 	max_search_num = iter_num, 
 	search_method = 'DE',

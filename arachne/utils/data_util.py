@@ -292,6 +292,7 @@ def sort_keys_by_cnt(misclfds):
 
 def gen_data_for_rq3(pred_file, top_n, idx = 0):
 	"""
+	idx = 0 or 1 -> to which half, 0 = front half, 1 = latter half
 	"""
 	import pandas as pd
 	

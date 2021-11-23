@@ -30,6 +30,7 @@ parser.add_argument("-w_hist", type = int, default = 0)
 parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
 parser.add_argument("-on_train", action = "store_true", help = "if given, then evaluate on the training data")
+parser.add_argument("-top_n", type = int, default = None)
 
 args = parser.parse_args()
 
@@ -41,7 +42,10 @@ target_X, target_y = target_data
 
 iter_num = args.iter_num
 num_label = args.num_label 
-top_n = args.seed # to target a unique type of misbehaviour per run
+if args.top_n is None:
+	top_n = args.seed # to target a unique type of misbehaviour per run
+else: # mainly for RQ4
+	top_n = args.top_n
 
 outs = data_util.gen_data_for_rq3(args.target_indices_file, top_n, idx = 0)
 if not isinstance(outs, Iterable):

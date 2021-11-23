@@ -1,6 +1,5 @@
 import os
 import argparse
-from re import A
 from utils import data_util
 from tensorflow.keras.models import load_model
 import numpy as np
@@ -112,7 +111,7 @@ if args.rq == 2:
 		eval_X, eval_y = X,y
 elif args.rq == 3:
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
-		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n) 
+		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n, seed = args.seed) 
 	used_X, used_y = used_data
 	eval_X, eval_y = eval_data 
 else:

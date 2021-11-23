@@ -55,6 +55,23 @@ def get_data_for_evaluation(**kwargs):
 		
 		print ("RQ3: processed {}".format(misclf_key))
 		return (used_data, eval_data, used_misclf_data)
+	elif rq == 4:
+		top_n = 0 # target the most frequent misclassification
+		outs = data_util.gen_data_for_rq3(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
+		assert len(outs) == 4, index_file
+
+		misclf_key, misclf_indices, new_data_indices, new_test_indices = outs
+		used_X = data_X[new_data_indices]; eval_X = data_X[new_test_indices]
+		used_misclf_X = data_X[misclf_indices]
+		used_y = data_y[new_data_indices]; eval_y = data_y[new_test_indices]
+		used_misclf_y = data_y[misclf_indices]
+		
+		used_data = (used_X, used_y)
+		eval_data = (eval_X, eval_y)
+		used_misclf_data = (used_misclf_X, used_misclf_y)
+		
+		print ("RQ3: processed {}".format(misclf_key))
+		return (used_data, eval_data, used_misclf_data)	
 	else:
 		pass 
 	pass
@@ -114,6 +131,10 @@ elif args.rq == 3:
 		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
 	used_X, used_y = used_data
 	eval_X, eval_y = eval_data 
+elif args.rq == 4:
+	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(X=X, y=y, rq=args.rq, file=args.index_file)
+	used_X, used_y = used_data
+	eval_X, eval_y = eval_data 
 else:
 	pass
 
@@ -122,7 +143,7 @@ pred_name = os.path.basename(path_to_patch).replace("model", "pred")[:-4]
 
 init_model = load_model(args.path_to_init_model, compile = False)
 init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data)
-if args.on_both or args.rq == 3:
+if args.on_both or args.rq in [3,4,5]: 
 	init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data)
 
 ####
@@ -130,7 +151,7 @@ input_reshape = args.which_data	== 'fashion_mnist'
 need_act = args.which_data == 'GTSRB'
 
 # for rq2, this doesn't apply and for RQ3, this always apply, since RQ3 is about the generaliation of patches
-if args.on_both or args.rq == 3: 
+if args.on_both or args.rq in [3,4,5]: 
 	print ("=========================For evaluation============================")
 	aft_pred_df_eval = gen_and_run_model(init_model, path_to_patch, eval_X, eval_y, num_label,
 		input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
@@ -158,8 +179,8 @@ if args.rq == 2:
 	total_targeted = len(indices_to_targeted)
 	print ("Out of {}, {} are corrected: {}%".format(
 		total_targeted, num_corrected, np.round(100*num_corrected/total_targeted, decimals = 2)))
-elif args.rq == 3:
-	# RQ3 spec
-	pass 
+#elif args.rq == 3:
+#	# RQ3 spec
+#	pass 
 
 

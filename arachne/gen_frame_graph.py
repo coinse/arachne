@@ -129,6 +129,7 @@ def build_partially_fronzen_model(mdl, X, indices_to_tls, indices_to_tneurons):
 
 def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 	"""
+	** The one that actually used in Arachne. All the others (maybe except build_partially_fronzen_model) will be removed
 	"""
 	import tensorflow as tf
 	from tensorflow.keras.models import Model
@@ -208,7 +209,8 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)    
 					t_b = tf.constant(b)
 					#print ("dot", layer_input.shape, t_w.shape, t_b.shape, tf.tensordot(layer_input, t_w, [[len(layer_input.shape)-1],[0]]).shape)
-					x = tf.add(tf.tensordot(layer_input, t_w, [[len(layer_input.shape)-1],[0]]), t_b, name = layer_name) # this is a neat way, but the probelm is memory explosion...
+					# this is a neat way, but the probelm is memory explosion... -> process by batches
+					x = tf.add(tf.tensordot(layer_input, t_w, [[len(layer_input.shape)-1],[0]]), t_b, name = layer_name) 
 					#print ("X", x.shape)
 					#print (len(layer_input.shape))
 					#x = tf.add(tf.matmul(layer_input, t_w), t_b, name = layer_name)

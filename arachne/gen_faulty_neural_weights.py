@@ -12,6 +12,7 @@ def return_chunks(num):
 	chunks = np.array_split(np.arange(num), num_split)
 	return chunks
 
+
 def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, batch_size = None, act_func = None):
 	from tensorflow.keras.models import load_model, Model 
 	from gen_frame_graph import build_k_frame_model
@@ -30,8 +31,6 @@ def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, 
 		k_fn_mdl_lst = []
 		for chunk in chunks:
 			k_fn_mdl, _, _  = build_k_frame_model(mdl, X[chunk], list(sorted(target_weights.keys())), act_func = act_func)
-			#a_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in target_weights.keys()] + [data_util.format_label(y,43)[chunk]])
-			#print ("++", np.sum(np.argmax(a_pred_probas, axis = 1) == y[chunk])/len(chunk))
 			k_fn_mdl_lst.append(k_fn_mdl)
 	return k_fn_mdl_lst, target_weights
 
@@ -42,13 +41,10 @@ def get_indices_to_grad_above_mean(path_to_keras_mdl, idx_to_tl, X):
 	"""
 	grad = np.abs(compute_gradient_to_output(path_to_keras_mdl, idx_to_tl, X, on_weight = True, wo_reset = True, by_batch = True))
 	mean_grad_v = np.mean(grad.flatten())
-	#print ("Grad", grad.shape)
 	indices_to_above_mean = list(zip(*np.where(grad > mean_grad_v)))
-	#print ("mean", idx_to_tl, len(indices_to_above_mean), mean_grad_v)
 	return indices_to_above_mean	
 
 
-#def random_sample_weights(path_to_keras_mdl, X, target_ws, indices_to_target, num_sample = 1):
 def random_sample_weights(path_to_keras_mdl, X, indices_to_target, num_sample = 1):
 	"""
 	"""
@@ -78,192 +74,10 @@ def inject_faults_for_keras_mdl(deltas_as_lst, mdl):
 		mdl.layers[idx_to_tl].set_weights([delta, org_bias])
 	return mdl
 
+
 def is_in_bound(bound_lr, v):
 	bound_l,bound_r = bound_lr
 	return (bound_l <= v) and (bound_r >= v)
-
-
-def is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, min_num_broken):
-	"""
-	"""
-	num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
-	num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
-	print ("===", num_broken, num_patched, min_num_broken)	
-	if num_broken > min_num_broken and num_patched == 0:
-		return True
-	else:
-		return False
-
-
-def tweak_weights(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False, test_mdl = None, test_ys = None):
-	"""
-	"""
-	import tensorflow as tf
-	import time
-
-	# initial prediction
-	indices_to_tls = sorted(list(target_weights.keys()))
-	init_predictions, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys])
-	init_corr_predictions = np.argmax(init_predictions, axis = 1)
-	init_corr_predictions = init_corr_predictions == np.argmax(ys, axis = 1)
-
-	indices_to_sel_w_tls = np.asarray([vs[0] for vs in selected_neural_weights])
-	indices_to_uniq_sel_w_tls = np.unique(indices_to_sel_w_tls)
-	indices_to_uniq_sel_w_tls.sort()
-	indices_to_sel_ws = np.asarray([vs[1] for vs in selected_neural_weights]) 
-
-	num_inputs = len(ys)
-	prev_corr_predictons = init_corr_predictions
-	num_init_corr = np.sum(prev_corr_predictons)
-	num_prev_corr = num_init_corr
-	by = by_v # starting from here
-	print ("By: {}".format(by))
-	chg_limit = 0.005 #0.001 #5 #0.001 #0005
-	print (num_inputs * chg_limit)
-	### for testing
-	#if test_mdl is not None:
-	#	print (k_fn_mdl_test)
-	#	test_init_predictions, _ = k_fn_mdl_test([target_weights[idx][0] for idx in indices_to_tls] + [test_ys])
-	#	test_init_corr_predictions = np.argmax(test_init_predictions, axis = 1)
-	#	test_init_corr_predictions = test_init_corr_predictions == np.argmax(test_ys, axis = 1)
-	#	test_num_init_corr = np.sum(test_init_corr_predictions)
-	###
-
-	which_direction_arr = np.ones(len(selected_neural_weights))
-	print ("Number of selected neural weights", len(selected_neural_weights))
-	which_direction_arr[np.where(which_direction_arr > 0.5)[0]] = -1.
-	which_direction = {tuple(vs):d for vs,d in zip(selected_neural_weights, which_direction_arr)}
-
-	org_weights = {idx_to_tl:np.copy(target_weights[idx_to_tl][0]) for idx_to_tl in indices_to_tls}
-
-	bound_lr_vs = {}
-	for idx_to_tl in indices_to_tls:
-		w = target_weights[idx_to_tl][0]
-		std_v = np.std(w)
-		mean_v = np.mean(w)
-		bound_l = np.max([mean_v - 3 * std_v, np.min(w)]) #np.quantile(w, 0.25)])
-		bound_r = np.min([mean_v + 3 * std_v, np.max(w)])  #np.quantile(w, 0.75)])
-		bound_lr_vs[idx_to_tl] = [bound_l, bound_r]
-
-	print (bound_lr_vs)
-	t1 = time.time()
-	timeout = 60 * 10
-	is_out_of_bound = False
-	while True:
-		t2 = time.time()
-		if t2 - t1 > timeout:
-			print ("Time out: {}".format(t2 - t1))
-			return None, None, None
-
-		deltas_as_lst = []
-		deltas_of_snws = {"layer":[], "w_idx":[], "init_v":[], "new_v":[]}
-		# update
-		for idx_to_tl in indices_to_tls:
-			init_weight, _ = target_weights[idx_to_tl]
-			if idx_to_tl not in indices_to_uniq_sel_w_tls:
-				deltas_as_lst.append(init_weight)
-			else:
-				w_stdev = np.std(org_weights[idx_to_tl])
-
-				local_indices_to_sel_nws = list(zip(*np.where(indices_to_sel_w_tls == idx_to_tl))) 
-				curr_indices_to_sel_nws = [indices_to_sel_ws[i] for i in local_indices_to_sel_nws]
-				delta = by * w_stdev * np.random.rand(*init_weight.shape) 
-				for idx in curr_indices_to_sel_nws:
-					deltas_of_snws['init_v'].append(org_weights[idx_to_tl][tuple(idx)])
-					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])
-					
-					if not is_rd:
-						init_weight[tuple(idx)] += which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
-						## check whether a new value exceeeds the bound
-						if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
-							print (bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
-							is_out_of_bound = True
-							# go back to the previous value
-							init_weight[tuple(idx)] -= which_direction[(idx_to_tl,tuple(idx))] * delta[tuple(idx)]
-							deltas_of_snws['layer'].append(idx_to_tl)
-							deltas_of_snws['w_idx'].append(idx)
-							deltas_of_snws['new_v'].append(init_weight[tuple(idx)])
-							break
-					else:
-						which_dir = -1. if np.random.rand(1)[0] > 0.5 else 1.
-						#init_weight[tuple(idx)] = org_weights[idx_to_tl][tuple(idx)] + delta[tuple(idx)]*which_dir
-						init_weight[tuple(idx)] = delta[tuple(idx)]*which_dir
-
-					#print ("++", init_weight[tuple(idx)], which_dir, org_weights[idx_to_tl][tuple(idx)], delta[tuple(idx)]*which_dir)
-					#print ("++", init_weight[tuple(idx)], delta[tuple(idx)]*which_direction[(idx_to_tl,tuple(idx))])
-					deltas_of_snws['layer'].append(idx_to_tl)
-					deltas_of_snws['w_idx'].append(idx)
-					deltas_of_snws['new_v'].append(init_weight[tuple(idx)])
-
-				deltas_as_lst.append(init_weight)
-
-		aft_predictions, _ = k_fn_mdl(deltas_as_lst + [ys])
-		aft_corr_predictions = np.argmax(aft_predictions, axis = 1)
-		aft_corr_predictions = aft_corr_predictions == np.argmax(ys, axis = 1)
-		
-		# check whehter the accuracy decreases
-		num_aft_corr = np.sum(aft_corr_predictions)
-		### testing
-		if test_mdl is not None:
-			test_aft_predictions, _ = k_fn_mdl_test(deltas_as_lst + [test_ys])
-			test_aft_corr_predictions = np.argmax(test_aft_predictions, axis = 1)
-			test_aft_corr_predictions = test_aft_corr_predictions == np.argmax(test_ys, axis = 1)
-			test_num_aft_corr = np.sum(test_aft_corr_predictions)
-		###
-		print ("Current: {} vs {} vs {}".format(num_aft_corr, num_prev_corr, num_init_corr), is_out_of_bound)
-		if test_mdl is not None:
-			print ("\t", test_num_aft_corr, test_num_init_corr, test_num_init_corr - test_num_aft_corr)
-		print ("\t", num_init_corr - num_aft_corr, num_prev_corr - num_aft_corr, by)
-		##
-		print (num_init_corr - num_aft_corr, num_inputs * chg_limit)	
-		#if (not is_out_of_bound) and num_init_corr - num_aft_corr > num_inputs * chg_limit:
-		if is_only_broken_wo_patched(prev_corr_predictons, aft_corr_predictions, num_inputs * chg_limit):
-			print ("Accuracy has been decreased: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
-			num_broken = np.sum((prev_corr_predictons == 1) & (aft_corr_predictions == 0))
-			num_patched = np.sum((prev_corr_predictons == 0) & (aft_corr_predictions == 1))
-			print ("\tNumber of broken: {}, number of patched: {}".format(num_broken, num_patched))
-			return list(zip(indices_to_tls, deltas_as_lst)), deltas_of_snws, num_aft_corr
-		elif is_rd:
-			continue 
-		else:
-			# tricky, tricky, tricky .... I mean, we cannot control the model's accuracy, especially if the selected neural weight is located near the input layer
-			# maybe.. goining back to the initial stage might be the solution ... (but, is likley to meet the time-limit)
-			if is_out_of_bound or (num_init_corr < num_aft_corr): # fix 
-				if is_out_of_bound:
-					print ('A new value is out of bound')
-					is_out_of_bound = False
-				else:
-					print ("Has been improved instead: {} -> {}".format(num_init_corr/num_inputs, num_aft_corr/num_inputs))
-
-				# set to init weight
-				for idx_to_tl in indices_to_tls:
-					target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
-					
-				for vs in selected_neural_weights:
-					which_direction[tuple(vs)] *= -1
-			
-				num_prev_corr = num_init_corr
-	
-			else: # num_prev == num_aft_corr (nothing has been changed)
-				print ("here", num_prev_corr - num_aft_corr, num_init_corr - num_aft_corr, by)
-				if num_prev_corr < num_aft_corr: # has been improved from the "previous" result (but, still below the initial results)
-					for vs in selected_neural_weights:
-						which_direction[tuple(vs)] *= -1
-	
-				num_prev_corr = num_aft_corr
-				by += by_v/2
-				if by > 3:
-					print ("Out of the initial distribution: {}".format(by))
-					#if by > 4.5:
-					for idx_to_tl in indices_to_tls:
-						target_weights[idx_to_tl][0] = np.copy(org_weights[idx_to_tl])
-				
-					# reverse
-					which_direction = {tuple(vs):-1*d for vs,d in zip(selected_neural_weights, which_direction_arr)}
-		
-					num_prev_corr = num_init_corr
-					by = by_v*2
-					print ("Increase by and start again", by)
 
 
 def compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls):
@@ -279,11 +93,6 @@ def compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls):
 		pred_probas = None
 		for k_fn_mdl, chunk in zip(k_fn_mdl_lst, chunks):
 			a_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys[chunk]])
-			#print ("bfre", a_pred_probas.shape)
-			#print ("\t", np.argmax(ys[chunk], axis = 1))
-			#print ("\t", np.sum(np.argmax(a_pred_probas,axis=1) == np.argmax(ys[chunk],axis=1))/len(chunk))
-			#print (np.unique(np.argmax(a_pred_probas,axis=1)))
-			#print (np.unique(np.argmax(ys[chunk])))
 			if pred_probas is None:
 				pred_probas = a_pred_probas
 			else:
@@ -293,7 +102,7 @@ def compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls):
 	#print ("Final", predictions.shape)
 	return predictions
 
-#def tweak_weights_v2(k_fn_mdl, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False, test_mdl = None, test_ys = None):
+
 def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, by_v = 0.1, is_rd = False, test_mdl = None, test_ys = None):
 	"""
 	the criterion would be the changes
@@ -302,18 +111,16 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 	import time
 
 	# initial prediction
+	indices_to_sel_ws = np.asarray([vs[1] for vs in selected_neural_weights]) 
 	indices_to_tls = sorted(list(target_weights.keys()))
-	init_predictions = compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls)
-	print ("Init predcitions")
-	print (np.sum(init_predictions == np.argmax(ys,1))/len(ys))
-	print ("=====")
-	# 
 	indices_to_sel_w_tls = np.asarray([vs[0] for vs in selected_neural_weights])
 	indices_to_uniq_sel_w_tls = np.unique(indices_to_sel_w_tls)
 	indices_to_uniq_sel_w_tls.sort()
-	indices_to_sel_ws = np.asarray([vs[1] for vs in selected_neural_weights]) 
 
 	num_inputs = len(ys)
+	init_predictions = compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls)
+	#print ("Init predcitions")
+	#print (np.sum(init_predictions == np.argmax(ys,1))/len(ys))
 	prev_predictions = np.copy(init_predictions)
 
 	by = {(vs[0],tuple(vs[1])):by_v for vs in selected_neural_weights} # starting from here
@@ -326,6 +133,7 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 	#	test_init_predictions = np.argmax(test_init_pred_probas, axis = 1)
 	###
 
+	# set direction -> -1 (decrese), +1 (increase)
 	which_direction_arr = np.ones(len(selected_neural_weights))
 	print ("Number of selected neural weights", len(selected_neural_weights))
 	which_direction_arr[np.where(which_direction_arr > 0.5)[0]] = -1.
@@ -375,10 +183,8 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 					#print ("++",idx_to_tl, idx, init_weight[tuple(idx)], delta[tuple(idx)], which_direction[(idx_to_tl,tuple(idx))], org_weights[idx_to_tl][tuple(idx)])	
 					if not is_rd:
 						init_weight[tuple(idx)] += which_direction[k] * (delta[tuple(idx)] * by[k])
-						#print ("+++++++=", which_direction[k], (delta[tuple(idx)] * by[k]),init_weight[tuple(idx)]) 
 						## check whether a new value exceeeds the bound
 						if not is_in_bound(bound_lr_vs[idx_to_tl], init_weight[tuple(idx)]):
-						#if False:
 							is_out_of_bound += 1
 							#print ("out of bound: ", bound_lr_vs[idx_to_tl], init_weight[tuple(idx)])
 							# go back to the previous value
@@ -399,18 +205,6 @@ def tweak_weights_v2(k_fn_mdl_lst, target_weights, ys, selected_neural_weights, 
 
 				deltas_as_lst.append(init_weight)
 
-		#if len(k_fn_mdl_lst) == 1:
-			#k_fn_mdl = k_fn_mdl_lst[0]
-			#aft_pred_probas, _ = k_fn_mdl(deltas_as_lst + [ys])
-		#else:
-			#num = len(ys)
-			#chunks = return_chunks(num)
-			#aft_pred_probas_lst = []
-			#for k_fn_mdl in k_fn_mdl_lst:
-				#a_aft_pred_probas, _ = k_fn_mdl([target_weights[idx][0] for idx in indices_to_tls] + [ys[chunks]])
-				#aft_pred_probas_lst.append(a_aft_pred_probas)
-			#aft_pred_probas = np.append(aft_pred_probas_lst)	
-		#aft_predictions = np.argmax(aft_pred_probas, axis = 1)
 		aft_predictions = compute_predictions(k_fn_mdl_lst, ys, target_weights, indices_to_tls)
 		
 		# compute the number of changed inputs
@@ -492,52 +286,18 @@ if __name__ == "__main__":
 
 	num_label = args.num_label
 
-	#train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = False, with_hist = False)#args.which_data == 'fashion_mnist', with_hist = False)
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir, is_input_2d = args.which_data == 'fashion_mnist', with_hist = False)
 	target_data = train_data if not args.on_test else test_data
-	##
-	#indices = np.arange(len(test_data[1]))
-	#np.random.shuffle(indices)
-	#train_data[0] = test_data[0][indices]
-	#train_data[1] = test_data[1][indices]
-	##
 
-	##
-	#from tensorflow.keras.models import load_model
-	#mdl = load_model(args.model_path, compile = False)
-	#print (np.sum(np.argmax(mdl.predict(train_data[0]),axis=1) == train_data[1])/len(train_data[1]))
-	#print (np.sum(np.argmax(mdl.predict(train_data[0][:4903]),axis=1) == train_data[1][:4903])/len(train_data[1][:4903]))
-	##
-
-	#k_fn_mdl, target_weights = generate_base_mdl(args.model_path, train_data[0], 
-	#	indices_to_target = None, target_all = bool(args.target_all))
 	k_fn_mdl_lst, target_weights = generate_base_mdl(args.model_path, target_data[0],
 		indices_to_target = None, target_all = bool(args.target_all), 
 		batch_size = BATCH_SIZE if args.which_data == 'GTSRB' else None,
 		act_func = tf.nn.relu if args.which_data == 'GTSRB' else None)
-	####
-	#k_fn_mdl_test, _ = generate_base_mdl(args.model_path, test_data[0],
-	#	indices_to_target = None, target_all = bool(args.target_all))
-	####
+
 	num_sample = args.num_sample
 	indices_to_target_layers = list(target_weights.keys())
 	print ("Indices", indices_to_target_layers)
 
-#	num = len(target_data[1])
-#	chunks = return_chunks(num)
-#	#
-#	new_ys = data_util.format_label(target_data[1], num_label)
-#	#a_pred_probas, _ = k_fn_mdl_lst[0]([target_weights[idx][0] for idx in indices_to_target_layers] + [new_ys])
-#	#print (np.sum(np.argmax(a_pred_probas, axis = 1) == target_data[1])/len(new_ys))
-#	#
-#	print ("Length", len(k_fn_mdl_lst), len(chunks))
-#	for m,chunk in zip(k_fn_mdl_lst,chunks):
-#		print (chunk)
-#		a_pred_probas, _ = m([target_weights[idx][0] for idx in indices_to_target_layers] + [new_ys[chunk]])
-#		print (a_pred_probas.shape, len(chunk))
-#		print (np.sum(np.argmax(a_pred_probas, axis = 1) == target_data[1][chunk])/len(chunk))
-#	sys.exit()
-#	#selected_neural_weights = random_sample_weights(target_weights, indices_to_target_layers, num_sample = num_sample)
 	if args.which_data == 'fashion_mnist':
 		selected_neural_weights = random_sample_weights(args.model_path, target_data[0].reshape(target_data[0].shape[0],1,target_data[0].shape[-1]), indices_to_target_layers, num_sample = num_sample)
 	else:
@@ -551,14 +311,8 @@ if __name__ == "__main__":
 	else:
 		new_ys = target_data[1]
 
-#	print ("====YS====")
-#	print (np.argmax(new_ys[:43], axis = 1), new_ys[0])
-#	print (set(np.argmax(new_ys, axis = 1)))
-#	print ("=========")
-	#deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(
-	#	k_fn_mdl, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
 	deltas_as_lst, deltas_of_snws, num_aft_corr = tweak_weights_v2(
-		k_fn_mdl_lst, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))#, test_mdl = k_fn_mdl_test, test_ys = new_ys_test)
+		k_fn_mdl_lst, target_weights, new_ys, selected_neural_weights, by_v = args.by_v, is_rd = bool(args.rd))
 	
 	if num_aft_corr is not None:
 		print ("Changed Accuracy: {}".format(num_aft_corr/len(target_data[1])))

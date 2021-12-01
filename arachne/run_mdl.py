@@ -40,7 +40,7 @@ def get_data_for_evaluation(**kwargs):
 		return (indices_to_targeted, used_data)
 	elif rq == 3:
 		top_n = kwargs['n']
-		outs = data_util.gen_data_for_rq3(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
+		outs = data_util.get_balanced_dataset(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
 		assert len(outs) == 4, index_file
 
 		misclf_key, misclf_indices, new_data_indices, new_test_indices = outs
@@ -57,7 +57,7 @@ def get_data_for_evaluation(**kwargs):
 		return (used_data, eval_data, used_misclf_data)
 	elif rq == 4:
 		top_n = 0 # target the most frequent misclassification
-		outs = data_util.gen_data_for_rq3(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
+		outs = data_util.get_balanced_dataset(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
 		assert len(outs) == 4, index_file
 
 		misclf_key, misclf_indices, new_data_indices, new_test_indices = outs

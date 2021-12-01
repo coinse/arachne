@@ -47,7 +47,7 @@ if args.top_n is None:
 else: # mainly for RQ4
 	top_n = args.top_n
 
-outs = data_util.gen_data_for_rq3(args.target_indices_file, top_n, idx = 0)
+outs = data_util.get_balanced_dataset(args.target_indices_file, top_n, idx = 0)
 if not isinstance(outs, Iterable):
 	print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))
 	sys.exit()

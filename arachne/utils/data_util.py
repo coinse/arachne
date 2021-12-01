@@ -290,8 +290,9 @@ def sort_keys_by_cnt(misclfds):
 	return sorted_keys
 
 
-def gen_data_for_rq3(pred_file, top_n, idx = 0):
+def get_balanced_dataset(pred_file, top_n, idx = 0):
 	"""
+	generate the training and test dataset for rq3 ~ rq6 
 	idx = 0 or 1 -> to which half, 0 = front half, 1 = latter half
 	"""
 	import pandas as pd
@@ -316,7 +317,7 @@ def gen_data_for_rq3(pred_file, top_n, idx = 0):
 		misclf_indices = misclfds_idx_target[misclf_key]
 
 		new_data_indices = []; new_test_indices = []
-		for sorted_k in sorted_keys:
+		for sorted_k in sorted_keys: # this means that all incorrect ones are include in new_data
 			new_data_indices.extend(misclfds_idx_target[sorted_k])
 			new_test_indices.extend(misclfds_idx_eval[sorted_k])
 			

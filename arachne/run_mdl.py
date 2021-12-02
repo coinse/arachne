@@ -126,7 +126,7 @@ if args.rq == 2:
 			X=train_X, y=train_y, rq=args.rq, file=args.index_file, seed=args.seed)
 		used_X, used_y = train_X, train_y
 		eval_X, eval_y = X,y
-elif args.rq == 3:
+elif args.rq in [3,5]:
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
 		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
 	used_X, used_y = used_data

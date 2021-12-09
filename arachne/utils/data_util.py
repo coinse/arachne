@@ -260,22 +260,21 @@ def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = Tru
 def get_misclf_indices_balanced(df, idx = 0):
 	"""
 	"""
-	misclf_types = np.unique(df[["true","pred"]].values, axis = 1)
+	misclf_types = list(set([tuple(pair) for pair in df[["true","pred"]].values]))
 	ret_misclfds = {}
-	
 	for misclf_type in misclf_types:
 		misclf_type = tuple(misclf_type)
 		true_label, pred_label = misclf_type
 		indices_to_misclf = df.loc[
 			(df.true == true_label) & (df.pred == pred_label)].index.values
-		
+	
 		#np.random.shuffle(indices_to_misclf)
 		if len(indices_to_misclf) >= 2:
 			indices_1, indices_2 = np.array_split(indices_to_misclf, 2)
 			ret_misclfds[misclf_type] = indices_1 if idx == 0 else indices_2
 		else: # a single input
 			ret_misclfds[misclf_type] = indices_to_misclf
-
+	
 	return ret_misclfds
 
 
@@ -285,7 +284,6 @@ def sort_keys_by_cnt(misclfds):
 	cnts = []
 	for misclf_key in misclfds:
 		cnts.append([misclf_key, len(misclfds[misclf_key])])
-		
 	sorted_keys = [v[0] for v in sorted(cnts, key = lambda v:v[1], reverse = True)]
 	return sorted_keys
 
@@ -304,7 +302,6 @@ def get_balanced_dataset(pred_file, top_n, idx = 0):
 	misclf_df = df.loc[df.true != df.pred]
 	misclfds_idx_target = get_misclf_indices_balanced(misclf_df, idx = target_idx)
 	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) # for patch generation
-
 	misclfds_idx_eval = get_misclf_indices_balanced(misclf_df, idx = eval_idx)
 
 	indices_to_corr = df.loc[df.true == df.pred].sort_values(by=['true']).index.values

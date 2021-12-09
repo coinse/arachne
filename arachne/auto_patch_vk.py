@@ -187,8 +187,10 @@ def patch(
 		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-			pickle.dump(indices_w_costs, f)	
+		# comment out b/c too big
+		#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		#	pickle.dump(indices_w_costs, f)	
+		# comment out end for loc result saving 
 
 	#elif loc_method == 'old_localiser': # will be deleted 
 		#if loc_file is None or not (os.path.exists(loc_file)):
@@ -230,8 +232,8 @@ def patch(
 			output_df.to_pickle(destfile)
 			
 			print ("Saved to", destfile)
-			with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-				pickle.dump(front_lst, f)
+			#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+			#	pickle.dump(front_lst, f)
 				
 		else: # since I dont' want to localise again
 			import pandas as pd

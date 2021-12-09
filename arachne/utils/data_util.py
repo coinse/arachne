@@ -347,5 +347,12 @@ def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
 	return indices_to_misclf
 
 
+def return_chunks(num, batch_size = None):
+	num_split = int(np.round(num/batch_size))
+	if num_split == 0:
+		num_split = 1
+	chunks = np.array_split(np.arange(num), num_split)
+	return chunks
+
 
 

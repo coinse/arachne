@@ -157,9 +157,12 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 		reset_keras([tensor_grad])
 	return ret_gradient 
 			
-def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, target = None, by_batch = False, wo_reset = False):
+			
+def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, 
+	target = None, by_batch = False, wo_reset = False, loss_func = 'softmax', **kwargs):
 	"""
-	compute gradients for the loss
+	compute gradients for the loss. 
+	kwargs contains the key-word argumenets required for the loss funation
 	"""
 	model = load_model(path_to_keras_model, compile = False)
 	if target is None:
@@ -167,17 +170,31 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, tar
 	num_label = int(model.output.shape[-1])
 	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
 
-	loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
-		logits = model.output, 
-		labels = y_tensor, 
-		name = "per_label_loss") 
-	
+	## should be fixed!!! -> to use the activation funciton of the model!!! -> sepcifiy or accept as the argument
+	if loss_func == 'softmax':
+		# might be changed as the following two
+		loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
+			logits = model.output, 
+			labels = y_tensor, 
+			name = "per_label_loss") 
+	elif loss_func == 'binary_crossentropy':
+		if 'name' in kwargs.keys():
+			kwargs.pop("name")
+		loss_tensor = tf.keras.losses.BinaryCrossentropy(name = "per_label_loss")
+		loss_tensor.__dict__.update(kwargs)
+	elif loss_func in ['mean_squared_error', 'mse']:
+		if 'name' in kwargs.keys():
+			kwargs.pop("name")
+		loss_tensor = tf.keras.losses.MeanSquaredError(name = "per_label_loss")
+		loss_tensor.__dict__.update(kwargs)
+	else:
+		print ("{} not supported yet".format())
+
 	tensor_grad = tf.gradients(
 		loss_tensor,
 		target, 
 		name = 'loss_grad')
 
-	###
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
@@ -376,7 +393,8 @@ def compute_FI_and_GL(
 	X, y,
 	indices_to_target,
 	target_weights,
-	path_to_keras_model = None):
+	path_to_keras_model = None, 
+	loss_func = 'softmax'):
 	"""
 	compute FL and GL for the given inputs
 	"""
@@ -457,7 +475,7 @@ def compute_FI_and_GL(
 			############ FI end #########
 
 			# Gradient
-			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, loss_func=loss_func)
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif is_C2D(lname):
@@ -601,7 +619,7 @@ def compute_FI_and_GL(
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
-			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True)
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True, loss_func=loss_func)
 			# ##	
 		elif is_LSTM(lname): #
 			from scipy.special import expit as sigmoid
@@ -734,9 +752,9 @@ def compute_FI_and_GL(
 			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
 			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
 			grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_kernel, by_batch = True)
+				target = tensor_w_kernel, by_batch = True, loss_func=loss_func)
 			grad_scndcr_recurr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_recurr_kernel, by_batch = True)
+				target = tensor_w_recurr_kernel, by_batch = True, loss_func=loss_func)
 			
 			grad_scndcr = [grad_scndcr_kernel, grad_scndcr_recurr_kernel]
 		#elif is_Attention(lname):

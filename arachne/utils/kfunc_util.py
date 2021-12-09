@@ -91,3 +91,18 @@ def generate_base_mdl(mdl, X, indices_to_tls = None, batch_size = None, act_func
 			k_fn_mdl_lst.append(k_fn_mdl)
 
 	return k_fn_mdl_lst
+
+def gen_pred_and_loss_ops(pred_shape, pred_dtype, y_shape, y_dtype):
+	"""
+	"""
+	import tensorflow as tf
+	import tensorflow.keras.backend as K
+
+	pred_tensor = tf.placeholder(dtype = pred_dtype, shape = pred_shape)  	
+	pred_probs = tf.math.softmax(pred_tensor) # softmax -> can just change to numpy (if it takes long)
+
+	y_tensor = tf.placeholder(dtype = y_dtype, shape = y_shape) 
+	loss_op = tf.keras.metrics.categorical_crossentropy(y_tensor, pred_probs) # if the time for this increase, save it as self.op		
+	
+	fn = K.function([pred_tensor, y_tensor], [loss_op])
+	return fn

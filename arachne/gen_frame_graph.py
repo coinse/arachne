@@ -2,6 +2,9 @@
 empty graph (tf.Graph) generation script
 """
 import os
+from re import I
+
+from utils import model_util
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 
@@ -127,6 +130,93 @@ def build_partially_fronzen_model(mdl, X, indices_to_tls, indices_to_tneurons):
 	return fn, t_ws, ys
 
 
+def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
+	"""
+	New 
+	"""
+	import tensorflow as tf
+	from tensorflow.keras.models import Model
+	import numpy as np
+	from collections.abc import Iterable
+
+	# dictionary to describe the network graph
+	network_dict = {'input_layers_of': {}, 'new_output_tensor_of': {}}
+
+	# Set the input layers of each layer
+	for layer in mdl.layers:
+		for node in layer._outbound_nodes: # the output node of the current layer (layer)
+			layer_name = node.outbound_layer.name # the layer that take node as input 
+			# layer_name takes layer.name as input
+			if layer_name not in network_dict['input_layers_of']:
+				network_dict['input_layers_of'].update({layer_name: [layer.name]})    
+			else:
+				network_dict['input_layers_of'][layer_name].append(layer.name)
+
+	#min_idx_to_tl = np.min(indices_to_tls) # this should be enought
+	min_idx_to_tl = np.min([idx if not isinstance(idx, Iterable) else idx[0] for idx in indices_to_tls])
+	num_layers = len(mdl.layers)
+	model_input = tf.keras.Input(shape = prev_out_shape)
+
+	# Iterate over all layers after the input
+	if min_idx_to_tl == 0:# or min_idx_to_tl - 1 == 0:
+		#constant_x = tf.constant(X, dtype = tf.float32) #X.dtype)
+		#model_input = tf.keras.Input(tensor = constant_x)
+		layer_name = mdl.layers[0].name
+		if model_util.is_Input(type(mdl.layers[0]).__name__): # if the previous layer (layer_name) is an input layer
+			network_dict['new_output_tensor_of'].update({layer_name: model_input})
+		else: # if it is not (happen when using Sequential())
+			_input_layer_name = 'input_layer'
+			network_dict['new_output_tensor_of'].update({_input_layer_name: model_input}) # x is the output of _input_layer_name
+			network_dict['input_layers_of'].update({layer_name: [_input_layer_name]}) # the input's of layer_name is _input_layer_name
+			# set the output tensor for the 0th layer 
+			#t_mdl = Model(inputs = mdl.input, outputs = mdl.layers[0].output) 
+			#prev_output = t_mdl(X)	
+			#network_dict['new_output_tensor_of'].update({layer_name: prev_output}) # not the constant, here, we use "tensor"!
+	else:
+		#t_mdl = Model(inputs = mdl.input, outputs = mdl.layers[min_idx_to_tl-1].output) 
+		#prev_output = t_mdl.predict(X)	
+		#dtype = mdl.layers[min_idx_to_tl-1].output.dtype
+		#constant_x = tf.constant(prev_output, dtype = dtype) # can be changed to a placeholder and take the prev_output freely
+		#model_input = tf.keras.Input(tensor = constant_x)
+		network_dict['new_output_tensor_of'].update({mdl.layers[min_idx_to_tl-1].name: model_input})
+
+	for idx_to_l in range(min_idx_to_tl, num_layers):
+		layer = mdl.layers[idx_to_l]
+		layer_name = layer.name
+		# Determine input tensors
+		#layer_input = [network_dict['new_output_tensor_of'][layer_aux] 
+		#			   for layer_aux in network_dict['input_layers_of'][layer.name]]
+		layer_input = []
+		for layer_aux in network_dict['input_layers_of'][layer.name]:
+			layer_input.append(network_dict['new_output_tensor_of'][layer_aux])
+
+		if len(layer_input) == 1:
+			layer_input = layer_input[0]
+		
+		x = layer(layer_input)
+		# Set new output tensor (the original one, or the one of the replaced layer)
+		network_dict['new_output_tensor_of'].update({layer_name: x}) # x is the output of the layer "layer_name" (current one)
+
+	last_layer_name = mdl.layers[-1].name
+	#num_label = int(mdl.layers[-1].output.shape[-1])
+	#ys = tf.placeholder(dtype = tf.float32, shape = (None, num_label))
+	#if last_act_func == 'softmax':
+		#pred_probs = tf.math.softmax(network_dict['new_output_tensor_of'][last_layer_name]) # softmax
+	#elif last_act_func == 'sigmoid':
+		#pred_probs = tf.math.sigmoid(network_dict['new_output_tensor_of'][last_layer_name]) # softmax
+	#elif last_act_func == 'tanh':
+		#pred_probs = tf.math.tanh(network_dict['new_output_tensor_of'][last_layer_name]) # softmax
+	#else:
+		#print ("{} not supported".format(last_act_func))
+	#if len(ys.shape) != len(pred_probs.shape):
+		#if pred_probs.shape[1] == 1:
+			#pred_probs = tf.squeeze(pred_probs, axis = 1)
+	#print ("model's input", model_input)
+	mdl = Model(inputs = model_input, # this is a constant
+		outputs = network_dict['new_output_tensor_of'][last_layer_name])
+	return mdl
+
+
 def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 	"""
 	** The one that actually used in Arachne. All the others (maybe except build_partially_fronzen_model) will be removed
@@ -137,8 +227,9 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 	import re
 	import numpy as np
 	import run_localise
+	from collections.abc import Iterable
 
-	targeting_clname_pattns = ['Dense*', 'Conv*'] #if not target_all else None
+	targeting_clname_pattns = ['Dense*', 'Conv*']#, 'LSTM*'] #if not target_all else None
 	is_target = lambda clname, targets: (targets is None) or any([bool(re.match(t,clname)) for t in targets])
 
 	# dictionary to describe the network graph
@@ -154,7 +245,8 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 			else:
 				network_dict['input_layers_of'][layer_name].append(layer.name)
 
-	min_idx_to_tl = np.min(indices_to_tls)
+	#min_idx_to_tl = np.min(indices_to_tls) # !!!!!
+	min_idx_to_tl = np.min([idx if not isinstance(idx, Iterable) else idx[0] for idx in indices_to_tls])
 	#t_mdl = Model(inputs = mdl.input, outputs = mdl.layers[min_idx_to_tl-1].output)
 	#prev_output = t_mdl.predict(X)
 	num_layers = len(mdl.layers)
@@ -202,8 +294,8 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 			l_class_name = type(layer).__name__
 			#new_layer = insert_layer_factory(layer_name) ## => currenlty, support only conv2d and dense layers
 			###
-			if is_target(l_class_name, targeting_clname_pattns): # is our target (dense and conv2d)
-				if run_localise.is_FC(l_class_name):
+			if is_target(l_class_name, targeting_clname_pattns): # is our target (dense and conv2d), and now also the lstm
+				if model_util.is_FC(l_class_name):
 					#print ("In fc")
 					w,b = layer.get_weights()
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)    
@@ -218,13 +310,11 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 						x = act_func(x)
 					#print ("x", x)
 					t_ws.append(t_w)
-				else:
+				else:# model_util.is_C2D(l_class_name):
 					#print ("In CONV2D")
 					#print (layer)
 					#print (layer.get_config())
 					# should be conv2d, if not, then something is wrong
-					assert run_localise.is_C2D(l_class_name), "{}".format(l_class_name)
-
 					w,b = layer.get_weights()
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)
 					t_b = tf.constant(b, dtype = b.dtype)
@@ -239,6 +329,22 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 					if act_func is not None: # tf.nn.relu
 						x = act_func(x)
 					t_ws.append(t_w)
+				#elif model_util.is_LSTM(l_class_name): ### *** SHOULD FIX ###
+					#w_kernel, w_recurr_kernel, bais = layer.get_weights()
+					## lstm_layer here ..?
+					#from lstm_layer import LSTM_Layer
+					#t_w_kernel = tf.placeholder(dtype = w_kernel.dtype, shape = w_kernel.shape)
+					#t_w_recurr_kernel = tf.placeholder(dtype = w_recurr_kernel.dtype, shape = w_recurr_kernel.shape)
+					#t_b = tf.constant(b, dtype = b.dtype)			
+					#def get_value_from_placeholder(p, feed_dict):
+						#with tf.Session() as sess:
+							#w = sess.run({p})
+					## placeholder -> variable 
+					## based on the version -> tf.compat.v1.rnn.LSTMCell
+					#if tf.__version__.split('.')[0] == 1:
+						#x = tf.nn.rnn.LSTMCell(layer_input)
+					#else:
+						#x = tf.compat.v1.nn.rnn.LSTMCell()
 			else:
 				msg = "{}th layer {}({}) is not our target".format(idx_to_l, layer_name, l_class_name)
 				assert False, msg

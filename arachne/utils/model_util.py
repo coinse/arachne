@@ -311,3 +311,79 @@ def predict(
 		return sess, (predictions, correct_predictions)
 	else:
 		return sess, (predictions, correct_predictions, per_label_losses)
+
+def is_FC(lname):
+	"""
+	"""
+	import re
+	pattns = ['Dense*'] # now, only Dense
+	return any([bool(re.match(t,lname)) for t in pattns])
+
+def is_C2D(lname):
+	"""
+	"""
+	import re
+	pattns = ['Conv2D']
+	return any([bool(re.match(t,lname)) for t in pattns])
+
+def is_LSTM(lname):
+	"""
+	"""
+	import re
+	pattns = ['LSTM']
+	return any([bool(re.match(t,lname)) for t in pattns])
+
+
+def is_Input(lname):
+	"""
+	"""
+	import re
+	pattns = ['InputLayer']
+	return any([bool(re.match(t,lname)) for t in pattns])
+
+
+def is_Attention(lname):
+	"""
+	"""
+	import re
+	pattns = ['LSTM']
+	return any([bool(re.match(t,lname)) for t in pattns])
+
+
+def generate_base_mdl(mdl, X, indices_to_tls = None, batch_size = None): 
+	from gen_frame_graph import build_mdl_lst
+	from utils.data_util import return_chunks
+	
+	indices_to_tls = sorted(indices_to_tls)
+	if batch_size is None:
+		mdl = build_mdl_lst(mdl, X, indices_to_tls)
+		mdl_lst = [mdl]
+	else:
+		chunks = return_chunks(len(X), batch_size = batch_size)
+		mdl_lst = []
+		for chunk in chunks:
+			mdl = build_mdl_lst(mdl, X[chunk], indices_to_tls)
+			mdl_lst.append(mdl)
+
+	return mdl_lst
+
+def compute_pred_and_loss(mdl_lst, ys, tws, batch_size = None):
+	"""
+	comptue k functon for ys and tws 
+	"""
+	append_vs = lambda vs_1, vs_2: vs_2 if vs_1 is None else np.append(vs_1, vs_2, axis = 0)
+	if len(mdl_lst) == 1:
+		mdl = mdl_lst[0]
+		#predictions = mdl()
+	else:
+		from utils.data_util import return_chunks
+		num = len(ys)
+		chunks = return_chunks(num, batch_size)
+
+		outputs_1 = None; outputs_2 = None
+		for mdl, chunk in zip(mdl_lst, chunks):
+			a_outputs_1, a_outputs_2 = mdl(tws + [ys[chunk]])
+			outputs_1 = append_vs(outputs_1, a_outputs_1)
+			outputs_2 = append_vs(outputs_2, a_outputs_2)
+		outputs = [outputs_1, outputs_2]
+	return outputs

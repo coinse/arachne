@@ -2,6 +2,8 @@
 """
 from pickle import NONE
 import time
+
+from arachne.utils import data_util
 class Searcher(object):
 	"""docstring for Searcher"""
 
@@ -9,7 +11,8 @@ class Searcher(object):
 	os = __import__('os')
 	importlib = __import__('importlib')
 	kfunc_util = importlib.import_module('utils.kfunc_util')
-	#model_util = importlib.import_module('utils.model_util')
+	model_util = importlib.import_module('utils.model_util')
+	data_util = importlib.import_modeul('utils.data_util')
 	#apricot_rel_util = importlib.import_module('utils.apricot_rel_util')
 	#torch_rel_util = importlib.import_module('utils.torch_rel_util')
 
@@ -67,7 +70,7 @@ class Searcher(object):
 
 		#self.which = which
 		#self.tensors = self.set_target_tensor_names(tensor_name_file)
-		self.indices_to_target_layers = indices_to_target_layers
+		self.indices_to_target_layers = indices_to_target_layers # !!!!!! here, include (idx_to_tl, idx_to_w (0 or 1))
 		
 		##
 		self.batch_size = batch_size
@@ -116,8 +119,9 @@ class Searcher(object):
 		from gen_frame_graph import build_k_frame_model
 		# fn, t_ws (for weights), ys (for labels)
 		print ("INPUT FORMAT", self.inputs.shape) 
-		self.k_fn_mdl, _, _  = build_k_frame_model(self.mdl, self.inputs, self.indices_to_target_layers)
+		self.fn_mdl, _, _  = build_k_frame_model(self.mdl, self.inputs, self.indices_to_target_layers)
 	
+
 	def set_base_model_v2(self):
 		"""
 		Generate an empyt graph frame for current searcher
@@ -126,10 +130,53 @@ class Searcher(object):
 		mdl = load_model(self.path_to_keras_model)
 		self.mdl = mdl
 		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
-		self.k_fn_mdl_lst = self.kfunc_util.generate_base_mdl(	
-			self.mdl, self.inputs, indices_to_tls = self.indices_to_target_layers, 
-			batch_size = self.batch_size, act_func = self.act_func)
 
+		self.fn_mdl_lst = self.kfunc_util.generate_base_mdl(	
+			self.mdl, self.inputs, indices_to_tls = self.indices_to_target_layers, # here, indices_to_target_layers is a (true) list of layers
+			batch_size = self.batch_size, act_func = self.act_func)
+		# store prev output here
+
+
+	def set_base_model_v3(self):
+		"""
+		generate a list of Model instances -> used with move_v3
+		here, set previous ouputs and model
+		"""
+		from tensorflow.keras.models import load_model
+		from collections.abc import Iterable
+		from tensorflow.keras.models import Model
+		import tensorflow as tf
+
+		mdl = load_model(self.path_to_keras_model)
+		self.mdl = mdl
+		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
+
+		# compute previous outputs
+		self.min_idx_to_tl = self.np.min([idx if not isinstance(idx, Iterable) else idx[0] for idx in self.indices_to_target_layers])
+		#if self.min_idx_to_tl == 0:
+			#if self.model_util.is_Input(type(mdl.layers[0]).__name__):
+				#prev_output_tensor = self.inputs
+			#else: # not an input layer
+				#prev_output_tensor = self.mdl.layers[0].output
+		#else:
+			#prev_output_tensor = self.mdl.layers[self.min_idx_to_tl-1].output
+		#t_mdl = Model(inputs = self.mdl.input, outputs = prev_output_tensor)
+		prev_l = self.mdl.layers[self.min_idx_to_tl-1 if self.min_idx_to_tl > 0 else 0]
+		if self.min_idx_to_tl == 0 and not self.model_util.is_Input(type(prev_l).__name__):
+			t_mdl = Model(inputs = self.mdl.input, outputs = self.mdl.layers[0].input)
+		else:
+			t_mdl = Model(inputs = self.mdl.input, outputs = prev_l.output)
+		self.prev_outputs = t_mdl(self.inputs)
+
+		# set base model
+		from gen_frame_graph import build_mdl_lst
+		self.fn_mdl_lst = [build_mdl_lst(self.mdl, self.prev_outputs.shape[1:], sorted(self.indices_to_target_layers))]
+
+		# set chunks
+		self.chunks = self.data_util.return_chunks(len(self.inputs), batch_size = self.batch_size)
+
+		# also set softmax and loss op
+		self.k_fn_loss = None 
 
 	def set_target_weights(self):
 		"""
@@ -138,10 +185,22 @@ class Searcher(object):
 			self.set_base_model(self.path_to_keras_model)
 		
 		self.init_weights = {}
+		self.init_biases = {}
 		for idx_to_tl in self.indices_to_target_layers:
-			self.init_weights[idx_to_tl] = self.mdl.layers[idx_to_tl].get_weights()[0]
-		
-
+			#self.init_weights[idx_to_tl] = self.mdl.layers[idx_to_tl].get_weights()[0]
+			ws = self.mdl.layers[idx_to_tl].get_weights()
+			lname = type(self.mdl.layers[idx_to_tl]).__name__
+			if (self.model_util.is_FC(lname) or self.model_util.is_C2D(lname)):
+				self.init_weights[idx_to_tl] = ws[0]
+				self.init_biases[idx_to_tl] = ws[1]
+			elif self.model_util.is_LSTM(lname):
+				for i in range(2): # get only the kernel and recurrent kernel, not the bias
+					self.init_weights[(idx_to_tl, i)] = ws[i]
+				self.init_biases[idx_to_tl] = ws[-1]
+			else:
+				print ("Not supported layer: {}".format(lname))
+				assert False
+	
 	def set_indices_to_wrong(self, indices_to_wrong):
 		"""
 		set new self.indices_to_wrong
@@ -290,28 +349,6 @@ class Searcher(object):
 		inputs = self.inputs
 		labels = self.labels
 
-		# # set new feed_dict for the variable placeholders
-		# if values_dict is not None:
-		# 	feed_dict = self.gen_feed_dict(values_dict)
-		# else:
-		# 	# if values_dict is not given, use self.curr_feed_dict as an initial feed_dict
-		# 	feed_dict = self.curr_feed_dict.copy()
-		# assert feed_dict is not None, feed_dict
-		#
-		
-		#### update target tensor: get the target tensor & update its value with delta ####
-		# target_tensor = self.model_util.get_tensor(target_tensor_name, self.empty_graph)
-		# assert target_tensor in feed_dict.keys(), "Target tensor %s should already exists" % (target_tensor_name)
-		# #
-		# if update_op == 'add':
-		# 	feed_dict[target_tensor] += delta
-		# elif update_op == 'sub':
-		# 	feed_dict[target_tensor] -= delta
-		# else:# set
-		# 	feed_dict[target_tensor] = delta
-		######################################
-		######## Update model ################
-		######################################
 		import time
 		t1 = time.time()
 		for idx_to_tl in self.indices_to_target_layers:
@@ -326,20 +363,7 @@ class Searcher(object):
 			else: # set
 				self.mdl.layers[idx_to_tl].set_weights([deltas[idx_to_tl], b])
 		t2 = time.time()
-		#print ("Time for updating model weights: {}".format(t2 - t1))
-		# ## can this part be more simpler? or can this changed to keras version (can)
-		# sess, (predictions, correct_predictions, all_losses) = self.model_util.predict(
-		# 	inputs, labels, self.num_label,
-		# 	predict_tensor_name = self.tensors['t_prediction'], 
-		# 	corr_predict_tensor_name = self.tensors['t_correct_prediction'],
-		# 	indices_to_slice_tensor_name = 'indices_to_slice' if self.w_gather else None,
-		# 	sess = self.sess, 
-		# 	empty_graph =  self.empty_graph,
-		# 	plchldr_feed_dict = feed_dict,
-		# 	use_pretr_front = self.path_to_keras_model is not None,
-		# 	compute_loss = True)
-		# ###
-		# losses_of_correct = all_losses[self.indices_to_correct]
+
 		t1 =time.time()	
 		predictions = self.mdl.predict(inputs)
 		correct_predictions = self.np.argmax(predictions, axis = 1)
@@ -348,16 +372,9 @@ class Searcher(object):
 		print (correct_predictions.shape, self.np.sum(correct_predictions))
 		print ('Time for pred: {}'.format(t2 - t1))
 		t1 = time.time()
+		pred_probs = tf.math.softmax(predictions) # softmax
+		loss_op = tf.keras.metrics.categorical_crossentropy(labels, pred_probs)
 		with tf.Session() as sess:
-			#predictions = self.mdl.predict(inputs)
-			#correct_predictions = self.np.argmax(predictions, axis = 1)
-			#correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
-
-			pred_probs = tf.math.softmax(predictions) # softmax
-			loss_op = tf.keras.metrics.categorical_crossentropy(labels, pred_probs)
-			#print ("out", pred_probs.shape, pred_probs[0])
-			#print (labels[0], len(labels))
-			#print ("session output\n\t", sess.run(loss_op))
 			losses_of_all = sess.run(loss_op)
 		t2 = time.time()
 		#print ("Time for sess: {}".format(t2 - t1))
@@ -417,6 +434,7 @@ class Searcher(object):
 
 	def move_v2(self, deltas, update_op = 'set'):
 		"""
+		*** should be checked and fixed
 		"""
 		import tensorflow as tf
 		import time
@@ -425,11 +443,11 @@ class Searcher(object):
 		labels = self.labels
 		t1 = time.time()
 		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers if idx_to_tl in deltas.keys()] 
-		#predictions_o, losses_of_all_o = self.k_fn_mdl_lst[0](deltas_as_lst + [labels])
+		#predictions_o, losses_of_all_o = self.fn_mdl_lst[0](deltas_as_lst + [labels])
 		#**
-		#predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
-		#losses_of_all = self.kfunc_util.compute_losses(self.k_fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
-		predictions, losses_of_all = self.kfunc_util.compute_preds_and_losses(self.k_fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
+		#predictions = self.kfunc_util.compute_predictions(self.fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
+		#losses_of_all = self.kfunc_util.compute_losses(self.fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
+		predictions, losses_of_all = self.kfunc_util.compute_preds_and_losses(self.fn_mdl_lst, labels, deltas_as_lst, batch_size = self.batch_size)
 		#print (predictions.shape, predictions_o.shape)
 		#print (losses_of_all.shape, losses_of_all_o.shape)
 		#print (losses_of_all[0], losses_of_all_o[0])
@@ -469,6 +487,97 @@ class Searcher(object):
 		#return sess, (predictions, correct_predictions, combined_losses)
 		
 
+	def move_v3(self, deltas):
+		"""
+		*** should be checked and fixed
+		--> need to fix this...
+		delatas -> key: idx_to_tl & inner_key: index to the weight
+				or key: (idx_to_tl, i) & inner_key
+				value -> the new value
+		"""
+		import tensorflow as tf
+		import time
+		from collections.abc import Iterable
+
+		labels = self.labels
+		t1 = time.time()
+		# prepare a new model to run by updating the weights from deltas
+		fn_mdl = self.fn_mdl_lst[0] # we only have a one model as this one accept any lenghts of an input, which is actually the output of the previous layers
+		#for idx_to_tl in self.indices_to_target_layers: # either idx_to_tl or (idx_to_tl, i)
+
+		# for the below to be worked, each layer's index of fn_mdl should be the same for the original one (self.mdl)
+		# meaning, we have to change this since, fn_mdl is the slice of the original model having pre-computed outputs
+		for idx_to_tl, delta in deltas.items(): # either idx_to_tl or (idx_to_tl, i)
+			if isinstance(idx_to_tl, Iterable):
+				idx_to_t_mdl_l, idx_to_w = idx_to_tl
+			else:
+				idx_to_t_mdl_l = idx_to_tl
+				
+			idx_to_t_mdl_l -= self.min_idx_to_tl - 1 # idx_to_t_mdl_l - self.min_idx_to_tl + 1 (because, an explict input layer has been made)
+			# set new weight values (deltas) for the model list
+			lname = type(fn_mdl.layers[idx_to_t_mdl_l]).__name__
+
+			if (self.model_util.is_FC(lname) or self.model_util.is_C2D(lname)):
+				fn_mdl.layers[idx_to_t_mdl_l].set_weights([delta, self.init_biases[idx_to_t_mdl_l]])
+			elif (self.model_util.is_LSTM(lname)):
+				if idx_to_w == 0: # kernel
+					new_kernel_w = delta # use the full 
+					new_recurr_kernel_w = self.init_weights[idx_to_t_mdl_l][1]
+				elif idx_to_w == 1:
+					new_recurr_kernel_w = delta
+					new_kernel_w = self.init_weights[idx_to_t_mdl_l][0]
+				else:
+					print ("{} not allowed".format(idx_to_w), idx_to_tl)
+					assert False
+				# set kernel, recurr kernel, bias
+				fn_mdl.layers[idx_to_t_mdl_l].set_weights([new_kernel_w, new_recurr_kernel_w, self.init_biases[idx_to_t_mdl_l]])
+			else:
+				print ("{} not supported".format(lname))
+				assert False
+		t2 = time.time()
+		print ("Time for setting weights: {}".format(t2 - t1))
+
+		predictions = None
+		for chunk in self.chunks:
+			_predictions = self.mdl(self.prev_outputs[chunk])
+			if predictions is None:
+				predictions = _predictions
+			else:
+				predictions = self.np.append(predictions, _predictions, axis = 0)
+
+		# the softmax or any other activation function should be inserted here!!!!! ... but, again think abou it
+		# since the applicaiton itself is argmax, the tendency itself doesn't change ... ok 
+
+		correct_predictions = self.np.argmax(predictions, axis = 1)
+		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		t3 = time.time()
+		print ("Time for predictions: {}".format(t3 - t2))
+
+		if self.k_fn_loss is None:
+			self.k_fn_loss = self.kfunc_util.gen_pred_and_loss_ops(predictions.shape, predictions.dtype, labels.shape, labels.dtype)
+
+		losses_of_all = self.k_fn_loss([predictions, labels])
+		t4 = time.time()
+		print ("Time for pred prob and loss: {}".format(t4 - t3))
+	
+		losses_of_correct = losses_of_all[self.indices_to_correct]
+		##
+		indices_to_corr_false = self.np.where(correct_predictions[self.indices_to_correct] == 0.)[0]
+		num_corr_true = len(self.indices_to_correct) - len(indices_to_corr_false)
+		new_losses_of_correct = num_corr_true + self.np.sum(1/(losses_of_correct[indices_to_corr_false] + 1))
+		##
+
+		losses_of_wrong = losses_of_all[self.indices_to_wrong]
+		##
+		indices_to_wrong_false = self.np.where(correct_predictions[self.indices_to_wrong] == 0.)[0]
+		num_wrong_true = len(self.indices_to_wrong) - len(indices_to_wrong_false)
+		new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
+		##
+		combined_losses	= (new_losses_of_correct, new_losses_of_wrong)
+
+		return predictions, correct_predictions, combined_losses
+		
+
 	def get_results_of_target(self, deltas, indices_to_target):
 		"""
 		Return the results of the target (can be accessed by indices_to_target)
@@ -491,9 +600,9 @@ class Searcher(object):
 		#predictions = self.mdl.predict(self.inputs)
 		## v2
 		deltas_as_lst = [deltas[idx_to_tl] for idx_to_tl in self.indices_to_target_layers]
-		#predictions, _ = self.k_fn_mdl(deltas_as_lst + [self.labels])
+		#predictions, _ = self.fn_mdl(deltas_as_lst + [self.labels])
 		## **
-		predictions = self.kfunc_util.compute_predictions(self.k_fn_mdl_lst, self.labels, deltas_as_lst, batch_size = self.batch_size)
+		predictions = self.kfunc_util.compute_predictions(self.fn_mdl_lst, self.labels, deltas_as_lst, batch_size = self.batch_size)
 		if len(predictions.shape) > len(self.labels.shape) and predictions.shape[1] == 1:
 			predictions = self.np.squeeze(predictions, axis = 1)
 		## **

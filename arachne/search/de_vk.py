@@ -134,7 +134,7 @@ class DE_searcher(Searcher):
 		deltas = {} # this is deltas for set update op
 		for i, (idx_to_tl, inner_indices) in enumerate(places_to_fix):
 			if idx_to_tl not in deltas.keys():
-				deltas[idx_to_tl] = self.init_weights[idx_to_tl]
+				deltas[idx_to_tl] = self.init_weights[idx_to_tl] ## *** HAVE CHANGED TO ACCEPT (idx_to_tl, idx_to_w(0 or 1))
 			# since our op is set
 			deltas[idx_to_tl][tuple(inner_indices)] = patch_candidate[i]
 		###################
@@ -253,7 +253,7 @@ class DE_searcher(Searcher):
 		#max_value = self.np.max(init_weight_value)
 		#bounds = self.set_bounds(num_places_to_fix, init_weight_value) # for clipping
 		bounds = []
-		for idx_to_tl ,_ in places_to_fix:
+		for idx_to_tl, _ in places_to_fix: # ** HAVE CHANGED TO HANDLE (idx_to_tl, idx_to_w (0 or 1))
 			_init_weight = self.init_weights[idx_to_tl]
 			mean_value = self.np.mean(_init_weight)
 			std_value = self.np.std(_init_weight)

@@ -43,6 +43,7 @@ def patch(
 	import run_localise
 	from tensorflow.keras.models import load_model, Model
 	import subprocess
+	from collections.abc import Iterable
 
 	random.seed(seed)
 	np.random.seed(seed)
@@ -216,6 +217,7 @@ def patch(
 		if loc_file is None or not (os.path.exists(loc_file)):
 			print (len(indices_to_correct_for_loc), len(indices_to_selected_wrong))
 			print ("Now ready to localiser")
+			### *** Now this may return (idx_to_tl, idx_to_w (0 for kerenl and 1 for recurr_kernel)) 
 			indices_to_places_to_fix, front_lst = run_localise.localise_by_chgd_unchgd(
 				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
@@ -290,7 +292,9 @@ def patch(
 	################################ PATCH #####################################
 	############################################################################
 	# patch target layers
-	indices_to_ptarget_layers = sorted(list(set([idx_to_tl for idx_to_tl,_ in indices_to_places_to_fix])))
+	indices_to_ptarget_layers = sorted(
+		list(set(
+			[idx_to_tl if not isinstance(idx_to_tl, Iterable) else idx_to_tl[0] for idx_to_tl,_ in indices_to_places_to_fix])))
 	print ("Patch target layers", indices_to_ptarget_layers)
 	
 	if search_method == 'DE':

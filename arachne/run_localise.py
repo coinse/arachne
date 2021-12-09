@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model, Model
 import tensorflow.keras.backend as K
 from tqdm import tqdm
+import lstm_layer
 
 def get_target_weights(model, path_to_keras_model, indices_to_target = None, target_all = True):
 	"""
@@ -15,7 +16,7 @@ def get_target_weights(model, path_to_keras_model, indices_to_target = None, tar
 	import re
 
 	# target only the layer with its class type in this list, but if target_all, then return all trainables
-	targeting_clname_pattns = ['Dense*', 'Conv*'] #if not target_all else None
+	targeting_clname_pattns = ['Dense*', 'Conv*', 'LSTM*'] #if not target_all else None
 	is_target = lambda clname,targets: (targets is None) or any([bool(re.match(t,clname)) for t in targets])
 	#if target_all: # some, like BatchNormalization has trainable weights. Not sure how to filter that out. so, comment out for the temporary use
 	#	indices_to_target = None
@@ -41,10 +42,17 @@ def get_target_weights(model, path_to_keras_model, indices_to_target = None, tar
 			if is_target(class_name, targeting_clname_pattns): 
 				ws = layer.get_weights()
 				if len(ws): # has weight
-					#target_weights[i] = ws[0]
-					target_weights[i] = [ws[0], type(layer).__name__]
+					if is_FC(class_name) or is_C2D(class_name):
+						target_weights[i] = [ws[0], type(layer).__name__]
+					elif is_LSTM(class_name): # for LSTM, even without bias, a fault can be in the weights of the kernel or the recurrent kernel (hidden state handling)
+						assert len(ws) == 3, ws
+						target_weights[i] = [ws[:-1], type(layer).__name__] # index 0: for the kernel, index 1: for the recurrent kernel
+					else:
+						print ("{} not supported yet".format(class_name))
+						assert False
 
 	return target_weights
+
 
 def is_FC(lname):
 	"""
@@ -59,6 +67,21 @@ def is_C2D(lname):
 	import re
 	pattns = ['Conv2D']
 	return any([bool(re.match(t,lname)) for t in pattns])
+
+def is_LSTM(lname):
+	"""
+	"""
+	import re
+	pattns = ['LSTM']
+	return any([bool(re.match(t,lname)) for t in pattns])
+
+def is_Attention(lname):
+	"""
+	"""
+	import re
+	pattns = ['LSTM']
+	return any([bool(re.match(t,lname)) for t in pattns])
+
 
 def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_batch = False, on_weight = False, wo_reset = False):
 	"""
@@ -134,26 +157,44 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 		reset_keras([tensor_grad])
 	return ret_gradient 
 			
-def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_batch = False, wo_reset = False):
+			
+def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, 
+	target = None, by_batch = False, wo_reset = False, loss_func = 'softmax', **kwargs):
 	"""
-	compute gradients for the loss
+	compute gradients for the loss. 
+	kwargs contains the key-word argumenets required for the loss funation
 	"""
 	model = load_model(path_to_keras_model, compile = False)
-	target = model.layers[idx_to_target_layer].weights[0]
+	if target is None:
+		target = model.layers[idx_to_target_layer].weights[0] 
 	num_label = int(model.output.shape[-1])
 	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
 
-	loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
-		logits = model.output, 
-		labels = y_tensor, 
-		name = "per_label_loss") 
-	
+	## should be fixed!!! -> to use the activation funciton of the model!!! -> sepcifiy or accept as the argument
+	if loss_func == 'softmax':
+		# might be changed as the following two
+		loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
+			logits = model.output, 
+			labels = y_tensor, 
+			name = "per_label_loss") 
+	elif loss_func == 'binary_crossentropy':
+		if 'name' in kwargs.keys():
+			kwargs.pop("name")
+		loss_tensor = tf.keras.losses.BinaryCrossentropy(name = "per_label_loss")
+		loss_tensor.__dict__.update(kwargs)
+	elif loss_func in ['mean_squared_error', 'mse']:
+		if 'name' in kwargs.keys():
+			kwargs.pop("name")
+		loss_tensor = tf.keras.losses.MeanSquaredError(name = "per_label_loss")
+		loss_tensor.__dict__.update(kwargs)
+	else:
+		print ("{} not supported yet".format())
+
 	tensor_grad = tf.gradients(
 		loss_tensor,
 		target, 
 		name = 'loss_grad')
 
-	###
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
@@ -169,7 +210,6 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_
 	for chunk in chunks:
 		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk]})[0]
 		gradients.append(_gradient)
-
 		#print ("tensor grad", tensor_grad)
 		#print ("\t", _gradient.shape)
 
@@ -183,6 +223,7 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, by_
 
 	return gradient
 	
+
 def reset_keras(delete_list = None, frac = 1):
 	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction = frac)
 	config = tf.ConfigProto(gpu_options=gpu_options)
@@ -352,7 +393,8 @@ def compute_FI_and_GL(
 	X, y,
 	indices_to_target,
 	target_weights,
-	path_to_keras_model = None):
+	path_to_keras_model = None, 
+	loss_func = 'softmax'):
 	"""
 	compute FL and GL for the given inputs
 	"""
@@ -371,7 +413,8 @@ def compute_FI_and_GL(
 	print (X.shape, np.max(indices_to_target), len(indices_to_target))
 	target_X = X[indices_to_target]
 	target_y = y[indices_to_target]
-
+	
+	model = None
 	##
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
@@ -432,7 +475,7 @@ def compute_FI_and_GL(
 			############ FI end #########
 
 			# Gradient
-			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y)
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, loss_func=loss_func)
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif is_C2D(lname):
@@ -544,7 +587,7 @@ def compute_FI_and_GL(
 						curr_prev_output_slice = curr_prev_output_slice[:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]
 						
 						output = curr_prev_output_slice * t_w[:,:,:,idx_ol] 
-						output = np.abs(output)
+						output = np.abs(output) 
 						sum_output = np.nan_to_num(np.sum(output), posinf = 0.)
 						output = output/sum_output
 						output = np.mean(output, axis = 0) 
@@ -576,8 +619,146 @@ def compute_FI_and_GL(
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
-			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True)
-			# ##		
+			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True, loss_func=loss_func)
+			# ##	
+		elif is_LSTM(lname): #
+			from scipy.special import expit as sigmoid
+			# ********** the hidden states !!! -> must be computed here -> make a temporary LSTM model, compute the sequences of 
+			# hidden states and cell states, so, we can compute the impact at once (otherwise, we have to iterate over, which will be costly) 
+			# after embedding layer ... so, here, we expect the input to be already formated to (batch_size, time_steps, input_feature_size)
+			##############################################
+			# should compute from_front and from_behind ##
+			##############################################
+			num_weights = 2 
+			assert len(t_w) == num_weights, t_w
+			t_w_kernel, t_w_recurr_kernel = t_w # t_w_kernel: (input_feature_size, 4 * num_units). t_w_recurr_kernel: (num_units, 4 * num_units)
+			
+			# get the previous output, which will be the input of the lstm
+			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output) # shape = (batch_size, time_steps, input_feature_size)
+			if idx_to_tl == 0 or idx_to_tl - 1 == 0: # input is already formated at the preprocessing stage
+				prev_output = target_X
+			else:
+				prev_output = t_model.predict(target_X)
+			
+			# the input's shape should be (batch_size, time_step, num_features)
+			assert len(prev_output.shape) == 3, prev_output.shape
+			num_features = prev_output.shape[-1] # the dimension of features that will be processed by the model
+
+			num_units = t_w_kernel.shape[1] # since the length is 2 -> -1 = 1 
+			assert t_w_kernel.shape[0] == num_features, "{} (kernel) vs {} (input)".format(t_w_kernel.shape[0], num_features)
+
+			# hidden state and cell state sequences computation
+			# generate a temporary model that only contains the target lstm layer 
+			# but with the modification to return sequences of hidden and cell states
+			temp_lstm_layer_inst = lstm_layer.LSTM_Layer(model.layers[idx_to_tl])
+			temp_lstm_mdl = temp_lstm_layer_inst.gen_lstm_layer_from_another()
+			# shapes of hstates_sequence and cell_states_sequence: 
+			# 	(batch_size, num_units, time_steps), (batch_size, num_units, time_steps) 
+			hstates_sequence, cell_states_sequence = temp_lstm_mdl(target_X) 
+			init_hstates, init_cell_states = lstm_layer.LSTM_Layer.get_initial_state(model.layers[idx_to_tl])
+			if init_hstates is None: 
+				init_hstates = np.zeros((len(target_X), num_units)) # based on the how states was handled in the github source
+			if init_cell_states is None:
+				init_cell_states = np.zeros((len(target_X), num_units)) # shape = (batch_size, num_units)
+			
+			hstates_sequence = np.insert(hstates_sequence, 0, init_hstates, axis = 1) # shape = (batch_size, time_steps + 1, num_units)
+			cell_states_sequence = np.insert(cell_states_sequence, 0, init_cell_states, axis = 1) # shape = (batch_size, time_steps + 1, num_units)
+
+			########################################################### -> checked up to here
+			#_gradient = K.get_session().run(temp_lstm, feed_dict={model.input: X[chunk]})[0]
+			###############################################################
+
+			bias = model.layer[idx_to_tl].get_weights()[-1] # shape = (4 * num_units,)
+			indices_to_each_gates = np.array_split(np.arange(num_units * 4), 4)
+
+			## prepare all the intermediate outputs and the variables that will be used later
+			idx_to_input_gate = 0; idx_to_forget_gate = 1; idx_to_cand_gate = 2; idx_to_output_gate = 3
+			
+			# for kenerl, weight shape = (input_feature_size, num_units) and for recurrent, (num_units, num_units), bias (num_units)
+			# and the shape of all the intermedidate outpu is "(batch_size, time_step, num_units)"
+			
+			# input 
+			t_w_kernel_I = t_w_kernel[:, indices_to_each_gates[idx_to_input_gate]] 
+			t_w_recurr_kernel_I = t_w_recurr_kernel[:, indices_to_each_gates[idx_to_input_gate]] 
+			bias_I = bias[indices_to_each_gates[idx_to_input_gate]]
+			I = sigmoid(np.dot(prev_output, t_w_kernel_I) + np.dot(hstates_sequence, t_w_recurr_kernel_I) + bias_I) # then sigmoid
+
+			# forget
+			t_w_kernel_F = t_w_kernel[:, indices_to_each_gates[idx_to_forget_gate]]
+			t_w_recurr_kernel_F = t_w_recurr_kernel[:, indices_to_each_gates[idx_to_forget_gate]]
+			bias_F = bias[indices_to_each_gates[idx_to_forget_gate]]
+			F = sigmoid(np.dot(prev_output, t_w_kernel_F) + np.dot(hstates_sequence, t_w_recurr_kernel_F) + bias_F) # then sigmoid
+
+			# cand
+			t_w_kernel_C = t_w_kernel[:, indices_to_each_gates[idx_to_cand_gate]]
+			t_w_recurr_kernel_C = t_w_recurr_kernel[:, indices_to_each_gates[idx_to_cand_gate]]
+			bias_C = bias[indices_to_each_gates[idx_to_cand_gate]]
+			C = np.tanh(np.dot(prev_output, t_w_kernel_C) + np.dot(hstates_sequence, t_w_recurr_kernel_C) + bias_C) # then tanh
+
+			# output
+			t_w_kernel_O = t_w_kernel[:, indices_to_each_gates[idx_to_output_gate]]
+			t_w_recurr_kernel_O = t_w_recurr_kernel[:, indices_to_each_gates[idx_to_output_gate]]
+			bias_O = bias[indices_to_each_gates[idx_to_output_gate]]
+			# shape = (batch_size, time_steps, num_units)
+			O = sigmoid(np.dot(prev_output, t_w_kernel_O) + np.dot(hstates_sequence, t_w_recurr_kernel_O) + bias_O) # then sigmoid
+
+			# set arguments to compute forward impact for the neural weights from these four gates
+			t_w_kernels = {'input':t_w_kernel_I, 'forget':t_w_kernel_F, 'cand':t_w_kernel_C, 'output':t_w_kernel_O}
+			t_w_recurr_kernels = {'input':t_w_recurr_kernel_I, 'forget':t_w_recurr_kernel_F, 'cand':t_w_recurr_kernel_C, 'output':t_w_recurr_kernel_O}
+
+			consts = {}
+			consts['input'] = get_constants('input', F, I, C, O, cell_states_sequence)
+			consts['forget'] = get_constants('forget', F, I, C, O, cell_states_sequence)
+			consts['cand'] = get_constants('cand', F, I, C, O, cell_states_sequence)
+			consts['output'] = get_constants('output', F, I, C, O, cell_states_sequence)
+
+			# from_front's shape = (num_units, (num_features + num_units) * 4)
+			# gate_orders = ['input', 'forget', 'cand', 'output']
+			from_front, gate_orders  = lstm_local_front_FI_for_target_all(
+				prev_output, hstates_sequence, num_units, 
+				t_w_kernels, t_w_recurr_kernels, consts)
+
+			from_front = from_front.T # ((num_features + num_units) * 4, num_units)
+			# N_k_rk_w = num_features + num_units
+			N_k_rk_w = int(from_front.shape[1]/4)
+			assert N_k_rk_w == num_features + num_units, "{} vs {}".format(N_k_rk_w, num_features + num_units)
+			
+			## from behind
+			from_behind = compute_gradient_to_output(
+				path_to_keras_model, idx_to_tl, target_X, by_batch = True) # shape = (num_units,)
+			print ("From behind", from_behind.shape)
+
+			t1 = time.time()
+			FIs_combined = np.multiply(from_front, from_behind) # shape = (N_k_rk_w, num_units)
+			t2 = time.time()
+			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
+			
+			# reshaping
+			FIs_kernel = np.zeros(t_w_kernel.shape) # t_w_kernel's shape (num_features, num_units * 4)
+			FIs_recurr_kernel = np.zeros(t_w_recurr_kernel.shape) # t_w_recurr_kernel's shape (num_units, num_units * 4)
+			for i, FI_p_gate in enumerate(np.array_split(FIs_combined, 4, axis = 0)): # from (4 * N_k_rk_w, num_units) to (N_k_rk_w, num_units)
+				# local indices that will split FI_p_gate (shape = (N_k_rk_w, num_units))
+				indices_to_features = np.arange(num_features)
+				indices_to_units = np.arange(num_units) + num_features
+
+				FIs_kernel[indices_to_features + (i * N_k_rk_w)] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
+				FIs_recurr_kernel[indices_to_units + (i * N_k_rk_w)] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
+			t3 =time.time()
+			FIs = [FIs_kernel, FIs_recurr_kernel]
+			print ('Time for formatting: {}'.format(t3 - t2))
+			
+			## Gradient
+			# will be 
+			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
+			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
+			grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
+				target = tensor_w_kernel, by_batch = True, loss_func=loss_func)
+			grad_scndcr_recurr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
+				target = tensor_w_recurr_kernel, by_batch = True, loss_func=loss_func)
+			
+			grad_scndcr = [grad_scndcr_kernel, grad_scndcr_recurr_kernel]
+		#elif is_Attention(lname):
+		#	pass
 		else:
 			print ("Currenlty not supported: {}. (shoulde be filtered before)".format(lname))		
 			import sys; sys.exit()
@@ -585,16 +766,129 @@ def compute_FI_and_GL(
 		t2 = time.time()
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
 		####
-		pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
-		#print ("Pairs", pairs.shape)
-		total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
-		#sess = K.get_session()
-		#sess.close()
+		from collections.abc import Iterable
+		if not isinstance(FIs, Iterable):
+			pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
+			#print ("Pairs", pairs.shape)
+			total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
+			#sess = K.get_session()
+			#sess.close()
+		else:
+			total_cands[idx_to_tl] = {'shape':[], 'costs':[]}
+			pairs = []
+			for _FIs, _grad_scndcr in zip(FIs, grad_scndcr):
+				# after flatten -> (num_features * num_units or num_units * num_units, )
+				pairs = np.asarray([_grad_scndcr.flatten(), _FIs.flatten()]).T
+				total_cands[idx_to_tl]['shape'].append(_FIs.shape)
+				total_cands[idx_to_tl]['costs'].append(pairs)
 	
 	t3 = time.time()
 	print ("Time for computing total costs: {}".format(t3 - t0))
 
 	return total_cands
+
+
+def compute_avg_of_output_per_w(x, h, t_w_kernel, t_w_recurr_kernel, const, with_norm = False):
+	"""
+	A slice for a single neuron (unit or lstm cell)
+	x = (batch_size, time_steps, num_features)
+	h = (batch_size, time_steps, num_units)
+	t_w_kernel = (num_features,)
+	t_w_recurr_kernel = (num_units,)
+	consts = (batch_size, time_steps) -> the value that is multiplied in the final state computation
+	Return the product of the multiplication of weights and input for each unit (i.e., each LSTM cell)
+	-> meaning the direct front impact computed per neural weights 
+	"""
+	from sklearn.preprocessing import Normalizer
+	norm_scaler = Normalizer(norm = "l1")
+
+	out_kernel = np.multiply(x, t_w_kernel) # shape = (batch_size, time_steps, num_features)
+	if h is not None: # None -> we will skip the weights for hiddens states
+		out_recurr_kernel = np.multiply(h, t_w_recurr_kernel) # shape = (batch_size, time_steps, num_units)
+		out = np.append(out_kernel, out_recurr_kernel, axis = -1) # out's shape = (batch_size, time_steps, (num_features + num_units))
+	else:
+		out = out_kernel # shape = (batch_size, time_steps, num_features)
+
+	# normalise -> make it between 0~1 (this is also to substitute the activation part ... 
+	# => all the values would be scale between 0 to its constant, and then they will be normalised between 0~1 with 
+	# all other neural weights from different gates before being returned as the front part of the FI
+	if with_norm:
+		out = np.abs(out)
+		out = norm_scaler.fit_transform(out)
+
+	# N = num_features or num_features + num_units
+	#for i in range(len(out)):
+	#	np.multiply(const, out[:,:,i])
+	out = np.einsum('ijk,ij->ijk', out, const) # shape = (batch_size, time_steps, N)
+	return out
+
+
+def get_constants(gate, F, I, C, O, cell_states):
+	"""
+	... division -> there can be divided by zero here....
+	"""
+	if gate == 'input':
+		#return np.multiply(O, np.divide(C, cell_states[:,1:,:]))
+		return np.multipy(O, np.divide(
+			C, cell_states[:,1:,:], 
+			out = np.zeros_like(C), where = cell_states[:,1:,:] != 0))
+	elif gate == 'forget':
+		#return np.multiply(O, np.divide(cell_states[:,:-1,:], cell_states[:,1:,:]))
+		return np.multipy(O, np.divide(
+			cell_states[:,:-1,:], cell_states[:,1:,:], 
+			out = np.zeros_like(cell_states[:,:-1,:]), where = cell_states[:,1:,:] != 0))
+	elif gate == 'cand':
+		#return np.multiply(O, np.divide(I, cell_states[:,1:,:]))
+		return np.multipy(O, np.divide(
+			I, cell_states[:,1:,:], 
+			out = np.zeros_like(C), where = cell_states[:,1:,:] != 0))
+	else: # output
+		return np.tanh(cell_states[:,1:,1])
+	
+
+def lstm_local_front_FI_for_target_all(
+	x, h, num_units, 
+	t_w_kernels, t_w_recurr_kernels, consts, 
+	gate_orders = ['input', 'forget', 'cand', 'output']):
+	"""
+	x = previous output
+	h = hidden state (-> should be computed using the layer)
+	t_w_kernels / t_w_recurr_kernels / consts: 
+		a group of neural weights that should be taken into account when measuring the impact.
+		arg consts is the corresponding group of constants that will be multiplied to each nueral weight's output, respectively
+	"""
+	from sklearn.preprocessing import Normalizer
+	norm_scaler = Normalizer(norm = "l1")
+	from_front = []
+	for idx_to_unit in tqdm(num_units):
+		out_combined = None
+		for gate in gate_orders:
+			out = compute_avg_of_output_per_w(
+				x, 
+				h if h is not None else None, 
+				t_w_kernels[gate][:,idx_to_unit],
+				t_w_recurr_kernels[gate][:,idx_to_unit],
+				consts[gate][...,idx_to_unit],
+				with_norm = True)
+
+			if out_combined is None:
+				out_combined = out 
+			else:
+				out_combined = np.append(out_combined, out, axis = -1)
+
+		# the shape of out_combined => (batch_size, time_steps, 4 * (num_features + num_units)) (since this is per unit)
+		# here, keep in mind that we have to use a scaler on the current out_combined (for instance, divide by the final output (the last 
+		# hidden state won't work here anymore, since the summation of the current value differs from the original due to 
+		# the absence of act and the scaling in the middle, etc.))
+		scaled_out_combined = norm_scaler.fit_transform(out_combined) # normalised 
+		# mean out_combined's shape: ((num_features + num_units) * 4,) -> for each neural weights, take the average across both the time step and the batch
+		avg_scaled_out_combined = np.mean(scaled_out_combined.reshape(-1, scaled_out_combined.shape[-1]), axis = 0) # the average over both time step and the batch 
+		from_front.append(avg_scaled_out_combined)
+
+	# from_front's shape = (num_units, (num_features + num_units) * 4)
+	from_front = np.asarray(from_front)
+	print ("For lstm's front part of FI: {}".format(from_front.shape))
+	return from_front, gate_orders
 
 
 def localise_offline_only_changed(
@@ -654,6 +948,7 @@ def localise_by_chgd_unchgd(
 	"""
 	Find those likely to be highly influential to the changed behaviour while less influential to the unchanged behaviour
 	"""
+	from collections.abc import Iterable
 	from scipy.stats import ks_2samp
 	loc_start_time = time.time()
 
@@ -672,25 +967,48 @@ def localise_by_chgd_unchgd(
 		target_weights,
 		path_to_keras_model = path_to_keras_model)
 
-
 	indices_to_tl = list(total_cands_chgd.keys()) 
 	costs_and_keys = []
 	shapes = {}
 	for idx_to_tl in indices_to_tl:
-		cost_from_chgd = total_cands_chgd[idx_to_tl]['costs']
-		cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
-		## key: more influential to changed behaviour and less influential to unchanged behaviour
-		costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
-		shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']
+		if not isinstance(total_cands_chgd[idx_to_tl]['shape'], Iterable):
+			assert not isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
+			cost_from_chgd = total_cands_chgd[idx_to_tl]['costs']
+			cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
+			## key: more influential to changed behaviour and less influential to unchanged behaviour
+			costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
+			shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']
 
-		for i,c in enumerate(costs_combined):
-			costs_and_keys.append(([idx_to_tl, i], c))
+			for i,c in enumerate(costs_combined):
+				costs_and_keys.append(([idx_to_tl, i], c))
+		else:
+			assert isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
+			num = len(total_cands_unchgd[idx_to_tl]['shape'])
+			shapes[idx_to_tl] = []
+			for idx_to_pair in range(num):
+				cost_from_chgd = total_cands_chgd[idx_to_tl]['costs'][idx_to_pair]
+				cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs'][idx_to_pair]
+				## key: more influential to changed behaviour and less influential to unchanged behaviour
+				costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
+				shapes[idx_to_tl].append(total_cands_chgd[idx_to_tl]['shape'][idx_to_pair])
+
+				for i,c in enumerate(costs_combined):
+					costs_and_keys.append(([(idx_to_tl, idx_to_pair), i], c))
 
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	# a list of [index to the target layer, index to a neural weight]
-	indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], shapes[vs[0][0]])] for vs in costs_and_keys]
+	#indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], shapes[vs[0][0]])] for vs in costs_and_keys]
+	indices_to_nodes = []
+	for vs in costs_and_keys:
+		if not isinstance(vs[0][0], Iterable):
+			_idx_to_tl = vs[0][0]
+			indices_to_nodes.append([_idx_to_tl, np.unravel_index(vs[0][1], shapes[_idx_to_tl])])
+		else:
+			_idx_to_tl, idx_to_shape = vs[0][0]
+			indices_to_nodes.append([(_idx_to_tl, idx_to_shape), np.unravel_index(vs[0][1], shapes[_idx_to_tl][idx_to_shape])])
+
 
 	t4 = time.time()
 	#while len(curr_nodes_to_lookat) > 0:
@@ -710,6 +1028,7 @@ def localise_by_chgd_unchgd(
 	print ("Time for computing the pareto front: {}".format(t5 - t4))
 	loc_end_time = time.time()
 	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
+	## ** now, the pareto front may contains (idx_to_tl, idx_to_shape (0 (kernel) or 1 (recurr_kernel)))
 	return pareto_front, costs_and_keys
 
 

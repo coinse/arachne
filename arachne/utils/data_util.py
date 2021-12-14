@@ -84,7 +84,7 @@ def load_data(which, path_to_data,
 	import tensorflow as tf
 	import os
 		
-	assert which in ['mnist','cifar10','cifar100','fashion_mnist', 'GTSRB', 'lfw'], which
+	#assert which in ['mnist','cifar10','cifar100','fashion_mnist', 'GTSRB', 'lfw'], which
 
 	if which == 'lfw':
 		from utils.data_loader import get_LFW_loader
@@ -163,7 +163,7 @@ def load_data(which, path_to_data,
 
 		test_data[0] = np.asarray(test_data[0])
 		test_data[1] = np.asarray(test_data[1])
-	else: # GTSRB
+	elif which == 'GTSRB': # GTSRB
 		#which, path_to_data,
 		import pickle
 		# train
@@ -181,7 +181,13 @@ def load_data(which, path_to_data,
 
 		#test_data = [np.moveaxis(test_data_dict['data'], [1], [-1]), test_data_dict['label']]
 		test_data = [test_data_dict['data'], test_data_dict['label']]
-
+	else: # for simple_lstm or airline_passengers
+		import pickle
+		with open(path_to_data, 'rb') as f:
+			data = pickle.load(f)
+		train_data = data['train']
+		test_data = data['test']
+		
 	return (train_data, test_data)
 
 	

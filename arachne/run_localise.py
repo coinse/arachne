@@ -90,10 +90,17 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 	on_weight = False -> on output of idx_to_target_layer'th layer
 	"""
 	from sklearn.preprocessing import Normalizer
+	from collections.abc import Iterable
 	norm_scaler = Normalizer(norm = "l1")
 		
 	model = load_model(path_to_keras_model, compile = False)
-	target = model.layers[idx_to_target_layer].output if not on_weight else model.layers[idx_to_target_layer].weights[0]
+	# this should be fixed as a layer can have more than one weight now ...
+	#target = model.layers[idx_to_target_layer].output if not on_weight else model.layers[idx_to_target_layer].weights[0]
+	if not on_weight:
+		target = model.layers[idx_to_target_layer].output
+	else: # on weights
+		target = model.layers[idx_to_target_layer].weights[:-1] # exclude the bias
+
 	print ("Target", target)	
 	tensor_grad = tf.gradients(
 		model.output, 
@@ -112,18 +119,13 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 	else:
 		chunks = [np.arange(num)]
 
-
 	if not on_weight:	
 		grad_shape = tuple([num] + [int(v) for v in tensor_grad[0].shape[1:]])
 		print ("Grad shape", grad_shape)
 		print (tensor_grad)	
 		gradient = np.zeros(grad_shape)
-		#fn = K.function([model.input], tensor_grad)
 		for chunk in chunks:
 			_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
-			#_gradient = fn([X[chunk]])[0]	
-			#print ("tensor grad", tensor_grad, X.shape)
-			#print ("\t", _gradient.shape)
 			gradient[chunk] = _gradient
 	
 		gradient = np.abs(gradient)
@@ -136,27 +138,32 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 		mean_gradient = np.mean(norm_gradient, axis = 0) # compute mean for a given input
 		#print ("Mean", mean_gradient, type(norm_gradient), norm_gradient.dtype)
 		ret_gradient = mean_gradient.reshape(gradient.shape[1:]) # reshape to the orignal shape
+		if not wo_reset:
+			reset_keras([tensor_grad])
+		return ret_gradient
 	else: # on a weight variable
 		#gradients = []
-		gradient = None
+		# THIS AGAIN SHOULD BE FIXED -> there can be more than one weights
+		gradients = []
 		for chunk in chunks:
-			_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})[0]
-			if gradient is None:
-				gradient = _gradient
+			_gradients = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk]})
+			if len(gradients) == 0:
+				gradients = _gradients 
 			else:
-				gradient += _gradient
-			#gradients.append(_gradient)
-
-		## due to memory error
-		#gradient = np.sum(np.asarray(gradients), axis = 0)
-		ret_gradient = np.abs(gradient)
+				for i in range(len(_gradients)):
+					gradients[i] += _gradients[i]
+		ret_gradients = list(map(np.abs, gradients))
 		
-	#K.clear_session()
-	#s = tf.InteractiveSession()
-	#K.set_session(s)
-	if not wo_reset:
-		reset_keras([tensor_grad])
-	return ret_gradient 
+		#K.clear_session()
+		#s = tf.InteractiveSession()
+		#K.set_session(s)
+		if not wo_reset:
+			reset_keras([tensor_grad])
+
+		if len(ret_gradients) == 0:
+			return ret_gradients[0]
+		else:
+			return ret_gradients 
 			
 			
 def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, 
@@ -168,10 +175,10 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	model = load_model(path_to_keras_model, compile = False)
 	if target is None:
 		target = model.layers[idx_to_target_layer].weights[0] 
+
 	num_label = int(model.output.shape[-1])
 	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
 
-	## should be fixed!!! -> to use the activation funciton of the model!!! -> sepcifiy or accept as the argument
 	if loss_func == 'softmax':
 		# might be changed as the following two
 		loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -732,22 +739,28 @@ def compute_FI_and_GL(
 			print ("From behind", from_behind.shape)
 
 			t1 = time.time()
-			FIs_combined = np.multiply(from_front, from_behind) # shape = (N_k_rk_w, num_units)
+			#FIs_combined = np.multiply(from_front, from_behind) # shape = (N_k_rk_w, num_units) 
+			FIs_combined = from_front * from_behind
 			t2 = time.time()
 			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
 			
 			# reshaping
 			FIs_kernel = np.zeros(t_w_kernel.shape) # t_w_kernel's shape (num_features, num_units * 4)
 			FIs_recurr_kernel = np.zeros(t_w_recurr_kernel.shape) # t_w_recurr_kernel's shape (num_units, num_units * 4)
-			for i, FI_p_gate in enumerate(np.array_split(FIs_combined, 4, axis = 0)): # from (4 * N_k_rk_w, num_units) to (N_k_rk_w, num_units)
+			for i, FI_p_gate in enumerate(np.array_split(FIs_combined, 4, axis = 0)): # from (4 * N_k_rk_w, num_units) to 4 * (N_k_rk_w, num_units)
+				# FI_p_gate's shape = (N_k_rk_w, num_units) -> will divided into (num_features, num_units) & (num_units, num_units)
 				# local indices that will split FI_p_gate (shape = (N_k_rk_w, num_units))
+				# since we append the weights in order of a kernel weight and a recurrent kernel weight
 				indices_to_features = np.arange(num_features)
 				indices_to_units = np.arange(num_units) + num_features
 
-				FIs_kernel[indices_to_features + (i * N_k_rk_w)] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
-				FIs_recurr_kernel[indices_to_units + (i * N_k_rk_w)] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
+				#FIs_kernel[indices_to_features + (i * N_k_rk_w)] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
+				#FIs_recurr_kernel[indices_to_units + (i * N_k_rk_w)] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
+				FIs_kernel[:, i * num_features:(i+1) * num_units] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
+				FIs_recurr_kernel[:, i * num_features:(i+1) * num_units] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
+
 			t3 =time.time()
-			FIs = [FIs_kernel, FIs_recurr_kernel]
+			FIs = [FIs_kernel, FIs_recurr_kernel] # [(num_features, num_units*4), (num_units, num_units*4)]
 			print ('Time for formatting: {}'.format(t3 - t2))
 			
 			## Gradient
@@ -755,8 +768,9 @@ def compute_FI_and_GL(
 			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
 			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
 			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'mse'
+			
 			grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_kernel, by_batch = True, loss_func = loss_func)
+				target = tensor_w_kernel, by_batch = True, loss_func = loss_func) 
 			grad_scndcr_recurr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
 				target = tensor_w_recurr_kernel, by_batch = True, loss_func = loss_func)
 			
@@ -792,7 +806,7 @@ def compute_FI_and_GL(
 	return total_cands
 
 
-def compute_avg_of_output_per_w(x, h, t_w_kernel, t_w_recurr_kernel, const, with_norm = False):
+def compute_output_per_w(x, h, t_w_kernel, t_w_recurr_kernel, const, with_norm = False):
 	"""
 	A slice for a single neuron (unit or lstm cell)
 	x = (batch_size, time_steps, num_features)
@@ -867,9 +881,9 @@ def lstm_local_front_FI_for_target_all(
 	for idx_to_unit in tqdm(num_units):
 		out_combined = None
 		for gate in gate_orders:
-			out = compute_avg_of_output_per_w(
-				x, 
-				h if h is not None else None, 
+			# out's shape, (batch_size, time_steps, (num_features + num_units))
+			out = compute_output_per_w(
+				x, h,
 				t_w_kernels[gate][:,idx_to_unit],
 				t_w_recurr_kernels[gate][:,idx_to_unit],
 				consts[gate][...,idx_to_unit],

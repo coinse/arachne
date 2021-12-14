@@ -76,7 +76,8 @@ class Searcher(object):
 		self.batch_size = batch_size
 		self.act_func = act_func # will be latter used for GTSRB
 		#self.set_base_model()
-		self.set_base_model_v2()
+		#self.set_base_model_v2()
+		self.set_base_model_v3()
 		self.set_target_weights()
 		##
 
@@ -506,7 +507,7 @@ class Searcher(object):
 		#for idx_to_tl in self.indices_to_target_layers: # either idx_to_tl or (idx_to_tl, i)
 
 		# for the below to be worked, each layer's index of fn_mdl should be the same for the original one (self.mdl)
-		# meaning, we have to change this since, fn_mdl is the slice of the original model having pre-computed outputs
+		# meaning, we have to change this since, fn_mdl is the slice of the original model having pre-computed outputs => done
 		for idx_to_tl, delta in deltas.items(): # either idx_to_tl or (idx_to_tl, i)
 			if isinstance(idx_to_tl, Iterable):
 				idx_to_t_mdl_l, idx_to_w = idx_to_tl

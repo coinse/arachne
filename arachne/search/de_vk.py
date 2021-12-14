@@ -146,7 +146,8 @@ class DE_searcher(Searcher):
 		# 	update_op = 'set') 
 		#predictions, correct_predictions, loss_v = self.move_v1(deltas, update_op = 'set') 
 		#print (deltas[idx_to_tl])
-		predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
+		#predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
+		predictions, correct_predictions, loss_v = self.move_v3(deltas)
 
 		assert predictions is not None
 		assert correct_predictions is not None

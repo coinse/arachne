@@ -1,6 +1,7 @@
 """
 Localise faults in offline for any faults
 """
+from re import A
 import numpy as np
 import time
 import tensorflow as tf
@@ -393,8 +394,8 @@ def compute_FI_and_GL(
 	X, y,
 	indices_to_target,
 	target_weights,
-	path_to_keras_model = None, 
-	loss_func = 'softmax'):
+	loss_funcs = None, 
+	path_to_keras_model = None):
 	"""
 	compute FL and GL for the given inputs
 	"""
@@ -475,6 +476,7 @@ def compute_FI_and_GL(
 			############ FI end #########
 
 			# Gradient
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'softmax'
 			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, loss_func=loss_func)
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
@@ -619,6 +621,7 @@ def compute_FI_and_GL(
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
 			# will be [F1, F2, Channel_in, Channel_out]
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'softmax'
 			grad_scndcr = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True, loss_func=loss_func)
 			# ##	
 		elif is_LSTM(lname): #
@@ -751,10 +754,11 @@ def compute_FI_and_GL(
 			# will be 
 			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
 			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'mse'
 			grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_kernel, by_batch = True, loss_func=loss_func)
+				target = tensor_w_kernel, by_batch = True, loss_func = loss_func)
 			grad_scndcr_recurr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_recurr_kernel, by_batch = True, loss_func=loss_func)
+				target = tensor_w_recurr_kernel, by_batch = True, loss_func = loss_func)
 			
 			grad_scndcr = [grad_scndcr_kernel, grad_scndcr_recurr_kernel]
 		#elif is_Attention(lname):
@@ -944,12 +948,13 @@ def localise_by_chgd_unchgd(
 	indices_to_chgd,
 	indices_to_unchgd,
 	target_weights,
-	path_to_keras_model = None):
+	path_to_keras_model = None,
+	loss_funcs = None):
 	"""
 	Find those likely to be highly influential to the changed behaviour while less influential to the unchanged behaviour
 	"""
 	from collections.abc import Iterable
-	from scipy.stats import ks_2samp
+	#from scipy.stats import ks_2samp
 	loc_start_time = time.time()
 
 	print ("indices to chgd, unchgd", indices_to_chgd, indices_to_unchgd)
@@ -958,6 +963,7 @@ def localise_by_chgd_unchgd(
 		X, y,
 		indices_to_chgd,
 		target_weights,
+		loss_funcs = loss_funcs, 
 		path_to_keras_model = path_to_keras_model)
 
 	# compute FI and GL with unchanged inputs
@@ -965,6 +971,7 @@ def localise_by_chgd_unchgd(
 		X, y,
 		indices_to_unchgd,
 		target_weights,
+		loss_funcs = loss_funcs, 
 		path_to_keras_model = path_to_keras_model)
 
 	indices_to_tl = list(total_cands_chgd.keys()) 
@@ -1006,8 +1013,8 @@ def localise_by_chgd_unchgd(
 			_idx_to_tl = vs[0][0]
 			indices_to_nodes.append([_idx_to_tl, np.unravel_index(vs[0][1], shapes[_idx_to_tl])])
 		else:
-			_idx_to_tl, idx_to_shape = vs[0][0]
-			indices_to_nodes.append([(_idx_to_tl, idx_to_shape), np.unravel_index(vs[0][1], shapes[_idx_to_tl][idx_to_shape])])
+			_idx_to_tl, idx_to_w = vs[0][0]
+			indices_to_nodes.append([(_idx_to_tl, idx_to_w), np.unravel_index(vs[0][1], shapes[_idx_to_tl][idx_to_w])])
 
 
 	t4 = time.time()
@@ -1389,11 +1396,10 @@ def localise_by_gradient_v2(
 		print ("targeting layer {} ({})".format(idx_to_tl, lname))
 		
 		t1 = time.time()
-		if is_C2D(lname):
-			by_batch = True
-		else:
-			by_batch = False
-
+		#if is_C2D(lname):
+			#by_batch = True
+		#else:
+			#by_batch = False
 		grad_scndcr_for_chgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_chgd], y[indices_to_chgd], by_batch = True)
 		grad_scndcr_for_unchgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_unchgd], y[indices_to_unchgd], by_batch = True)
 		t2 = time.time()
@@ -1422,17 +1428,124 @@ def localise_by_gradient_v2(
 	return sorted_costs_and_keys
 
 
+def localise_by_gradient_v3(
+	X, y,
+	indices_to_chgd,
+	indices_to_unchgd,
+	target_weights,
+	path_to_keras_model = None, 
+	loss_funcs = None):
+	"""
+	localise using chgd & unchgd
+	"""
+	from collections.abc import Iterable
+	
+	total_cands = {}
+	print ('Total {} layers are targeted'.format(len(target_weights)))
+	t0 = time.time()
+	## slice inputs
+	loc_start_time = time.time()
+	##
+	for idx_to_tl, vs in target_weights.items():
+		t_w, lname = vs
+		print ("targeting layer {} ({})".format(idx_to_tl, lname))
+		t1 = time.time()
+		if is_C2D(lname) or is_FC(lname):
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'softmax'
+			grad_scndcr_for_chgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_chgd], y[indices_to_chgd], 
+				loss_func = loss_func, by_batch = True)
+			grad_scndcr_for_unchgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_unchgd], y[indices_to_unchgd], 
+				loss_func = loss_func, by_batch = True)
+
+			assert t_w.shape == grad_scndcr_for_chgd.shape, "{} vs {}".format(t_w.shape, grad_scndcr_for_chgd.shape)
+			total_cands[idx_to_tl] = {'shape':grad_scndcr_for_chgd.shape, 
+									'costs':grad_scndcr_for_chgd.flatten()/(1.+grad_scndcr_for_unchgd.flatten())}
+		elif is_LSTM(lname):
+			model = load_model(path_to_keras_model, compile = False)
+			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'mse'
+			# for changed inputs
+			# kernel
+			grad_scndcr_kernel_chgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_chgd], y[indices_to_chgd],
+				target = tensor_w_kernel, loss_func = loss_func, by_batch = True)
+			# recurrent kernel
+			grad_scndcr_recurr_kernel_chgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_chgd], y[indices_to_chgd], 
+				target = tensor_w_recurr_kernel, loss_func = loss_func, by_batch = True)
+			grad_scndcr_for_chgd = [grad_scndcr_kernel_chgd, grad_scndcr_recurr_kernel_chgd]
+
+			# for unchanged inptus
+			# kernel
+			grad_scndcr_kernel_unchgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_unchgd], y[indices_to_unchgd],
+				target = tensor_w_kernel, loss_func = loss_func, by_batch = True)
+			# recurrent kernel
+			grad_scndcr_recurr_kernel_unchgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_unchgd], y[indices_to_unchgd], 
+				target = tensor_w_recurr_kernel, loss_func = loss_func, by_batch = True)
+			grad_scndcr_for_unchgd = [grad_scndcr_kernel_unchgd, grad_scndcr_recurr_kernel_unchgd]
+			
+			# check
+			assert t_w[0].shape == grad_scndcr_for_chgd[0].shape, "{} vs {}".format(t_w[0].shape, grad_scndcr_for_chgd[0].shape)
+			assert t_w[1].shape == grad_scndcr_for_chgd[1].shape, "{} vs {}".format(t_w[1].shape, grad_scndcr_for_chgd[1].shape)
+
+			# generate total candidates
+			total_cands[idx_to_tl] = {'shape':[], 'costs':[]}
+			for _grad_scndr_chgd, _grad_scndr_unchgd in zip(grad_scndcr_for_chgd, grad_scndcr_for_unchgd):
+				#_grad_scndr_chgd & _grad_scndr_unchgd -> can be for either kernel or recurrent kernel
+				_costs = _grad_scndr_chgd.flatten()/(1. + _grad_scndr_unchgd.flatten())
+				total_cands[idx_to_tl]['shape'].append(_grad_scndr_chgd.shape)
+				total_cands[idx_to_tl]['costs'].append(_costs)
+		else:
+			print ("{} not supported yet".format(lname))
+			assert False
+		###
+		
+		t2 = time.time()
+		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
+	
+	t3 = time.time()
+	print ("Time for computing total costs: {}".format(t3 - t0))
+
+	indices_to_tl = list(total_cands.keys())
+	costs_and_keys = []
+	for idx_to_tl in indices_to_tl:
+		if not isinstance(total_cands[idx_to_tl]['shape'], Iterable):
+			for local_i,c in enumerate(total_cands[idx_to_tl]['costs']):
+				cost_and_key = ([idx_to_tl, np.unravel_index(local_i, total_cands[idx_to_tl]['shape'])], c) 
+				costs_and_keys.append(cost_and_key)
+		else:
+			num = len(total_cands[idx_to_tl]['shape'])
+			for idx_to_w in range(num):
+				for local_i, c in enumerate(total_cands[idx_to_tl]['costs'][idx_to_w]):
+					cost_and_key = ([(idx_to_tl, idx_to_w), np.unravel_index(local_i, total_cands[idx_to_tl]['shape'][idx_to_w])], c) 
+					costs_and_keys.append(cost_and_key)
+
+	costs = np.asarray([vs[1] for vs in costs_and_keys])
+	print ("Indices", indices_to_tl)
+	print ("the number of total cands: {}".format(len(costs)))
+
+	sorted_costs_and_keys = sorted(costs_and_keys, key = lambda vs:vs[1], reverse = True)
+	loc_end_time = time.time()
+	print ("Time for total localisation: {}".format(loc_end_time - loc_start_time))
+
+	return sorted_costs_and_keys
+
+
 def localise_by_random_selection(number_of_place_to_fix, target_weights):
 	"""
 	randomly select places to fix
 	"""
-	
+	from collections.abc import Iterable
+
 	total_indices = []
 	for idx_to_tl, vs in target_weights.items():
 		t_w, _ = vs
-		l_indices = list(np.ndindex(t_w.shape))
-		total_indices.extend(list(zip([idx_to_tl] * len(l_indices), l_indices)))
-	
+		if not isinstance(t_w, Iterable):
+			l_indices = list(np.ndindex(t_w.shape))
+			total_indices.extend(list(zip([idx_to_tl] * len(l_indices), l_indices)))
+		else: # to handle the layers with more than one weights (e.g., LSTM)
+			for idx_to_w, a_t_w in enumerate(t_w):
+				l_indices = list(np.ndindex(a_t_w.shape))
+				total_indices.extend(list(zip([idx_to_tl, idx_to_w] * len(l_indices), l_indices)))
+
 	if number_of_place_to_fix > 0 and number_of_place_to_fix < len(total_indices):
 		selected_indices = np.random.choice(np.arange(len(total_indices)), number_of_place_to_fix, replace = False)
 		indices_to_places_to_fix = [total_indices[idx] for idx in selected_indices]

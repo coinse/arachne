@@ -26,7 +26,8 @@ def patch(
 	target_all = False,
 	loc_file = None,
 	loc_dest = None,
-	batch_size = None):
+	batch_size = None, 
+	loss_funcs = None):
 	"""
 	only_loc = True:
 		Ret(list, list):
@@ -172,12 +173,13 @@ def patch(
 			# retrieve all
 			top_n = -1
 
-		indices_w_costs = run_localise.localise_by_gradient_v2(
+		indices_w_costs = run_localise.localise_by_gradient_v3(
 				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
 				indices_to_correct_for_loc,
 				target_weights,
-				path_to_keras_model = path_to_keras_model)
+				path_to_keras_model = path_to_keras_model,
+				loss_funcs = loss_funcs)
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
@@ -192,27 +194,6 @@ def patch(
 		#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
 		#	pickle.dump(indices_w_costs, f)	
 		# comment out end for loc result saving 
-
-	#elif loc_method == 'old_localiser': # will be deleted 
-		#if loc_file is None or not (os.path.exists(loc_file)):
-			#indices_to_places_to_fix, front_lst = run_localise.localise_offline_v2(
-				#X_for_loc, y_for_loc,
-				#indices_to_selected_wrong,
-				#target_weights,
-				#path_to_keras_model = path_to_keras_model)
-			#print ("Places to fix", indices_to_places_to_fix)
-			##import sys; sys.exit()
-			#output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			#loc_dest = os.path.join(loc_dest, "new_loc/{}/old_loc".format(which))
-			#os.makedirs(loc_dest, exist_ok= True)
-			#destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
-			#output_df.to_pickle(destfile)
-			#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-				#pickle.dump(front_lst, f)
-		#else: # since I dont' want to localise again
-			#import pandas as pd
-			#df = pd.read_pickle(loc_file)
-			#indices_to_places_to_fix = df.values
 	elif loc_method == 'localiser':
 		if loc_file is None or not (os.path.exists(loc_file)):
 			print (len(indices_to_correct_for_loc), len(indices_to_selected_wrong))
@@ -223,7 +204,8 @@ def patch(
 				indices_to_selected_wrong,
 				indices_to_correct_for_loc,
 				target_weights,
-				path_to_keras_model = path_to_keras_model)
+				path_to_keras_model = path_to_keras_model, 
+				loss_funcs = loss_funcs)
 
 			print ("Places to fix", indices_to_places_to_fix)
 
@@ -248,8 +230,11 @@ def patch(
 				top_n = int(np.round(7.6))
 			elif which == 'simple_cm':
 				top_n = int(np.round(11.6))
-			else: # GTSRB
+			elif which == 'GTSBR': # GTSRB
 				top_n = int(np.round(14.3))
+			else: # for LSTM
+				print ("not yet")
+				import sys; sys.exit()
 			num_random_sample = top_n 
 		else:
 			num_random_sample = -1

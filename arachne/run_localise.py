@@ -832,9 +832,10 @@ def compute_output_per_w(x, h, t_w_kernel, t_w_recurr_kernel, const, with_norm =
 	from sklearn.preprocessing import Normalizer
 	norm_scaler = Normalizer(norm = "l1")
 
-	out_kernel = np.multiply(x, t_w_kernel) # shape = (batch_size, time_steps, num_features)
+	# here, "multiply" instead of dot, b/c we want to get the output of each neural weight (not the final one)
+	out_kernel = x * t_w_kernel #np.multiply(x, t_w_kernel) # shape = (batch_size, time_steps, num_features)
 	if h is not None: # None -> we will skip the weights for hiddens states
-		out_recurr_kernel = np.multiply(h, t_w_recurr_kernel) # shape = (batch_size, time_steps, num_units)
+		out_recurr_kernel = h * t_w_recurr_kernel #np.multiply(h, t_w_recurr_kernel) # shape = (batch_size, time_steps, num_units)
 		out = np.append(out_kernel, out_recurr_kernel, axis = -1) # out's shape = (batch_size, time_steps, (num_features + num_units))
 	else:
 		out = out_kernel # shape = (batch_size, time_steps, num_features)
@@ -842,14 +843,12 @@ def compute_output_per_w(x, h, t_w_kernel, t_w_recurr_kernel, const, with_norm =
 	# normalise -> make it between 0~1 (this is also to substitute the activation part ... 
 	# => all the values would be scale between 0 to its constant, and then they will be normalised between 0~1 with 
 	# all other neural weights from different gates before being returned as the front part of the FI
-	if with_norm:
+	if with_norm: 
 		out = np.abs(out)
 		out = norm_scaler.fit_transform(out)
 
 	# N = num_features or num_features + num_units
-	#for i in range(len(out)):
-	#	np.multiply(const, out[:,:,i])
-	out = np.einsum('ijk,ij->ijk', out, const) # shape = (batch_size, time_steps, N)
+	out = np.einsum('ijk,ij->ijk', out, const) # shape = (batch_size, time_steps, N) 
 	return out
 
 
@@ -873,7 +872,8 @@ def get_constants(gate, F, I, C, O, cell_states):
 			I, cell_states[:,1:,:], 
 			out = np.zeros_like(C), where = cell_states[:,1:,:] != 0))
 	else: # output
-		return np.tanh(cell_states[:,1:,1])
+		#return np.tanh(cell_states[:,1:,1])
+		return np.tanh(cell_states[:,1:,:])
 	
 
 def lstm_local_front_FI_for_target_all(

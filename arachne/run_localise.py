@@ -417,7 +417,7 @@ def compute_FI_and_GL(
 	print ('Total {} layers are targeted'.format(len(target_weights)))
 	t0 = time.time()
 	## slice inputs
-	print (X.shape, indices_to_target)
+	print (X.shape, len(indices_to_target))
 	print (X.shape, np.max(indices_to_target), len(indices_to_target))
 	target_X = X[indices_to_target]
 	target_y = y[indices_to_target]
@@ -431,10 +431,15 @@ def compute_FI_and_GL(
 		#t_w_tensor = model.layers[idx_to_tl].weights[0]
 		############ FI ############
 		model = load_model(path_to_keras_model, compile = False)
+		print (model.summary())
 		if idx_to_tl == 0: # meaning the model doesn't specify the input layer explicitly
 			prev_output = target_X
 		else:
 			prev_output = model.layers[idx_to_tl - 1].output
+			print ("here")
+			print (prev_output.shape)
+			print (idx_to_tl - 1)
+			print (model.layers[idx_to_tl - 1])
 		layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
@@ -639,18 +644,22 @@ def compute_FI_and_GL(
 			##############################################
 			# should compute from_front and from_behind ##
 			##############################################
+			print ("in lstm", prev_output.shape)
 			num_weights = 2 
 			assert len(t_w) == num_weights, t_w
 			t_w_kernel, t_w_recurr_kernel = t_w # t_w_kernel: (input_feature_size, 4 * num_units). t_w_recurr_kernel: (num_units, 4 * num_units)
 			
 			# get the previous output, which will be the input of the lstm
 			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output) # shape = (batch_size, time_steps, input_feature_size)
-			if idx_to_tl == 0 or idx_to_tl - 1 == 0: # input is already formated at the preprocessing stage
-				prev_output = target_X
-			else:
-				prev_output = t_model.predict(target_X)
+			#if idx_to_tl == 0: # or idx_to_tl - 1 == 0: # input is already formated at the preprocessing stage
+			#	prev_output = target_X
+			#else:
+			prev_output = t_model.predict(target_X)
 			
 			# the input's shape should be (batch_size, time_step, num_features)
+			
+			print ("idx to tl", idx_to_tl, prev_output.shape)
+			print (model.layers[idx_to_tl])
 			assert len(prev_output.shape) == 3, prev_output.shape
 			num_features = prev_output.shape[-1] # the dimension of features that will be processed by the model
 
@@ -661,10 +670,13 @@ def compute_FI_and_GL(
 			# generate a temporary model that only contains the target lstm layer 
 			# but with the modification to return sequences of hidden and cell states
 			temp_lstm_layer_inst = lstm_layer.LSTM_Layer(model.layers[idx_to_tl])
-			temp_lstm_mdl = temp_lstm_layer_inst.gen_lstm_layer_from_another()
+			#temp_lstm_mdl = temp_lstm_layer_inst.gen_lstm_layer_from_another(prev_output)
 			# shapes of hstates_sequence and cell_states_sequence: 
 			# 	(batch_size, num_units, time_steps), (batch_size, num_units, time_steps) 
-			hstates_sequence, cell_states_sequence = temp_lstm_mdl(target_X) 
+			#hstates_sequence, cell_states_sequence = temp_lstm_mdl(target_X) 
+			# maybe we can change to directly compyte the seeusenc (the above)
+			hstates_sequence, cell_states_sequence = temp_lstm_layer_inst.gen_lstm_layer_from_another(prev_output)
+			
 			init_hstates, init_cell_states = lstm_layer.LSTM_Layer.get_initial_state(model.layers[idx_to_tl])
 			if init_hstates is None: 
 				init_hstates = np.zeros((len(target_X), num_units)) # based on the how states was handled in the github source
@@ -767,7 +779,7 @@ def compute_FI_and_GL(
 			# will be 
 			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
 			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
-			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'mse'
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'binary_crossentropy'
 			
 			grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
 				target = tensor_w_kernel, by_batch = True, loss_func = loss_func) 
@@ -971,7 +983,8 @@ def localise_by_chgd_unchgd(
 	#from scipy.stats import ks_2samp
 	loc_start_time = time.time()
 
-	print ("indices to chgd, unchgd", indices_to_chgd, indices_to_unchgd)
+	print ("Layers to inspect", list(target_weights.keys()))
+	#print ("indices to chgd, unchgd", indices_to_chgd, indices_to_unchgd)
 	# compute FI and GL with changed inputs
 	total_cands_chgd = compute_FI_and_GL(
 		X, y,
@@ -1477,7 +1490,7 @@ def localise_by_gradient_v3(
 		elif is_LSTM(lname):
 			model = load_model(path_to_keras_model, compile = False)
 			tensor_w_kernel, tensor_w_recurr_kernel, _ = model.layers[idx_to_tl].weights[:2]
-			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'mse'
+			loss_func = loss_funcs[idx_to_tl] if loss_funcs[idx_to_tl] is not None else 'binary_crossentropy'
 			# for changed inputs
 			# kernel
 			grad_scndcr_kernel_chgd = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, X[indices_to_chgd], y[indices_to_chgd],

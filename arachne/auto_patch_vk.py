@@ -199,6 +199,7 @@ def patch(
 			print (len(indices_to_correct_for_loc), len(indices_to_selected_wrong))
 			print ("Now ready to localiser")
 			### *** Now this may return (idx_to_tl, idx_to_w (0 for kerenl and 1 for recurr_kernel)) 
+			print ("x", X_for_loc.shape)
 			indices_to_places_to_fix, front_lst = run_localise.localise_by_chgd_unchgd(
 				X_for_loc, y_for_loc,
 				indices_to_selected_wrong,
@@ -258,6 +259,7 @@ def patch(
 	if loc_method == 'localiser':
 		print (indices_to_places_to_fix) # loggin
 
+	import sys; sys.exit()
 	if only_loc: # RQ1
 		if loc_method in ['localiser', 'c_localiser']:
 			return indices_to_places_to_fix, front_lst

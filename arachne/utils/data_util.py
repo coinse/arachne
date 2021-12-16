@@ -114,7 +114,7 @@ def load_data(which, path_to_data,
 		sorted_test_vs = [test_vs[n] for n in names_in_test]
 		test_data[0] = [vs[0] for vs in sorted_test_vs]
 		test_data[1] = [vs[1] for vs in sorted_test_vs]
-	elif which != 'GTSRB':
+	elif which in ['fashion_mnist', 'cifar10']:# != 'GTSRB':
 		import torch
 		import torchvision
 		import torchvision.transforms as transforms
@@ -163,24 +163,25 @@ def load_data(which, path_to_data,
 
 		test_data[0] = np.asarray(test_data[0])
 		test_data[1] = np.asarray(test_data[1])
-	elif which == 'GTSRB': # GTSRB
-		#which, path_to_data,
+	elif which in ['GTSRB', 'imdb']: # GTSRB
 		import pickle
 		# train
-		if with_hist:
+		if which == 'GTSRB' and with_hist:
 			path_to_data = os.path.join(path_to_data, 'hist')
 
 		with open(os.path.join(path_to_data, "train_data.pkl"), 'rb') as f:
-			train_data_dict = pickle.load(f)
+			train_data = pickle.load(f)
 
 		#train_data = [np.moveaxis(train_data_dict['data'], [1], [-1]), train_data_dict['label']]
-		train_data = [train_data_dict['data'], train_data_dict['label']]
+		if isinstance(train_data, dict):
+			train_data = [train_data['data'], train_data['label']]
 		# test
 		with open(os.path.join(path_to_data, "test_data.pkl"), 'rb') as f:
-			test_data_dict = pickle.load(f)
+			test_data = pickle.load(f)
 
 		#test_data = [np.moveaxis(test_data_dict['data'], [1], [-1]), test_data_dict['label']]
-		test_data = [test_data_dict['data'], test_data_dict['label']]
+		if isinstance(test_data, dict):
+			test_data = [test_data['data'], test_data['label']]
 	else: # for simple_lstm or airline_passengers
 		import pickle
 		with open(path_to_data, 'rb') as f:

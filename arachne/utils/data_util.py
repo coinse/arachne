@@ -225,12 +225,10 @@ def split_into_wrong_and_correct(correct_predictions):
 		ret = {'wrong':indices_to_wrong(list), 'correct':indices_to_correct(list)}
 	"""
 	indices = {'wrong':[], 'correct':[]}
-	
 	indices_to_wrong, = np.where(correct_predictions == False)
 	indices_to_correct, = np.where(correct_predictions == True)
 	indices['correct'] = list(indices_to_correct)
 	indices['wrong'] = list(indices_to_wrong)
-
 	return indices
 
 

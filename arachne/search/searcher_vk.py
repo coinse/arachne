@@ -1,9 +1,7 @@
 """
 """
-from pickle import NONE
 import time
 
-from arachne.utils import data_util
 class Searcher(object):
 	"""docstring for Searcher"""
 
@@ -12,7 +10,7 @@ class Searcher(object):
 	importlib = __import__('importlib')
 	kfunc_util = importlib.import_module('utils.kfunc_util')
 	model_util = importlib.import_module('utils.model_util')
-	data_util = importlib.import_modeul('utils.data_util')
+	data_util = importlib.import_module('utils.data_util')
 	#apricot_rel_util = importlib.import_module('utils.apricot_rel_util')
 	#torch_rel_util = importlib.import_module('utils.torch_rel_util')
 
@@ -459,7 +457,7 @@ class Searcher(object):
 		#
 		if len(predictions.shape) > len(labels.shape) and predictions.shape[1] == 1:
 			predictions = self.np.squeeze(predictions, axis = 1)
-
+		# THIS PART SHOULD BE CORRECTED
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
 		#print (correct_predictions.shape, self.np.sum(correct_predictions))

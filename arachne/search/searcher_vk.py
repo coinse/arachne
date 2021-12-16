@@ -2,6 +2,8 @@
 """
 import time
 
+from arachne.utils.model_util import predict
+
 class Searcher(object):
 	"""docstring for Searcher"""
 
@@ -30,15 +32,13 @@ class Searcher(object):
 		inputs, labels,
 		indices_to_correct, indices_to_wrong,
 		num_label,
-		#tensor_name_file,
 		indices_to_target_layers, 
 		max_search_num = 200,
 		initial_predictions = None,
-		#empty_graph = None,
-		#which = None,
 		path_to_keras_model = None,
 		at_indices = None, 
 		batch_size = None, 
+		is_multi_label = True,
 		act_func = None):
 
 		"""
@@ -49,13 +49,17 @@ class Searcher(object):
 		self.num_label = num_label
 		self.inputs = inputs
 		from collections.abc import Iterable
-		if not isinstance(labels[0], Iterable):
-			from utils.data_util import format_label
-			self.ground_truth_labels = labels
-			self.labels = format_label(labels, self.num_label)
+		if is_multi_label:
+			if not isinstance(labels[0], Iterable):
+				from utils.data_util import format_label
+				self.ground_truth_labels = labels
+				self.labels = format_label(labels, self.num_label)
+			else:	
+				self.labels = labels
+				self.ground_truth_labels = self.np.argmax(self.labels, axis = 1)
 		else:
 			self.labels = labels
-			self.ground_truth_labels = self.np.argmax(self.labels, axis = 1)
+			self.ground_truth_labels = labels
 
 		self.model_name = "model"
 		self.model_name_format = self.model_name + ".{}"
@@ -69,27 +73,24 @@ class Searcher(object):
 		#self.which = which
 		#self.tensors = self.set_target_tensor_names(tensor_name_file)
 		self.indices_to_target_layers = indices_to_target_layers # !!!!!! here, include (idx_to_tl, idx_to_w (0 or 1))
-		
+		self.targeted_layer_names = None
 		##
 		self.batch_size = batch_size
 		self.act_func = act_func # will be latter used for GTSRB
+		self.is_multi_label = is_multi_label
 		#self.set_base_model()
 		#self.set_base_model_v2()
 		self.set_base_model_v3()
 		self.set_target_weights()
-		##
 
-		self.at_indices = at_indices
-		# if empty_graph is None:
-		# 	self.generate_empty_graph()
-		# else:
-		# 	self.empty_graph = empty_graph
-		
+		self.at_indices = at_indices ## related to RQ6 ... not sure what this is
+
 		#self.sess = None
 		# initialise the names of the tensors used in Searcher
-		#if not is_empty_one: 
-		#self.initialise_feed_dict() 
-		self.set_initial_predictions()# initial_predictions)
+		if initial_predictions is None:
+			self.set_initial_predictions()# initial_predictions)
+		else:
+			self.initial_predictions = initial_predictions
 		self.maximum_fitness = 0.0 # the maximum fitness value	
 		# set search relate parameters
 		self.max_search_num = max_search_num	
@@ -149,6 +150,10 @@ class Searcher(object):
 		mdl = load_model(self.path_to_keras_model)
 		self.mdl = mdl
 		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
+		# set targete layer names
+		self.targeted_layer_names = {}
+		for idx_to_tl in self.indices_to_target_layers:
+			self.targeted_layer_names[idx_to_tl] = type(self.mdl.layers[idx_to_tl]).__name__
 
 		# compute previous outputs
 		self.min_idx_to_tl = self.np.min([idx if not isinstance(idx, Iterable) else idx[0] for idx in self.indices_to_target_layers])
@@ -162,13 +167,14 @@ class Searcher(object):
 		#t_mdl = Model(inputs = self.mdl.input, outputs = prev_output_tensor)
 		prev_l = self.mdl.layers[self.min_idx_to_tl-1 if self.min_idx_to_tl > 0 else 0]
 		if self.min_idx_to_tl == 0 and not self.model_util.is_Input(type(prev_l).__name__):
-			t_mdl = Model(inputs = self.mdl.input, outputs = self.mdl.layers[0].input)
+			t_mdl = Model(inputs = self.mdl.input, outputs = self.mdl.layers[0].input) # add an explict input layer that will store inputs
 		else:
 			t_mdl = Model(inputs = self.mdl.input, outputs = prev_l.output)
 		self.prev_outputs = t_mdl(self.inputs)
 
 		# set base model
 		from gen_frame_graph import build_mdl_lst
+		# a list that contains a single model
 		self.fn_mdl_lst = [build_mdl_lst(self.mdl, self.prev_outputs.shape[1:], sorted(self.indices_to_target_layers))]
 
 		# set chunks
@@ -421,7 +427,10 @@ class Searcher(object):
 		predictions = self.mdl.predict(self.inputs)
 		correct_predictions = self.np.argmax(predictions, axis = 1)
 		correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)
-		
+		##
+
+		##
+
 		target_corr_predcs = correct_predictions[indices_to_target]
 
 		num_of_total_target = len(target_corr_predcs)
@@ -457,14 +466,19 @@ class Searcher(object):
 		#
 		if len(predictions.shape) > len(labels.shape) and predictions.shape[1] == 1:
 			predictions = self.np.squeeze(predictions, axis = 1)
-		# THIS PART SHOULD BE CORRECTED
-		correct_predictions = self.np.argmax(predictions, axis = 1)
-		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		
+		#if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
+		if self.is_multi_label:
+			correct_predictions = self.np.argmax(predictions, axis = 1)
+			correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		else:
+			correct_predictions = self.np.round(predictions).flatten() == labels
+
 		#print (correct_predictions.shape, self.np.sum(correct_predictions))
 		t2 =time.time()
 		#print ("Time for move: {}".format(t2 - t1))
 		#print ("Time for sess: {}".format(t2 - t1))
-		#print ("Loss", losses_of_all.shape)
+		#print ("Loss", losses_of_all.shape)å
 		#print (np.max(self.indices_to_correct))
 
 		losses_of_correct = losses_of_all[self.indices_to_correct]
@@ -485,27 +499,16 @@ class Searcher(object):
 		return predictions, correct_predictions, combined_losses
 		#return sess, (predictions, correct_predictions, combined_losses)
 		
-
-	def move_v3(self, deltas):
+	def predict_with_new_delat(self, deltas):
 		"""
-		*** should be checked and fixed
-		--> need to fix this...
-		delatas -> key: idx_to_tl & inner_key: index to the weight
-				or key: (idx_to_tl, i) & inner_key
-				value -> the new value
+		predict with the model patched using deltas
 		"""
-		import tensorflow as tf
-		import time
 		from collections.abc import Iterable
+		import time 
 
-		labels = self.labels
 		t1 = time.time()
 		# prepare a new model to run by updating the weights from deltas
 		fn_mdl = self.fn_mdl_lst[0] # we only have a one model as this one accept any lenghts of an input, which is actually the output of the previous layers
-		#for idx_to_tl in self.indices_to_target_layers: # either idx_to_tl or (idx_to_tl, i)
-
-		# for the below to be worked, each layer's index of fn_mdl should be the same for the original one (self.mdl)
-		# meaning, we have to change this since, fn_mdl is the slice of the original model having pre-computed outputs => done
 		for idx_to_tl, delta in deltas.items(): # either idx_to_tl or (idx_to_tl, i)
 			if isinstance(idx_to_tl, Iterable):
 				idx_to_t_mdl_l, idx_to_w = idx_to_tl
@@ -516,9 +519,9 @@ class Searcher(object):
 			# set new weight values (deltas) for the model list
 			lname = type(fn_mdl.layers[idx_to_t_mdl_l]).__name__
 
-			if (self.model_util.is_FC(lname) or self.model_util.is_C2D(lname)):
+			if self.model_util.is_FC(lname) or self.model_util.is_C2D(lname):
 				fn_mdl.layers[idx_to_t_mdl_l].set_weights([delta, self.init_biases[idx_to_t_mdl_l]])
-			elif (self.model_util.is_LSTM(lname)):
+			elif self.model_util.is_LSTM(lname):
 				if idx_to_w == 0: # kernel
 					new_kernel_w = delta # use the full 
 					new_recurr_kernel_w = self.init_weights[idx_to_t_mdl_l][1]
@@ -538,22 +541,44 @@ class Searcher(object):
 
 		predictions = None
 		for chunk in self.chunks:
-			_predictions = self.mdl(self.prev_outputs[chunk])
+			_predictions = fn_mdl(self.prev_outputs[chunk])
 			if predictions is None:
 				predictions = _predictions
 			else:
 				predictions = self.np.append(predictions, _predictions, axis = 0)
 
-		# the softmax or any other activation function should be inserted here!!!!! ... but, again think abou it
-		# since the applicaiton itself is argmax, the tendency itself doesn't change ... ok 
-
-		correct_predictions = self.np.argmax(predictions, axis = 1)
-		correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
 		t3 = time.time()
 		print ("Time for predictions: {}".format(t3 - t2))
+		return predictions
 
+
+	def move_v3(self, deltas):
+		"""
+		*** should be checked and fixed
+		--> need to fix this...
+		delatas -> key: idx_to_tl & inner_key: index to the weight
+				or key: (idx_to_tl, i) & inner_key
+				value -> the new value
+		"""
+		import time
+
+		labels = self.labels
+		predictions = self.predict_with_new_delat(deltas)
+
+		# the softmax or any other activation function should be inserted here!!!!! ... but, again think abou it
+		# since the applicaiton itself is argmax, the tendency itself doesn't change ... ok 
+		#if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
+		if self.is_multi_label:
+			correct_predictions = self.np.argmax(predictions, axis = 1)
+			correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
+		else:
+			correct_predictions = self.np.round(predictions).flatten() == labels
+
+		# set self.k_fn_loss if it has been done yet.
 		if self.k_fn_loss is None:
-			self.k_fn_loss = self.kfunc_util.gen_pred_and_loss_ops(predictions.shape, predictions.dtype, labels.shape, labels.dtype)
+			loss_func = self.model_util.get_loss_func(is_multi_label = self.is_multi_label)
+			self.k_fn_loss = self.kfunc_util.gen_pred_and_loss_ops(
+				predictions.shape, predictions.dtype, labels.shape, labels.dtype, loss_func)
 
 		losses_of_all = self.k_fn_loss([predictions, labels])
 		t4 = time.time()
@@ -602,13 +627,13 @@ class Searcher(object):
 		#predictions, _ = self.fn_mdl(deltas_as_lst + [self.labels])
 		## **
 		predictions = self.kfunc_util.compute_predictions(self.fn_mdl_lst, self.labels, deltas_as_lst, batch_size = self.batch_size)
-		if len(predictions.shape) > len(self.labels.shape) and predictions.shape[1] == 1:
-			predictions = self.np.squeeze(predictions, axis = 1)
-		## **
-		##
-		correct_predictions = self.np.argmax(predictions, axis = 1)
-		correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)
-		
+		#if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
+		if self.is_multi_label:
+			correct_predictions = self.np.argmax(predictions, axis = 1)
+			correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)
+		else:
+			correct_predictions = self.np.round(predictions).flatten() == self.labels
+
 		target_corr_predcs = correct_predictions[indices_to_target]
 
 		num_of_total_target = len(target_corr_predcs)
@@ -617,6 +642,29 @@ class Searcher(object):
 
 		return (correctly_classified, correctly_classified / num_of_total_target)
 
+
+	def get_results_of_target_v3(self, deltas, indices_to_target):
+		"""
+		Return the results of the target (can be accessed by indices_to_target)
+			-> results are compute for currnet self.mdl
+		Ret (int, float):
+			int: the number of patched
+			float: percentage of the number of patched)
+		"""
+		predictions = self.predict_with_new_delat(deltas)
+		if self.is_multi_label:
+			correct_predictions = self.np.argmax(predictions, axis = 1)
+			correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)
+		else:
+			correct_predictions = self.np.round(predictions).flatten() == self.labels
+
+		target_corr_predcs = correct_predictions[indices_to_target]
+
+		num_of_total_target = len(target_corr_predcs)
+		assert num_of_total_target == len(indices_to_target), "%d vs %d" % (num_of_total_target, len(indices_to_target))
+		correctly_classified = self.np.sum(target_corr_predcs)
+
+		return (correctly_classified, correctly_classified / num_of_total_target)
 
 	def get_number_of_patched(self, deltas): #, 
 		#empty_graph = None, plchldr_feed_dict = None):
@@ -628,17 +676,9 @@ class Searcher(object):
 			int: the number of patched
 			float: percentage of the number of patched)
 		"""
-		# if empty_graph is None:
-		# 	empty_graph = self.empty_graph
-		# if plchldr_feed_dict is None:
-		# 	plchldr_feed_dict = self.curr_feed_dict
-
-		correctly_classified, perc_correctly_classifed = self.get_results_of_target(
+		correctly_classified, perc_correctly_classifed = self.get_results_of_target_v3(
 			deltas, 
 			self.indices_to_wrong) 
-			#sess, 
-			#empty_graph, 
-			#plchldr_feed_dict)
 
 		return (correctly_classified, perc_correctly_classifed)
 
@@ -653,18 +693,10 @@ class Searcher(object):
 			int: the number of patched
 			float: percentage of the number of patched)
 		"""
-		# if empty_graph is None:
-		# 	empty_graph = self.empty_graph
-		# if plchldr_feed_dict is None:
-		# 	plchldr_feed_dict = self.curr_feed_dict
-
 		target_indices = self.indices_to_correct
-		correctly_classified, perc_correctly_classifed = self.get_results_of_target(
+		correctly_classified, perc_correctly_classifed = self.get_results_of_target_v3(
 			deltas,
 			target_indices) 
-			#sess, 
-			#empty_graph, 
-			#plchldr_feed_dict)
 
 		num_of_initially_correct = len(target_indices)
 		return (num_of_initially_correct - correctly_classified, 1.0 - perc_correctly_classifed)
@@ -677,10 +709,16 @@ class Searcher(object):
 			boolean: True if restriction is not violated, otherwise, False
 			float: new fitness value
 		"""
-		# get the final clasification results of the newly computed predictions
-		new_classifcation_results = self.np.argmax(predictions, axis = 1)	
-		num_violated = self.np.sum((new_classifcation_results != self.ground_truth_labels)[self.indices_to_correct])
-		num_patched = self.np.sum((new_classifcation_results == self.ground_truth_labels)[self.indices_to_wrong])
+		# get the final clasification of labels  of the newly computed predictions 
+		#new_classifcation_results = self.np.argmax(predictions, axis = 1)	
+		#if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
+		if self.is_multi_label:
+			new_classifcation_results = self.np.argmax(predictions, axis = 1)
+		else:
+			new_classifcation_results = self.np.round(predictions).flatten()
+
+		num_violated = self.np.sum((new_classifcation_results != self.ground_truth_labels)[self.indices_to_correct]) # correct -> incorrect
+		num_patched = self.np.sum((new_classifcation_results == self.ground_truth_labels)[self.indices_to_wrong]) # incorrect (wrong) -> corret
 
 		return num_violated, num_patched	
 
@@ -702,27 +740,10 @@ class Searcher(object):
 		"""
 		if model_name is None:
 		 	model_name = self.model_name
-		# if empty_graph is None:
-		# 	empty_graph = self.empty_graph
-		# if empty_graph is not None:
-		# 	plchldr_feed_dict = self.curr_feed_dict.copy()
-		# 	target_tensor = self.model_util.get_tensor(self.tensors['t_weight'], empty_graph)
-		#
-		# 	assert target_tensor in self.curr_feed_dict.keys(), "Target tensor %s should already exists" % (target_tensor_name)
-		#
-		# 	plchldr_feed_dict[target_tensor] = new_weight_value
-		# else:
-		# 	plchldr_feed_dict = None
 
 		num_of_patched, perc_num_of_patched = self.get_number_of_patched(new_weights)
-			#empty_graph = empty_graph, 
-			#plchldr_feed_dict = plchldr_feed_dict)
-
 		num_of_violated, perc_num_of_violated = self.get_number_of_violated(new_weights)
-			#empty_graph = empty_graph, 
-			#plchldr_feed_dict = plchldr_feed_dict)
 
-		#t3= time.time()
 		if num_of_patched == len(self.indices_to_wrong) and num_of_violated == 0:
 			print("In early stop checking:%d, %d" % (num_of_patched, num_of_violated))
 			print ("\t fitness values", fitness_value)

@@ -27,7 +27,7 @@ def patch(
 	loc_file = None,
 	loc_dest = None,
 	batch_size = None, 
-	loss_funcs = None):
+	is_multi_label = True):
 	"""
 	only_loc = True:
 		Ret(list, list):
@@ -173,8 +173,11 @@ def patch(
 				top_n = int(np.round(7.6))
 			elif which == 'simple_cm':
 				top_n = int(np.round(11.6))
-			else: # GTSRB
+			elif which == 'GTSRB': # GTSRB
 				top_n = int(np.round(14.3))
+			else: # lstm
+				print ("Not yet")
+				assert False
 		else:
 			# retrieve all
 			top_n = -1
@@ -185,7 +188,7 @@ def patch(
 				indices_to_correct_for_loc,
 				target_weights,
 				path_to_keras_model = path_to_keras_model,
-				loss_funcs = loss_funcs)
+				is_multi_label = is_multi_label)
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
@@ -212,7 +215,7 @@ def patch(
 				indices_to_correct_for_loc,
 				target_weights,
 				path_to_keras_model = path_to_keras_model, 
-				loss_funcs = loss_funcs)
+				is_multi_label = is_multi_label)
 
 			print ("Places to fix", indices_to_places_to_fix)
 
@@ -265,7 +268,7 @@ def patch(
 	if loc_method == 'localiser':
 		print (indices_to_places_to_fix) # loggin
 
-	import sys; sys.exit()
+	#import sys; sys.exit()
 	if only_loc: # RQ1
 		if loc_method in ['localiser', 'c_localiser']:
 			return indices_to_places_to_fix, front_lst
@@ -286,10 +289,9 @@ def patch(
 	############################################################################
 	# patch target layers
 	indices_to_ptarget_layers = sorted(
-		list(set(
-			[idx_to_tl if not isinstance(idx_to_tl, Iterable) else idx_to_tl[0] for idx_to_tl,_ in indices_to_places_to_fix])))
+		list(set([idx_to_tl if not isinstance(idx_to_tl, Iterable) else idx_to_tl[0] for idx_to_tl,_ in indices_to_places_to_fix])))
 	print ("Patch target layers", indices_to_ptarget_layers)
-	
+
 	if search_method == 'DE':
 		searcher = de.DE_searcher(
 			X, y,
@@ -299,11 +301,12 @@ def patch(
 			mutation = (0.5, 1), 
 			recombination = 0.7,
 			max_search_num = max_search_num,
-			initial_predictions = None, #predictions,
+			initial_predictions = None, 
 			path_to_keras_model = path_to_keras_model,
 			patch_aggr = patch_aggr,
 			batch_size = batch_size,
 			act_func = tf.nn.relu if which == 'GTSRB' else None,
+			is_multi_label = is_multi_label,
 			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
 
 		places_to_fix = indices_to_places_to_fix

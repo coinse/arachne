@@ -344,10 +344,23 @@ def is_Input(lname):
 
 def is_Attention(lname):
 	"""
+	not implemented yet
 	"""
 	import re
-	pattns = ['LSTM']
+	pattns = ['Attention']
 	return any([bool(re.match(t,lname)) for t in pattns])
+
+
+def get_loss_func(is_multi_label = True):
+	"""
+	here, we will only return either cross_entropy or binary_crossentropy
+	"""
+	#if loss_funcs is None: # default will be used
+	loss_func = 'categorical_cross_entropy' if is_multi_label else 'binary_crossentropy'
+	#else:
+	#	from collections.abc import Iterable 
+	#	#loss_func =  if not isinstance(loss_funcs, str) and isinstance(loss_funcs, Iterable) else loss_funcs
+	return loss_func 
 
 
 def generate_base_mdl(mdl, X, indices_to_tls = None, batch_size = None): 

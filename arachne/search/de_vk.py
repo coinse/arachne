@@ -19,18 +19,15 @@ class DE_searcher(Searcher):
 		indices_to_correct, indices_to_wrong,
 		num_label,
 		indices_to_target_layers,
-		#tensor_name_file,
 		mutation = (0.5, 1), 
 		recombination = 0.7,
 		max_search_num = 200, # 100
 		initial_predictions = None,
-		#empty_graph = None,
-		#which = None,
 		path_to_keras_model = None,
-		#is_empty_one = False,
 		patch_aggr = None,
 		batch_size = None,
 		act_func = None,
+		is_multi_label = True,
 		at_indices = None):
 
 		"""
@@ -40,15 +37,12 @@ class DE_searcher(Searcher):
 				indices_to_correct, indices_to_wrong,
 				num_label,
 				indices_to_target_layers,
-				#tensor_name_file,
 				max_search_num = max_search_num,
 				initial_predictions = initial_predictions,
-				#empty_graph = empty_graph,
-				#which = which,
 				path_to_keras_model = path_to_keras_model,
-				#is_empty_one = is_empty_one,
 				batch_size = batch_size,
 				act_func = act_func,
+				is_multi_label = is_multi_label,
 				at_indices = at_indices)
 
 		# fitness computation related initialisation
@@ -106,11 +100,6 @@ class DE_searcher(Searcher):
 		#self.set_base_model()
 
 	# ######### This will be our fitness function ##################3
-	# def eval(self, 
-	# 	patch_candidate, 
-	# 	#init_weight_value, 
-	# 	places_to_fix): #, 
-	# 	#new_model_name): #, 
 	def eval(self, patch_candidate, places_to_fix): 
 		"""
 		Evaluate a given trial vector
@@ -147,14 +136,12 @@ class DE_searcher(Searcher):
 		#predictions, correct_predictions, loss_v = self.move_v1(deltas, update_op = 'set') 
 		#print (deltas[idx_to_tl])
 		#predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
-		predictions, correct_predictions, loss_v = self.move_v3(deltas)
+		# here, we don't have to be worry about the corre_predictins -> alrady done in move_v3.
+		predictions, _, loss_v = self.move_v3(deltas)
 
 		assert predictions is not None
-		assert correct_predictions is not None
-		num_violated, num_patched = self.get_num_patched_and_broken(
-			predictions) 
+		num_violated, num_patched = self.get_num_patched_and_broken(predictions) 
 
-		
 		losses_of_correct, losses_of_target = loss_v
 		if self.patch_aggr is None:
 			final_fitness = losses_of_correct + losses_of_target
@@ -198,7 +185,6 @@ class DE_searcher(Searcher):
 
 
 	def set_bounds(self, init_weight_value):
-		
 		"""
 		"""
 		min_v = self.np.min(init_weight_value)
@@ -320,7 +306,6 @@ class DE_searcher(Searcher):
 		record = stats.compile(pop)
 		logbook.record(gen = 0, evals = len(pop), **record)
 		print (logbook)
-		#import sys; sys.exit()
 		search_start_time = time.time()
 		# search start
 		import time

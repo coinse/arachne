@@ -25,7 +25,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-if args.which_data != 'GTSRB':
+if args.which_data in ['fashion_mnist', 'cifar10']: #!= 'GTSRB':
 	if args.which_data == 'cifar10':
 		if bool(args.is_train):
 			dataset = torchvision.datasets.CIFAR10(root=args.datadir, train=True,
@@ -56,19 +56,35 @@ if args.which_data != 'GTSRB':
 
 	X = np.asarray(X)
 	y = np.asarray(y)
-else: # gtsrb
-	train_data, test_data = data_util.load_data('GTSRB', args.datadir, with_hist = bool(args.w_hist))
-	
+elif args.which_data in ['GTSRB', 'imbd']: # gtsrb
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
 	if bool(args.is_train):
 		X,y = train_data
 	else:
 		X,y = test_data
-		
+
+else:# will be deleted later
+	rain_data, test_data = data_util.load_data(args.which_data, args.datadir)
+	if bool(args.is_train):
+		X,y = train_data
+	else:
+		X,y = test_data
+
+	from sklearn.preprocessing import MinMaxScaler
+	import pandas as pd
+	datafile = "data/lstm/airline-passengers.csv"
+	dataframe = pd.read_csv(datafile, usecols=[1], engine='python')
+	dataset = dataframe.values
+	dataset = dataset.astype('float32')
+
+	scaler = MinMaxScaler(feature_range=(0, 1))
+	scaler.fit(dataset)	
+
 
 loaded_model = load_model(args.model)
 loaded_model.summary()
 
-if args.which_data in ['cifar10', 'GTSRB']: # and also GTSRB
+if args.which_data in ['cifar10', 'GTSRB', 'imdb', 'simple_lstm']: # and also GTSRB
 	predicteds = loaded_model.predict(X)
 else:
 	if is_input_2d:
@@ -76,15 +92,31 @@ else:
 	else:
 		predicteds = loaded_model.predict(X).reshape(-1, 10)
 
-pred_labels = np.argmax(predicteds, axis = 1)
+print ("predicted shape", predicteds.shape)
+if args.which_data != 'simple_lstm':
+	if predicteds.shape[-1] > 1:
+		pred_labels = np.argmax(predicteds, axis = 1)
+	else:
+		pred_labels = np.round(predicteds).flatten()
+else: # might be deleted later
+	pred_labels = scaler.inverse_transform(predicteds)	
+	y = scaler.inverse_transform(y.reshape(-1,1))
+	y = np.int32(np.round(y.reshape(-1,)))
+	pred_labels = np.int32(np.round(pred_labels.reshape(-1,)))
+
 os.makedirs(args.dest, exist_ok = True)
 
 init_preds = [['index', 'true', 'pred']]
 misclfs = [['index','true','pred']]
 cnt = 0
 for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
-	if pred_label != true_label:
-		misclfs.append([i,true_label,pred_label])
+	if args.which_data != 'simple_lstm':
+		if pred_label != true_label:
+			misclfs.append([i,true_label,pred_label])
+	else:
+		if np.abs(pred_label - true_label) > 30:
+			misclfs.append([i,true_label,pred_label])
+
 	init_preds.append([i,true_label,pred_label])
 	if true_label == pred_label:
 		cnt += 1

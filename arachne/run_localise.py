@@ -175,11 +175,8 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	#	assert model is not None
 	#else:
 	model = load_model(path_to_keras_model, compile = False)
-	target = model.layers[idx_to_target_layer].weights[0] 
-
-	num_label = int(model.output.shape[-1])
-	y_tensor = tf.placeholder(tf.float32, shape = [None, num_label], name = 'labels')
-
+	target = model.layers[idx_to_target_layer].weights[0]
+	y_tensor = tf.keras.Input(shape = list(model.output.shape)[1:], name = 'labels')
 	if loss_func == 'softmax':
 		# might be changed as the following two
 		loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -201,9 +198,7 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 
 	tensor_grad = tf.gradients(
 		loss_tensor,
-		target, 
-		name = 'loss_grad')
-
+		target)#, 
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
@@ -217,19 +212,13 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	
 	gradients = []
 	for chunk in chunks:
-		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk]})[0]
+		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})[0]
 		gradients.append(_gradient)
-		#print ("tensor grad", tensor_grad)
-		#print ("\t", _gradient.shape)
 
-	#print (np.asarray(gradients).shape)
 	gradient = np.sum(np.asarray(gradients), axis = 0)
-	#print (gradient[:10])
-	#import sys; sys.exit()	
 	gradient = np.abs(gradient)
 	if not wo_reset:
 		reset_keras([gradient, loss_tensor, y_tensor])
-	import sys; sys.exit()
 	return gradient
 	
 
@@ -355,8 +344,14 @@ def sample_input_for_loc_sophis(
 	## in auto_patch.patch: new_indices_to_target = list(indices_to_correct) + list(indices_to_selected_wrong) 
 	sample the indices to changed and unchanged behaviour later used for localisation 
 	"""
-	pred_labels = np.argmax(predictions, axis = 1)
-	y_labels = np.argmax(ys, axis = 1)
+	if len(ys.shape) > 1 and ys.shape[-1] > 1:
+		pred_labels = np.argmax(predictions, axis = 1)
+		y_labels = np.argmax(ys, axis = 1) 
+	else:
+		pred_labels = np.round(predictions).flatten()
+		y_labels = ys
+
+	print ("ex",y_labels)
 	_indices = np.zeros(len(indices_to_unchgd) + len(indices_to_chgd))
 	_indices[:len(indices_to_unchgd)] = indices_to_unchgd
 	_indices[len(indices_to_unchgd):] = indices_to_chgd
@@ -366,6 +361,8 @@ def sample_input_for_loc_sophis(
 	indices_to_unchgd = np.asarray(indices_to_unchgd); indices_to_unchgd.sort()
 	_indices_to_chgd = np.where(pred_labels != y_labels)[0]; _indices_to_chgd.sort()
 	indices_to_chgd = np.asarray(indices_to_chgd); indices_to_chgd.sort()
+
+	print ("indics_to_unchgd", indices_to_unchgd[:10])
 	assert all(indices_to_unchgd == _indices[_indices_to_unchgd])
 	assert all(indices_to_chgd == np.sort(_indices[_indices_to_chgd]))
 	###  checking end  ###
@@ -384,7 +381,6 @@ def sample_input_for_loc_sophis(
 	num_total_sampled = 0
 	for uniq_label,vs in grouped_by_label.items():
 		num_sample = int(np.round(num_chgd * len(vs)/num_unchgd))
-		print ("++", num_sample, len(vs)/num_unchgd)
 		if num_sample <= 0:
 			num_sample = 1
 		
@@ -785,7 +781,7 @@ def compute_FI_and_GL(
 			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
 			tensor_w_kernel, tensor_w_recurr_kernel = model.layers[idx_to_tl].weights[:2]
 			if loss_funcs is None:
-				loss_func = 'softmax' #'binary_crossentropy'
+				loss_func = 'binary_crossentropy'
 			else:
 				from collections.abc import Iterable 
 				loss_func = loss_funcs[idx_to_tl] if not isinstance(loss_funcs, str) and isinstance(loss_funcs, Iterable) else loss_funcs

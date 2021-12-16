@@ -60,7 +60,7 @@ def patch(
 	assert num_data == len(data_y), "%d vs %d" % (num_data, len(data_y))
 	
 	from collections import Iterable
-	if not isinstance(data_y[0], Iterable):
+	if not isinstance(data_y[0], Iterable) and num_label > 2:
 		from utils.data_util import format_label
 		data_y = format_label(data_y, num_label)
 
@@ -88,17 +88,23 @@ def patch(
 
 	# compute prediction & corr_predictions
 	predictions = model.predict(data_X)
+	print ("raw predictions shape", predictions.shape)	
 	if len(predictions.shape) == 3:
 		predictions = predictions.reshape((predictions.shape[0], predictions.shape[-1]))
+	
+	if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
+		correct_predictions = np.argmax(predictions, axis = 1)
+		correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
+	else:
+		correct_predictions = np.round(predictions).flatten() == data_y
 
-	correct_predictions = np.argmax(predictions, axis = 1)
-	correct_predictions = correct_predictions == np.argmax(data_y, axis = 1)
 	print ("The predictions", correct_predictions.shape)
 	if not only_loc:
 		indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
 		#check whether given predef_indices_to_chgd to wrong is actually correct
 		if predef_indices_to_chgd is not None:  # Since, here, we asssume an ideal model
 			diff = set(predef_indices_to_chgd) - set(indices_to_target['wrong'])
+			print (len(set(predef_indices_to_chgd)), len(set(indices_to_target['wrong'])))
 			assert len(diff) == 0, diff 
 		indices_to_target['wrong'] = predef_indices_to_chgd
 	else: # only loc, so do not need to care about correct and wrong classification

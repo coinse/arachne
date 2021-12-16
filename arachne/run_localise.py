@@ -166,16 +166,15 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 			
 			
 def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, 
-	target = None, model = None,by_batch = False, wo_reset = False, loss_func = 'softmax', **kwargs):
+	#target = None, model = None,by_batch = False, wo_reset = False, loss_func = 'softmax', **kwargs):
+	by_batch = False, wo_reset = False, loss_func = 'softmax', **kwargs):
 	"""
 	compute gradients for the loss. 
 	kwargs contains the key-word argumenets required for the loss funation
 	"""
-	#if target is not None:
-	#	assert model is not None
-	#else:
 	model = load_model(path_to_keras_model, compile = False)
-	target = model.layers[idx_to_target_layer].weights[0]
+	#target = model.layers[idx_to_target_layer].weights[0]
+	targets = model.layers[idx_to_target_layer].weights[:-1]
 	y_tensor = tf.keras.Input(shape = list(model.output.shape)[1:], name = 'labels')
 	if loss_func == 'softmax':
 		# might be changed as the following two
@@ -196,9 +195,7 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	else:
 		print ("{} not supported yet".format())
 
-	tensor_grad = tf.gradients(
-		loss_tensor,
-		target)#, 
+	tensor_grad = tf.gradients(loss_tensor, targets)
 	# since this might cause OOM error, divide them 
 	num = X.shape[0]
 	if by_batch:
@@ -210,16 +207,26 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	else:
 		chunks = [np.arange(num)]
 	
-	gradients = []
+	#gradients = []
+	gradients = [[] for _ in range(len(targets))]
 	for chunk in chunks:
-		_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})[0]
-		gradients.append(_gradient)
+		#_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})[0]
+		#gradients.append(_gradient)
+		_gradients = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})
+		for i,_gradient in enumerate(_gradients):
+			gradients[i].append(_gradient)
 
-	gradient = np.sum(np.asarray(gradients), axis = 0)
-	gradient = np.abs(gradient)
+	#gradient = np.sum(np.asarray(gradients), axis = 0)
+	#gradient = np.abs(gradient)
+	for i, gradients_p_chunk in enumerate(gradients):
+		gradients[i] = np.abs(np.sum(np.asarray(gradients_p_chunk), axis = 0)) # combine
+
 	if not wo_reset:
-		reset_keras([gradient, loss_tensor, y_tensor])
-	return gradient
+		#reset_keras([gradient, loss_tensor, y_tensor])
+		reset_keras(gradients + [loss_tensor, y_tensor])
+	return gradients[0] if len(gradients) == 1 else gradients
+	#import sys; sys.exit()
+	#return gradient
 	
 
 def reset_keras(delete_list = None, frac = 1):
@@ -420,7 +427,6 @@ def compute_FI_and_GL(
 	target_y = y[indices_to_target]
 	
 	model = None
-	##
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()
 		t_w, lname = vs
@@ -433,10 +439,10 @@ def compute_FI_and_GL(
 			prev_output = target_X
 		else:
 			prev_output = model.layers[idx_to_tl - 1].output
-			print ("here")
-			print (prev_output.shape)
-			print (idx_to_tl - 1)
-			print (model.layers[idx_to_tl - 1])
+			#print ("here")
+			#print (prev_output.shape)
+			#print (idx_to_tl - 1)
+			#print (model.layers[idx_to_tl - 1])
 		layer_config = model.layers[idx_to_tl].get_config() 
 
 		# if this takes too long, then change to tensor and compute them using K (backend)
@@ -786,13 +792,16 @@ def compute_FI_and_GL(
 				from collections.abc import Iterable 
 				loss_func = loss_funcs[idx_to_tl] if not isinstance(loss_funcs, str) and isinstance(loss_funcs, Iterable) else loss_funcs
 
-			grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_kernel, model = model, by_batch = True, loss_func = loss_func) 
-			sys.exit()
-			grad_scndcr_recurr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
-				target = tensor_w_recurr_kernel, model = model, by_batch = True, loss_func = loss_func)
-			
-			grad_scndcr = [grad_scndcr_kernel, grad_scndcr_recurr_kernel]
+			#grad_scndcr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
+			#	target = tensor_w_kernel, model = model, by_batch = True, loss_func = loss_func) 
+			grad_scndcr = compute_gradient_to_loss(
+				path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True, loss_func = loss_func)
+	
+			#sys.exit()
+			#grad_scndcr_recurr_kernel = compute_gradient_to_loss(path_to_keras_model, idx_to_tl, target_X, target_y, 
+			#	target = tensor_w_recurr_kernel, model = model, by_batch = True, loss_func = loss_func)
+			#import sys; sys.exit()
+			#grad_scndcr = [grad_scndcr_kernel, grad_scndcr_recurr_kernel]
 		#elif is_Attention(lname):
 		#	pass
 		else:
@@ -802,14 +811,13 @@ def compute_FI_and_GL(
 		t2 = time.time()
 		print ("Time for computing cost for the {} layer: {}".format(idx_to_tl, t2 - t1))
 		####
-		from collections.abc import Iterable
-		if not isinstance(FIs, Iterable):
+		if not is_LSTM(target_weights[idx_to_tl][1]): # only one weight variable to process 
 			pairs = np.asarray([grad_scndcr.flatten(), FIs.flatten()]).T
 			#print ("Pairs", pairs.shape)
 			total_cands[idx_to_tl] = {'shape':FIs.shape, 'costs':pairs}
 			#sess = K.get_session()
 			#sess.close()
-		else:
+		else: # currently, all of them go into here
 			total_cands[idx_to_tl] = {'shape':[], 'costs':[]}
 			pairs = []
 			for _FIs, _grad_scndcr in zip(FIs, grad_scndcr):
@@ -817,10 +825,9 @@ def compute_FI_and_GL(
 				pairs = np.asarray([_grad_scndcr.flatten(), _FIs.flatten()]).T
 				total_cands[idx_to_tl]['shape'].append(_FIs.shape)
 				total_cands[idx_to_tl]['costs'].append(pairs)
-	
+		print ("Currenlty in {}".format(idx_to_tl))
 	t3 = time.time()
 	print ("Time for computing total costs: {}".format(t3 - t0))
-
 	return total_cands
 
 
@@ -922,13 +929,13 @@ def lstm_local_front_FI_for_target_all(
 		# hidden state won't work here anymore, since the summation of the current value differs from the original due to 
 		# the absence of act and the scaling in the middle, etc.)
 		t1= time.time()
-		#original_shape = out_combined.shape
-		#scaled_out_combined = norm_scaler.fit_transform(out_combined.flatten().reshape(1,-1)).reshape(-1,) # normalised
-		sum_v  = np.sum(np.abs(out_combined.flatten()))
-		scaled_out_combined = out_combined/sum_v
+		original_shape = out_combined.shape
+		scaled_out_combined = norm_scaler.fit_transform(np.abs(out_combined).flatten().reshape(1,-1)) # normalised
+		#sum_v  = np.sum(np.abs(out_combined.flatten()))
+		#scaled_out_combined = out_combined/sum_v
 		t2 = time.time()
 		#print ("time for norm: {}".format(t2 - t1))
-		#scaled_out_combined = scaled_out_combined.reshape(original_shape) 
+		scaled_out_combined = scaled_out_combined.reshape(original_shape) 
 		# mean out_combined's shape: ((num_features + num_units) * 4,) -> for each neural weights, take the average acr2ss both the time step and the batch
 		avg_scaled_out_combined = np.mean(scaled_out_combined.reshape(-1, scaled_out_combined.shape[-1]), axis = 0) # the average over both time step and the batch 
 		t3 = time.time()
@@ -1006,6 +1013,7 @@ def localise_by_chgd_unchgd(
 	print ("Layers to inspect", list(target_weights.keys()))
 	#print ("indices to chgd, unchgd", indices_to_chgd, indices_to_unchgd)
 	# compute FI and GL with changed inputs
+	#target_weights = {k:target_weights[k] for k in [2]}
 	total_cands_chgd = compute_FI_and_GL(
 		X, y,
 		indices_to_chgd,
@@ -1025,8 +1033,8 @@ def localise_by_chgd_unchgd(
 	costs_and_keys = []
 	shapes = {}
 	for idx_to_tl in indices_to_tl:
-		if not isinstance(total_cands_chgd[idx_to_tl]['shape'], Iterable):
-			assert not isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
+		if not is_LSTM(target_weights[idx_to_tl][1]): # we have only one weight to process
+			#assert not isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
 			cost_from_chgd = total_cands_chgd[idx_to_tl]['costs']
 			cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
 			## key: more influential to changed behaviour and less influential to unchanged behaviour
@@ -1035,8 +1043,8 @@ def localise_by_chgd_unchgd(
 
 			for i,c in enumerate(costs_combined):
 				costs_and_keys.append(([idx_to_tl, i], c))
-		else:
-			assert isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
+		else: # 
+			#assert isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
 			num = len(total_cands_unchgd[idx_to_tl]['shape'])
 			shapes[idx_to_tl] = []
 			for idx_to_pair in range(num):
@@ -1056,7 +1064,7 @@ def localise_by_chgd_unchgd(
 	#indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], shapes[vs[0][0]])] for vs in costs_and_keys]
 	indices_to_nodes = []
 	for vs in costs_and_keys:
-		if not isinstance(vs[0][0], Iterable):
+		if not isinstance(vs[0][0], Iterable): # if only a single weight has been handles, vs[0][0] should be an integer (i.e., index to the target layer)
 			_idx_to_tl = vs[0][0]
 			indices_to_nodes.append([_idx_to_tl, np.unravel_index(vs[0][1], shapes[_idx_to_tl])])
 		else:

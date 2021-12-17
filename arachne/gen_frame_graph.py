@@ -137,6 +137,7 @@ def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
 	import tensorflow as tf
 	from tensorflow.keras.models import Model
 	import numpy as np
+	import tensorflow.keras.backend as K
 	from collections.abc import Iterable
 
 	# dictionary to describe the network graph
@@ -214,6 +215,8 @@ def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
 	#print ("model's input", model_input)
 	mdl = Model(inputs = model_input, # this is a constant
 		outputs = network_dict['new_output_tensor_of'][last_layer_name])
+
+	fn = K.function([pred_tensor, y_tensor], [loss_op])
 	return mdl
 
 

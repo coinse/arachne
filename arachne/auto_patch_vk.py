@@ -177,7 +177,8 @@ def patch(
 				top_n = int(np.round(14.3))
 			else: # lstm
 				print ("Not yet")
-				assert False
+				top_n = 14
+				#assert False
 		else:
 			# retrieve all
 			top_n = -1
@@ -192,7 +193,7 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		loc_dest = os.path.join(loc_dest, "new_loc/{}/grad/on_test".format(which))
+		loc_dest = os.path.join(loc_dest, "temp/{}/grad/on_test".format(which))
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
@@ -209,18 +210,19 @@ def patch(
 			print ("Now ready to localiser")
 			### *** Now this may return (idx_to_tl, idx_to_w (0 for kerenl and 1 for recurr_kernel)) 
 			print ("x", X_for_loc.shape)
-			indices_to_places_to_fix, front_lst = run_localise.localise_by_chgd_unchgd(
-				X_for_loc, y_for_loc,
-				indices_to_selected_wrong,
-				indices_to_correct_for_loc,
-				target_weights,
-				path_to_keras_model = path_to_keras_model, 
-				is_multi_label = is_multi_label)
-
+			print ("y", y_for_loc.shape)
+			#indices_to_places_to_fix, front_lst = run_localise.localise_by_chgd_unchgd(
+			#	X_for_loc, y_for_loc,
+			#	indices_to_selected_wrong,
+			#	indices_to_correct_for_loc,
+			#	target_weights,
+			#	path_to_keras_model = path_to_keras_model, 
+			#	is_multi_label = is_multi_label)
+			indices_to_places_to_fix = [((1, 1), (8, 261)), ((1, 1), (57, 320)), ((1, 1), (57, 333)), ((1, 1), (57, 346)), ((1, 1), (91, 380)), ((1, 1), (108, 353)), (2, (43, 0)), (2, (63, 0)), (2, (67, 0)), (2, (108, 0))]
 			print ("Places to fix", indices_to_places_to_fix)
 
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join(loc_dest, "new_loc/{}/c_loc/on_test/".format(which))
+			loc_dest = os.path.join(loc_dest, "temp/{}/c_loc/on_test/".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
@@ -244,7 +246,8 @@ def patch(
 				top_n = int(np.round(14.3))
 			else: # for LSTM
 				print ("not yet")
-				import sys; sys.exit()
+				top_n = 14
+			#	import sys; sys.exit()
 			num_random_sample = top_n 
 		else:
 			num_random_sample = -1
@@ -252,15 +255,15 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-		loc_dest = os.path.join(loc_dest, "new_loc/{}/random/on_test".format(which))	
+		loc_dest = os.path.join(loc_dest, "temp/{}/random/on_test".format(which))	
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
 		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-		with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
-			pickle.dump(indices_to_places_to_fix, f)
+		#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.random.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
+		#	pickle.dump(indices_to_places_to_fix, f)
 
 	t2 = time.time()
 	#print ("Time taken for localisation: %f" % (t2 - t1))
@@ -268,7 +271,6 @@ def patch(
 	if loc_method == 'localiser':
 		print (indices_to_places_to_fix) # loggin
 
-	#import sys; sys.exit()
 	if only_loc: # RQ1
 		if loc_method in ['localiser', 'c_localiser']:
 			return indices_to_places_to_fix, front_lst
@@ -294,7 +296,7 @@ def patch(
 
 	if search_method == 'DE':
 		searcher = de.DE_searcher(
-			X, y,
+			np.float32(X), np.float32(y),
 			indices_to_correct, [],
 			num_label,
 			indices_to_ptarget_layers,

@@ -350,6 +350,8 @@ def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
 
 
 def return_chunks(num, batch_size = None):
+	if batch_size is None:
+		batch_size = num
 	num_split = int(np.round(num/batch_size))
 	if num_split == 0:
 		num_split = 1

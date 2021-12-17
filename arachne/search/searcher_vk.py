@@ -2,7 +2,6 @@
 """
 import time
 
-from arachne.utils.model_util import predict
 
 class Searcher(object):
 	"""docstring for Searcher"""
@@ -170,6 +169,10 @@ class Searcher(object):
 			t_mdl = Model(inputs = self.mdl.input, outputs = self.mdl.layers[0].input) # add an explict input layer that will store inputs
 		else:
 			t_mdl = Model(inputs = self.mdl.input, outputs = prev_l.output)
+		print (t_mdl)
+		print (prev_l.output)
+		print (prev_l)
+		print (type(self.inputs))
 		self.prev_outputs = t_mdl(self.inputs)
 
 		# set base model
@@ -505,7 +508,6 @@ class Searcher(object):
 		"""
 		from collections.abc import Iterable
 		import time 
-
 		t1 = time.time()
 		# prepare a new model to run by updating the weights from deltas
 		fn_mdl = self.fn_mdl_lst[0] # we only have a one model as this one accept any lenghts of an input, which is actually the output of the previous layers
@@ -537,11 +539,16 @@ class Searcher(object):
 				print ("{} not supported".format(lname))
 				assert False
 		t2 = time.time()
-		print ("Time for setting weights: {}".format(t2 - t1))
+		#print ("Time for setting weights: {}".format(t2 - t1))
 
 		predictions = None
 		for chunk in self.chunks:
-			_predictions = fn_mdl(self.prev_outputs[chunk])
+			#_t1 =time.time()
+			_predictions = fn_mdl(self.prev_outputs[chunk], training = False)
+			#_predictions = fn_mdl.predict(self.prev_outputs[chunk])
+			#_t2= time.time()
+			#print (_t2 - _t1)
+			#sys.exit()
 			if predictions is None:
 				predictions = _predictions
 			else:
@@ -549,6 +556,7 @@ class Searcher(object):
 
 		t3 = time.time()
 		print ("Time for predictions: {}".format(t3 - t2))
+		import sys;sys.exit()
 		return predictions
 
 
@@ -564,10 +572,16 @@ class Searcher(object):
 
 		labels = self.labels
 		predictions = self.predict_with_new_delat(deltas)
+		print (predictions)
+		# due to the data dimention of fashion_mnist, 
+		if predictions.shape != labels.shape:
+			to_this_shape = labels.shape
+			predictions = self.np.reshape(predictions, to_this_shape)
 
 		# the softmax or any other activation function should be inserted here!!!!! ... but, again think abou it
 		# since the applicaiton itself is argmax, the tendency itself doesn't change ... ok 
 		#if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
+		t1 = time.time()
 		if self.is_multi_label:
 			correct_predictions = self.np.argmax(predictions, axis = 1)
 			correct_predictions = correct_predictions == self.np.argmax(labels, axis = 1)
@@ -580,10 +594,10 @@ class Searcher(object):
 			self.k_fn_loss = self.kfunc_util.gen_pred_and_loss_ops(
 				predictions.shape, predictions.dtype, labels.shape, labels.dtype, loss_func)
 
-		losses_of_all = self.k_fn_loss([predictions, labels])
-		t4 = time.time()
-		print ("Time for pred prob and loss: {}".format(t4 - t3))
-	
+		losses_of_all = self.k_fn_loss([predictions, labels])[0]
+		t2 = time.time()
+		#print ("Time for pred prob and loss: {}".format(t2 - t1))
+
 		losses_of_correct = losses_of_all[self.indices_to_correct]
 		##
 		indices_to_corr_false = self.np.where(correct_predictions[self.indices_to_correct] == 0.)[0]
@@ -598,7 +612,6 @@ class Searcher(object):
 		new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
 		##
 		combined_losses	= (new_losses_of_correct, new_losses_of_wrong)
-
 		return predictions, correct_predictions, combined_losses
 		
 
@@ -652,6 +665,11 @@ class Searcher(object):
 			float: percentage of the number of patched)
 		"""
 		predictions = self.predict_with_new_delat(deltas)
+                # due to the data dimention of fashion_mnist,
+		if predictions.shape != self.labels.shape:
+			to_this_shape = self.labels.shape
+			predictions = self.np.reshape(predictions, to_this_shape)
+
 		if self.is_multi_label:
 			correct_predictions = self.np.argmax(predictions, axis = 1)
 			correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)

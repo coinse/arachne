@@ -105,10 +105,15 @@ def gen_pred_and_loss_ops(pred_shape, pred_dtype, y_shape, y_dtype, loss_func):
 	#y_tensor = tf.placeholder(dtype = y_dtype, shape = y_shape) 
 	y_tensor = tf.keras.Input(dtype = y_dtype, shape = y_shape[1:]) 
 
-	if loss_func == 'cross_entropy':
+	if len(pred_probs.shape) > 2:
+		to_this_shape = [int(v) for v in y_tensor.shape[1:]]
+		pred_probs = tf.reshape(pred_probs, [-1] + list(y_shape[1:]))
+		
+	if loss_func == 'categorical_cross_entropy':
 		# might be changed as the following two
 		loss_op = tf.keras.metrics.categorical_crossentropy(y_tensor, pred_probs)	
 	elif loss_func == 'binary_crossentropy':
+		
 		loss_op = tf.keras.metrics.binary_crossentropy(y_tensor, pred_probs)	
 	else:
 		print ("{} not supported yet".format(loss_func))

@@ -139,33 +139,43 @@ def compute_gradient_to_output(path_to_keras_model, idx_to_target_layer, X, by_b
 			
 def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y, 
 	#target = None, model = None,by_batch = False, wo_reset = False, loss_func = 'cross_entropy', **kwargs):
-	by_batch = False, wo_reset = False, loss_func = 'cross_entropy', **kwargs):
+	by_batch = False, wo_reset = False, loss_func = 'categorical_cross_entropy', **kwargs):
 	"""
 	compute gradients for the loss. 
 	kwargs contains the key-word argumenets required for the loss funation
 	"""
 	model = load_model(path_to_keras_model, compile = False)
+	#print("in gd loss",y.shape, model.output.shape)
 	#target = model.layers[idx_to_target_layer].weights[0]
 	targets = model.layers[idx_to_target_layer].weights[:-1]
-	y_tensor = tf.keras.Input(shape = list(model.output.shape)[1:], name = 'labels')
-	if loss_func == 'cross_entropy':
+	if len(model.output.shape) == 3:
+		y_tensor = tf.keras.Input(shape = (model.output.shape[-1],), name = 'labels')
+	else:# is not multi label
+		print ("modle output", model.output.shape)
+		y_tensor = tf.keras.Input(shape = list(model.output.shape)[1:], name = 'labels')
+
+	if loss_func == 'categorical_cross_entropy':
 		# might be changed as the following two
 		loss_tensor = tf.nn.softmax_cross_entropy_with_logits_v2(
 			labels = y_tensor,
 			logits = model.output, 
 			name = "per_label_loss") 
 	elif loss_func == 'binary_crossentropy':
+		print ("Herer!")
 		if 'name' in kwargs.keys():
 			kwargs.pop("name")
 		loss_tensor = tf.keras.losses.binary_crossentropy(y_tensor, model.output) #y_true, y_pred
 		loss_tensor.__dict__.update(kwargs)
+		y = y.reshape(-1,1) 
 	elif loss_func in ['mean_squared_error', 'mse']:
 		if 'name' in kwargs.keys():
 			kwargs.pop("name")
 		loss_tensor = tf.keras.losses.MeanSquaredError(y_tensor, model.output, name = "per_label_loss")
 		loss_tensor.__dict__.update(kwargs)
 	else:
-		print ("{} not supported yet".format())
+		print (loss_func)
+		print ("{} not supported yet".format(loss_func))
+		assert False
 
 	tensor_grad = tf.gradients(loss_tensor, targets)
 	# since this might cause OOM error, divide them 
@@ -184,7 +194,7 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	for chunk in chunks:
 		#_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})[0]
 		#gradients.append(_gradient)
-		_gradients = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})
+		_gradients = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk]})# .reshape(-1,1)})
 		for i,_gradient in enumerate(_gradients):
 			gradients[i].append(_gradient)
 
@@ -400,6 +410,7 @@ def compute_FI_and_GL(
 	
 	# get loss func
 	loss_func = model_util.get_loss_func(is_multi_label = is_multi_label)
+	print ("lsos fucn", loss_func)
 	model = None
 	for idx_to_tl, vs in target_weights.items():
 		t1 = time.time()

@@ -211,14 +211,14 @@ def patch(
 			### *** Now this may return (idx_to_tl, idx_to_w (0 for kerenl and 1 for recurr_kernel)) 
 			print ("x", X_for_loc.shape)
 			print ("y", y_for_loc.shape)
-			#indices_to_places_to_fix, front_lst = run_localise.localise_by_chgd_unchgd(
-			#	X_for_loc, y_for_loc,
-			#	indices_to_selected_wrong,
-			#	indices_to_correct_for_loc,
-			#	target_weights,
-			#	path_to_keras_model = path_to_keras_model, 
-			#	is_multi_label = is_multi_label)
-			indices_to_places_to_fix = [((1, 1), (8, 261)), ((1, 1), (57, 320)), ((1, 1), (57, 333)), ((1, 1), (57, 346)), ((1, 1), (91, 380)), ((1, 1), (108, 353)), (2, (43, 0)), (2, (63, 0)), (2, (67, 0)), (2, (108, 0))]
+			indices_to_places_to_fix, front_lst = run_localise.localise_by_chgd_unchgd(
+				X_for_loc, y_for_loc,
+				indices_to_selected_wrong,
+				indices_to_correct_for_loc,
+				target_weights,
+				path_to_keras_model = path_to_keras_model, 
+				is_multi_label = is_multi_label)
+			#indices_to_places_to_fix = [((1, 1), (8, 261)), ((1, 1), (57, 320)), ((1, 1), (57, 333)), ((1, 1), (57, 346)), ((1, 1), (91, 380)), ((1, 1), (108, 353)), (2, (43, 0)), (2, (63, 0)), (2, (67, 0)), (2, (108, 0))]
 			print ("Places to fix", indices_to_places_to_fix)
 
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})

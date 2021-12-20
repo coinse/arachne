@@ -156,24 +156,20 @@ class Searcher(object):
 
 		# compute previous outputs
 		self.min_idx_to_tl = self.np.min([idx if not isinstance(idx, Iterable) else idx[0] for idx in self.indices_to_target_layers])
-		#if self.min_idx_to_tl == 0:
-			#if self.model_util.is_Input(type(mdl.layers[0]).__name__):
-				#prev_output_tensor = self.inputs
-			#else: # not an input layer
-				#prev_output_tensor = self.mdl.layers[0].output
-		#else:
-			#prev_output_tensor = self.mdl.layers[self.min_idx_to_tl-1].output
-		#t_mdl = Model(inputs = self.mdl.input, outputs = prev_output_tensor)
+		self.input_layer_added = False
+		if self.min_idx_to_tl == 0:
+			if not self.model_util.is_Input(type(self.mdl.layers[0]).__name__):
+				self.input_layer_added = True
+
+		print ("index", self.min_idx_to_tl-1 if self.min_idx_to_tl > 0 else 0, "and min idx", self.min_idx_to_tl)
 		prev_l = self.mdl.layers[self.min_idx_to_tl-1 if self.min_idx_to_tl > 0 else 0]
-		if self.min_idx_to_tl == 0 and not self.model_util.is_Input(type(prev_l).__name__):
-			t_mdl = Model(inputs = self.mdl.input, outputs = self.mdl.layers[0].input) # add an explict input layer that will store inputs
-		else:
+		if self.model_util.is_Input(type(prev_l).__name__): # previous layer is an input layer
+			self.prev_outputs = self.inputs
+		else: # otherwise, compute the output of the previous layer
 			t_mdl = Model(inputs = self.mdl.input, outputs = prev_l.output)
-		print (t_mdl)
-		print (prev_l.output)
-		print (prev_l)
-		print (type(self.inputs))
-		self.prev_outputs = t_mdl(self.inputs)
+			print ("temporaray model")
+			print (t_mdl.summary())		
+			self.prev_outputs = t_mdl.predict(self.inputs)
 
 		# set base model
 		from gen_frame_graph import build_mdl_lst
@@ -511,41 +507,53 @@ class Searcher(object):
 		t1 = time.time()
 		# prepare a new model to run by updating the weights from deltas
 		fn_mdl = self.fn_mdl_lst[0] # we only have a one model as this one accept any lenghts of an input, which is actually the output of the previous layers
+		#print ("targets", deltas.keys())
 		for idx_to_tl, delta in deltas.items(): # either idx_to_tl or (idx_to_tl, i)
+			#print ("** delta: {} **".format(idx_to_tl))
 			if isinstance(idx_to_tl, Iterable):
 				idx_to_t_mdl_l, idx_to_w = idx_to_tl
 			else:
 				idx_to_t_mdl_l = idx_to_tl
-				
-			idx_to_t_mdl_l -= self.min_idx_to_tl - 1 # idx_to_t_mdl_l - self.min_idx_to_tl + 1 (because, an explict input layer has been made)
-			# set new weight values (deltas) for the model list
-			lname = type(fn_mdl.layers[idx_to_t_mdl_l]).__name__
-
+			
+			# index of idx_to_tl (from deltas) in the local model
+			local_idx_to_l = idx_to_t_mdl_l - self.min_idx_to_tl + 1 
+			lname = type(fn_mdl.layers[local_idx_to_l]).__name__
 			if self.model_util.is_FC(lname) or self.model_util.is_C2D(lname):
-				fn_mdl.layers[idx_to_t_mdl_l].set_weights([delta, self.init_biases[idx_to_t_mdl_l]])
+				fn_mdl.layers[local_idx_to_l].set_weights([delta, self.init_biases[idx_to_t_mdl_l]])
 			elif self.model_util.is_LSTM(lname):
 				if idx_to_w == 0: # kernel
 					new_kernel_w = delta # use the full 
-					new_recurr_kernel_w = self.init_weights[idx_to_t_mdl_l][1]
+					new_recurr_kernel_w = self.init_weights[(idx_to_t_mdl_l, 1)]
 				elif idx_to_w == 1:
 					new_recurr_kernel_w = delta
-					new_kernel_w = self.init_weights[idx_to_t_mdl_l][0]
+					new_kernel_w = self.init_weights[(idx_to_t_mdl_l, 0)]
 				else:
-					print ("{} not allowed".format(idx_to_w), idx_to_tl)
+					print ("{} not allowed".format(idx_to_w), idx_to_t_mdl_l, idx_to_tl)
 					assert False
 				# set kernel, recurr kernel, bias
-				fn_mdl.layers[idx_to_t_mdl_l].set_weights([new_kernel_w, new_recurr_kernel_w, self.init_biases[idx_to_t_mdl_l]])
+				fn_mdl.layers[local_idx_to_l].set_weights([new_kernel_w, new_recurr_kernel_w, self.init_biases[idx_to_t_mdl_l]])
 			else:
 				print ("{} not supported".format(lname))
 				assert False
+		#import sys; sys.exit()
 		t2 = time.time()
 		#print ("Time for setting weights: {}".format(t2 - t1))
 
 		predictions = None
+		#print ("number of chunks", len(self.chunks), len(self.chunks[0]))
+		#print (self.chunks[0].shape)
+		#print (self.prev_outputs.shape)
+		#print (fn_mdl.summary())
 		for chunk in self.chunks:
 			#_t1 =time.time()
-			_predictions = fn_mdl(self.prev_outputs[chunk], training = False)
-			#_predictions = fn_mdl.predict(self.prev_outputs[chunk])
+			#_predictions = fn_mdl(self.prev_outputs[chunk], training = False)
+			#print (type(chunk))
+			#print (chunk.shape)
+			#print (self.prev_outputs.shape)
+			#print (chunk[:10])
+			#print (self.prev_outputs[[0,1,2]].shape)
+			#print ("prev otuput", self.prev_outputs[chunk].shape) 
+			_predictions = fn_mdl.predict(self.prev_outputs[chunk], batch_size = len(chunk))
 			#_t2= time.time()
 			#print (_t2 - _t1)
 			#sys.exit()
@@ -555,8 +563,8 @@ class Searcher(object):
 				predictions = self.np.append(predictions, _predictions, axis = 0)
 
 		t3 = time.time()
-		print ("Time for predictions: {}".format(t3 - t2))
-		import sys;sys.exit()
+		#print ("Time for predictions: {}".format(t3 - t2))
+		#import sys;sys.exit()
 		return predictions
 
 
@@ -572,7 +580,7 @@ class Searcher(object):
 
 		labels = self.labels
 		predictions = self.predict_with_new_delat(deltas)
-		print (predictions)
+		#print (predictions)
 		# due to the data dimention of fashion_mnist, 
 		if predictions.shape != labels.shape:
 			to_this_shape = labels.shape

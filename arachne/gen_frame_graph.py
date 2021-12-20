@@ -164,9 +164,9 @@ def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
 		#model_input = tf.keras.Input(tensor = constant_x)
 		layer_name = mdl.layers[0].name
 		if model_util.is_Input(type(mdl.layers[0]).__name__): # if the previous layer (layer_name) is an input layer
-			network_dict['new_output_tensor_of'].update({layer_name: model_input})
+			network_dict['new_output_tensor_of'].update({layer_name: model_input}) # set model_input as the output of this input layer
 		else: # if it is not (happen when using Sequential())
-			_input_layer_name = 'input_layer'
+			_input_layer_name = 'input_layer' # -> insert one addiitonal input layer
 			network_dict['new_output_tensor_of'].update({_input_layer_name: model_input}) # x is the output of _input_layer_name
 			network_dict['input_layers_of'].update({layer_name: [_input_layer_name]}) # the input's of layer_name is _input_layer_name
 			# set the output tensor for the 0th layer 
@@ -216,7 +216,7 @@ def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
 	mdl = Model(inputs = model_input, # this is a constant
 		outputs = network_dict['new_output_tensor_of'][last_layer_name])
 
-	fn = K.function([pred_tensor, y_tensor], [loss_op])
+	#fn = K.function([pred_tensor, y_tensor], [loss_op])
 	return mdl
 
 

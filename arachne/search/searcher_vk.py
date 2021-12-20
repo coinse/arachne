@@ -146,7 +146,7 @@ class Searcher(object):
 		from tensorflow.keras.models import Model
 		import tensorflow as tf
 
-		mdl = load_model(self.path_to_keras_model)
+		mdl = load_model(self.path_to_keras_model, compile = False)
 		self.mdl = mdl
 		print ("Number of layers in model: {}".format(len(self.mdl.layers)))
 		# set targete layer names
@@ -537,7 +537,7 @@ class Searcher(object):
 				assert False
 		#import sys; sys.exit()
 		t2 = time.time()
-		#print ("Time for setting weights: {}".format(t2 - t1))
+		print ("Time for setting weights: {}".format(t2 - t1))
 
 		predictions = None
 		#print ("number of chunks", len(self.chunks), len(self.chunks[0]))
@@ -545,7 +545,7 @@ class Searcher(object):
 		#print (self.prev_outputs.shape)
 		#print (fn_mdl.summary())
 		for chunk in self.chunks:
-			#_t1 =time.time()
+			_t1 =time.time()
 			#_predictions = fn_mdl(self.prev_outputs[chunk], training = False)
 			#print (type(chunk))
 			#print (chunk.shape)
@@ -554,9 +554,9 @@ class Searcher(object):
 			#print (self.prev_outputs[[0,1,2]].shape)
 			#print ("prev otuput", self.prev_outputs[chunk].shape) 
 			_predictions = fn_mdl.predict(self.prev_outputs[chunk], batch_size = len(chunk))
-			#_t2= time.time()
-			#print (_t2 - _t1)
-			#sys.exit()
+			_t2= time.time()
+			print ("time for pure predict: {}".format(_t2 - _t1))
+			import sys; sys.exit()
 			if predictions is None:
 				predictions = _predictions
 			else:
@@ -605,7 +605,6 @@ class Searcher(object):
 		losses_of_all = self.k_fn_loss([predictions, labels])[0]
 		t2 = time.time()
 		#print ("Time for pred prob and loss: {}".format(t2 - t1))
-
 		losses_of_correct = losses_of_all[self.indices_to_correct]
 		##
 		indices_to_corr_false = self.np.where(correct_predictions[self.indices_to_correct] == 0.)[0]

@@ -42,7 +42,7 @@ class LSTM_Layer(object):
 			recurrent_initializer=tf.constant_initializer(recurr_kernel_w),
 			bias_initializer=tf.constant_initializer(bias),
 			return_sequences = False, 
-			return_state=True, 
+			return_state=True,
 			input_shape = input_shape)
 		skip = ['units', 'kernel_initializer', 'recurrent_initializer', 'bias_initializer', 'input_shape', 'return_state']
 		for k,v in self.init_lstm_layer.__dict__.items():

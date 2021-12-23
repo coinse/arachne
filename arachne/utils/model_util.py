@@ -400,3 +400,55 @@ def compute_pred_and_loss(mdl_lst, ys, tws, batch_size = None):
 			outputs_2 = append_vs(outputs_2, a_outputs_2)
 		outputs = [outputs_1, outputs_2]
 	return outputs
+
+
+def predict_with_new_delat(fn_mdl, deltas, min_idx_to_tl, init_biases, init_weights, prev_outputs, chunks):
+	"""
+	predict with the model patched using deltas
+	"""
+	from collections.abc import Iterable
+	import time 
+	#t1 = time.time()
+	# prepare a new model to run by updating the weights from deltas
+	for idx_to_tl, delta in deltas.items(): # either idx_to_tl or (idx_to_tl, i)
+		#print ("** delta: {} **".format(idx_to_tl))
+		if isinstance(idx_to_tl, Iterable):
+			idx_to_t_mdl_l, idx_to_w = idx_to_tl
+		else:
+			idx_to_t_mdl_l = idx_to_tl
+		#
+		# index of idx_to_tl (from deltas) in the local model
+		local_idx_to_l = idx_to_t_mdl_l - min_idx_to_tl + 1 
+		lname = type(fn_mdl.layers[local_idx_to_l]).__name__
+		if is_FC(lname) or is_C2D(lname):
+			fn_mdl.layers[local_idx_to_l].set_weights([delta, init_biases[idx_to_t_mdl_l]])
+		elif is_LSTM(lname):
+			if idx_to_w == 0: # kernel
+				new_kernel_w = delta # use the full 
+				new_recurr_kernel_w = init_weights[(idx_to_t_mdl_l, 1)]
+			elif idx_to_w == 1:
+				new_recurr_kernel_w = delta
+				new_kernel_w = init_weights[(idx_to_t_mdl_l, 0)]
+			else:
+				print ("{} not allowed".format(idx_to_w), idx_to_t_mdl_l, idx_to_tl)
+				assert False
+			# set kernel, recurr kernel, bias
+			fn_mdl.layers[local_idx_to_l].set_weights([new_kernel_w, new_recurr_kernel_w, init_biases[idx_to_t_mdl_l]])
+		else:
+			print ("{} not supported".format(lname))
+			assert False
+	#t2 = time.time()
+	#print ("Time for setting weights: {}".format(t2 - t1))
+	predictions = None
+	for chunk in chunks:
+		#_t1 =time.time()
+		_predictions = fn_mdl.predict(prev_outputs[chunk], batch_size = len(chunk))
+		#_t2= time.time()
+		#print ("time for pure predict: {}".format(_t2 - _t1))
+		if predictions is None:
+			predictions = _predictions
+		else:
+			predictions = np.append(predictions, _predictions, axis = 0)
+	#t3 = time.time()
+	#print ("Time for predictions: {}".format(t3 - t2))
+	return predictions

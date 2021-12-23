@@ -59,6 +59,8 @@ train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_
 #num_entire_corrclfs = num_train - num_entire_misclfs
 train_X,train_y = train_data
 test_X,test_y = test_data
+#test_X = test_X[:100]
+#test_y = test_y[:100]
 
 num_label = args.num_label
 iter_num = args.iter_num
@@ -78,6 +80,7 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	seed = args.seed, 
 	patch_aggr = args.patch_aggr, #) #True)
 	batch_size = args.batch_size,
+	is_multi_label = True if args.which != 'lstm' else False,  
 	target_all = True)
 
 os.replace(patched_model_name.replace("None", "model"), 

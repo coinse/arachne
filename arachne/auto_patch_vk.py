@@ -161,7 +161,7 @@ def patch(
 	assert len(predictions) == num_of_our_target, "%d vs %d" % (len(predictions), num_of_our_target)
 	########### logging and testing end ###########
 
-	#t1 = time.time()
+	t1 = time.time()
 	import pickle
 	import pandas as pd
 
@@ -193,7 +193,7 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		loc_dest = os.path.join(loc_dest, "temp/{}/grad/on_test".format(which))
+		loc_dest = os.path.join(loc_dest, "new_loc/{}/grad/on_test".format(which))
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
@@ -222,7 +222,7 @@ def patch(
 			print ("Places to fix", indices_to_places_to_fix)
 
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
-			loc_dest = os.path.join(loc_dest, "temp/{}/c_loc/on_test/".format(which))
+			loc_dest = os.path.join(loc_dest, "new_loc/{}/c_loc/on_test/".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
@@ -255,7 +255,7 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-		loc_dest = os.path.join(loc_dest, "temp/{}/random/on_test".format(which))	
+		loc_dest = os.path.join(loc_dest, "new_loc/{}/random/on_test".format(which))	
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
@@ -266,7 +266,7 @@ def patch(
 		#	pickle.dump(indices_to_places_to_fix, f)
 
 	t2 = time.time()
-	#print ("Time taken for localisation: %f" % (t2 - t1))
+	print ("Time taken for localisation: %f" % (t2 - t1))
 	run_localise.reset_keras([model])
 	if loc_method == 'localiser':
 		print (indices_to_places_to_fix) # loggin

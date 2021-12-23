@@ -151,11 +151,21 @@ if args.on_both or args.rq in [3,4,5]:
 input_reshape = args.which_data	== 'fashion_mnist'
 need_act = args.which_data == 'GTSRB'
 
+##
+if args.which_data == 'imdb':
+	has_lstm_layer = True; is_multi_label = False
+else:
+	has_lstm_layer = False; is_multi_label = True
+##
+
 # for rq2, this doesn't apply and for RQ3, this always apply, since RQ3 is about the generaliation of patches
 if args.on_both or args.rq in [3,4,5]: 
 	print ("=========================For evaluation============================")
-	aft_pred_df_eval = gen_and_run_model(init_model, path_to_patch, eval_X, eval_y, num_label,
-		input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
+	#aft_pred_df_eval = gen_and_run_model(init_model, path_to_patch, eval_X, eval_y, num_label,
+	#	input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
+	aft_pred_df_eval = gen_and_run_model(init_model, path_to_patch, eval_X, eval_y, num_label, 
+		has_lstm_layer = has_lstm_layer, is_multi_label = is_multi_label, need_act = need_act, batch_size = args.batch_size)
+
 	combined_df = combine_init_aft_predcs(init_pred_df_eval, aft_pred_df_eval)
 	filename = os.path.join(dest, pred_name + ".eval.pkl")
 	combined_df.to_pickle(filename)
@@ -165,8 +175,10 @@ if args.on_both or args.rq in [3,4,5]:
 
 print ("=========================Used for patching============================")
 init_model.summary()
-aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label,
-    input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
+#aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label,
+#    input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
+aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label, 
+	has_lstm_layer = has_lstm_layer, is_multi_label = is_multi_label, need_act = need_act, batch_size = args.batch_size)
 combined_df = combine_init_aft_predcs(init_pred_df_used, aft_pred_df_used)
 filename = os.path.join(dest, pred_name + ".train.pkl")
 combined_df.to_pickle(filename)

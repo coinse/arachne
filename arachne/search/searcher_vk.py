@@ -56,9 +56,11 @@ class Searcher(object):
 			else:	
 				self.labels = labels
 				self.ground_truth_labels = self.np.argmax(self.labels, axis = 1)
+			self.lstm_mdl = False # curretly
 		else:
 			self.labels = labels
 			self.ground_truth_labels = labels
+			self.lstm_mdl = True
 
 		self.model_name = "model"
 		self.model_name_format = self.model_name + ".{}"
@@ -78,8 +80,10 @@ class Searcher(object):
 		self.act_func = act_func # will be latter used for GTSRB
 		self.is_multi_label = is_multi_label
 		#self.set_base_model()
-		#self.set_base_model_v2()
-		self.set_base_model_v3()
+		if not self.lstm_mdl:
+			self.set_base_model_v2()
+		else:
+			self.set_base_model_v3()
 		self.set_target_weights()
 
 		self.at_indices = at_indices ## related to RQ6 ... not sure what this is
@@ -537,7 +541,7 @@ class Searcher(object):
 				assert False
 		#import sys; sys.exit()
 		t2 = time.time()
-		print ("Time for setting weights: {}".format(t2 - t1))
+		#print ("Time for setting weights: {}".format(t2 - t1))
 
 		predictions = None
 		#print ("number of chunks", len(self.chunks), len(self.chunks[0]))
@@ -555,8 +559,7 @@ class Searcher(object):
 			#print ("prev otuput", self.prev_outputs[chunk].shape) 
 			_predictions = fn_mdl.predict(self.prev_outputs[chunk], batch_size = len(chunk))
 			_t2= time.time()
-			print ("time for pure predict: {}".format(_t2 - _t1))
-			import sys; sys.exit()
+			#print ("time for pure predict: {}".format(_t2 - _t1))
 			if predictions is None:
 				predictions = _predictions
 			else:
@@ -649,13 +652,15 @@ class Searcher(object):
 		predictions = self.kfunc_util.compute_predictions(self.fn_mdl_lst, self.labels, deltas_as_lst, batch_size = self.batch_size)
 		#if len(predictions.shape) >= 2 and predictions.shape[-1] > 1: # first check whether this task is multi-class classification
 		if self.is_multi_label:
-			correct_predictions = self.np.argmax(predictions, axis = 1)
-			correct_predictions = correct_predictions == self.np.argmax(self.labels, axis = 1)
+			correct_predictions = self.np.argmax(predictions, axis = -1)
+			y_labels = self.np.argmax(self.labels, axis = 1)
+			if correct_predictions.shape != y_labels.shape:
+				correct_predictions = correct_predictions.reshape(y_labels.shape)
+			correct_predictions = correct_predictions == y_labels
 		else:
 			correct_predictions = self.np.round(predictions).flatten() == self.labels
 
 		target_corr_predcs = correct_predictions[indices_to_target]
-
 		num_of_total_target = len(target_corr_predcs)
 		assert num_of_total_target == len(indices_to_target), "%d vs %d" % (num_of_total_target, len(indices_to_target))
 		correctly_classified = self.np.sum(target_corr_predcs)
@@ -701,9 +706,14 @@ class Searcher(object):
 			int: the number of patched
 			float: percentage of the number of patched)
 		"""
-		correctly_classified, perc_correctly_classifed = self.get_results_of_target_v3(
-			deltas, 
-			self.indices_to_wrong) 
+		if self.lstm_mdl:
+			correctly_classified, perc_correctly_classifed = self.get_results_of_target_v3(
+				deltas, 
+				self.indices_to_wrong)
+		else:
+			correctly_classified, perc_correctly_classifed = self.get_results_of_target(
+				deltas, 
+				self.indices_to_wrong) 
 
 		return (correctly_classified, perc_correctly_classifed)
 
@@ -719,9 +729,14 @@ class Searcher(object):
 			float: percentage of the number of patched)
 		"""
 		target_indices = self.indices_to_correct
-		correctly_classified, perc_correctly_classifed = self.get_results_of_target_v3(
-			deltas,
-			target_indices) 
+		if self.lstm_mdl:
+			correctly_classified, perc_correctly_classifed = self.get_results_of_target_v3(
+				deltas, 
+				target_indices)
+		else:
+			correctly_classified, perc_correctly_classifed = self.get_results_of_target(
+				deltas,
+				target_indices) 
 
 		num_of_initially_correct = len(target_indices)
 		return (num_of_initially_correct - correctly_classified, 1.0 - perc_correctly_classifed)

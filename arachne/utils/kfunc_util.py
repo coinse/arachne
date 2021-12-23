@@ -113,8 +113,17 @@ def gen_pred_and_loss_ops(pred_shape, pred_dtype, y_shape, y_dtype, loss_func):
 		# might be changed as the following two
 		loss_op = tf.keras.metrics.categorical_crossentropy(y_tensor, pred_probs)	
 	elif loss_func == 'binary_crossentropy':
-		
-		loss_op = tf.keras.metrics.binary_crossentropy(y_tensor, pred_probs)	
+		pred_shape = pred_probs.shape
+		assert len(pred_shape) in [1,2], pred_shape
+		if len(pred_shape) == 1:
+			probs_to_be_zero = tf.ones_like(pred_probs) - pred_probs
+			pred_probs_2d = tf.stack([probs_to_be_zero, pred_probs], axis = 1)
+			y_zero_tensor = tf.ones_like(y_tensor) - y_tensor	
+			y_tensor_2d = tf.stack([y_zero_tensor, y_tensor], axis = 1)
+
+			loss_op = tf.keras.metrics.binary_crossentropy(y_tensor_2d, pred_probs_2d)
+		else:
+			loss_op = tf.keras.metrics.binary_crossentropy(y_tensor, pred_probs)	
 	else:
 		print ("{} not supported yet".format(loss_func))
 

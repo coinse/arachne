@@ -38,12 +38,13 @@ def get_data_for_evaluation(**kwargs):
 		
 		used_data = (data_X, data_y)
 		return (indices_to_targeted, used_data)
-	elif rq == 3:
+	elif rq in [3,5]:
 		top_n = kwargs['n']
 		outs = data_util.get_balanced_dataset(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
 		assert len(outs) == 4, index_file
 
-		misclf_key, misclf_indices, new_data_indices, new_test_indices = outs
+		misclf_key, misclf_indices, new_data_indices, new_test_indices = outs	
+		print ("Processing: {},{}".format(misclf_key[0], misclf_key[1]))
 		used_X = data_X[new_data_indices]; eval_X = data_X[new_test_indices]
 		used_misclf_X = data_X[misclf_indices]
 		used_y = data_y[new_data_indices]; eval_y = data_y[new_test_indices]
@@ -53,7 +54,7 @@ def get_data_for_evaluation(**kwargs):
 		eval_data = (eval_X, eval_y)
 		used_misclf_data = (used_misclf_X, used_misclf_y)
 		
-		print ("RQ3: processed {}".format(misclf_key))
+		print ("RQ{}: processed {}".format(rq, misclf_key))
 		return (used_data, eval_data, used_misclf_data)
 	elif rq == 4:
 		top_n = 0 # target the most frequent misclassification
@@ -88,7 +89,7 @@ parser.add_argument("-which_data", type = str, default = 'cifar10', help = "cifa
 parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
 parser.add_argument("-rq", type = int, default = 0, help = "should be one of: 2, 3, 4, 5 (can be extended)")
-parser.add_argument("-top_n", type = int, default = 1, help = "required for rq3")
+parser.add_argument("-top_n", type = int, default = 0, help = "required for rq3")
 parser.add_argument("-seed", type = int, help = "required for rq2")
 parser.add_argument("-on_both", action='store_true')
 args = parser.parse_args()

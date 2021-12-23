@@ -34,7 +34,7 @@ class LSTM_Layer(object):
 		assert time_steps is not None, "For this time_steps should be given"
 		kernel_w, recurr_kernel_w, bias = self.init_lstm_layer.get_weights()
 		
-		inputs = tf.keras.Input(shape = input_shape[1:])
+		inputs = tf.keras.Input(shape =input_shape[1:])
 		h_state_input = tf.keras.Input(shape = (input_shape[-1],))
 		c_state_input = tf.keras.Input(shape = (input_shape[-1],))
 		new_lstm = LSTM(self.init_lstm_layer.units, 
@@ -48,7 +48,7 @@ class LSTM_Layer(object):
 		for k,v in self.init_lstm_layer.__dict__.items():
 			if k not in skip:
 				new_lstm.__dict__.update({k:v})
-		
+	
 		outs = new_lstm(inputs, initial_state = [h_state_input, c_state_input])
 		outs_2 = new_lstm(inputs)
 

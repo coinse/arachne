@@ -135,9 +135,11 @@ class DE_searcher(Searcher):
 		# 	update_op = 'set') 
 		#predictions, correct_predictions, loss_v = self.move_v1(deltas, update_op = 'set') 
 		#print (deltas[idx_to_tl])
-		#predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
-		# here, we don't have to be worry about the corre_predictins -> alrady done in move_v3.
-		predictions, _, loss_v = self.move_v3(deltas)
+		if not self.lstm_mdl:
+			predictions, correct_predictions, loss_v = self.move_v2(deltas, update_op = 'set')
+		else:
+			# here, we don't have to be worry about the corre_predictins -> alrady done in move_v3.
+			predictions, _, loss_v = self.move_v3(deltas)
 
 		assert predictions is not None
 		num_violated, num_patched = self.get_num_patched_and_broken(predictions) 

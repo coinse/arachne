@@ -349,6 +349,37 @@ def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
 	return indices_to_misclf
 
 
+def get_test_val_dataset_by_perc(pred_file, percent = 0.1, seed = None, idx = 0):
+	"""
+	generate the training and test dataset for rq3 ~ rq6 
+	idx = 0 or 1 -> to which half, 0 = front half, 1 = latter half
+	"""
+	import pandas as pd
+	
+	idx = idx if idx == 0 else 1 # only 0 or 1
+	target_idx = idx; eval_idx = np.abs(1 - target_idx)
+	
+	df = pd.read_csv(pred_file, index_col = 'index')
+	indices_to_misclf = df.loc[df.true != df.pred].index.values
+	indices_misclf_1 = [idx for idx in indices_to_misclf if idx % 2 == target_idx]
+	indices_misclf_2 = [idx for idx in indices_to_misclf if idx % 2 == eval_idx]
+
+	indices_to_corrclf = df.loc[df.true == df.pred].index.values
+	indices_corrclf_1 = [idx for idx in indices_to_corrclf if idx % 2 == target_idx]
+	indices_corrclf_2 = [idx for idx in indices_to_corrclf if idx % 2 == eval_idx]
+
+	num_to_sample = int(len(indices_to_misclf) * percent)
+	np.random.seed(seed)
+	sampled_indices_to_misclf = np.random.choice(indices_misclf_1, num_to_sample, replace=False)
+	target_indices = np.append(sampled_indices_to_misclf, indices_corrclf_1)
+	np.random.shuffle(target_indices)
+	
+	eval_indices = np.append(indices_misclf_2, indices_corrclf_2)
+	np.random.shuffle(eval_indices)
+
+	return target_indices, eval_indices
+
+
 def return_chunks(num, batch_size = None):
 	if batch_size is None:
 		batch_size = num

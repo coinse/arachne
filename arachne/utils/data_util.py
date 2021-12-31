@@ -62,9 +62,9 @@ def get_lfw_data(is_train = True):
 	"""
 	import pickle
 	if is_train:
-		datafile = "lfw_np/LFW_train_info.pkl"
+		datafile = "data/lfw_np/LFW_train_info.pkl"
 	else:
-		datafile = "lfw_np/LFW_test_info.pkl"
+		datafile = "data/lfw_np/LFW_test_info.pkl"
 	
 	with open(datafile, 'rb') as f:
 		data = pickle.load(f)

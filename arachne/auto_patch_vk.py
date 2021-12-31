@@ -242,7 +242,7 @@ def patch(
 				top_n = int(np.round(7.6))
 			elif which == 'simple_cm':
 				top_n = int(np.round(11.6))
-			elif which == 'GTSBR': # GTSRB
+			elif which == 'GTSRB': # GTSRB
 				top_n = int(np.round(14.3))
 			else: # for LSTM
 				print ("not yet")
@@ -267,6 +267,8 @@ def patch(
 
 	t2 = time.time()
 	print ("Time taken for localisation: %f" % (t2 - t1))
+	print ("places to fix", indices_to_places_to_fix)	
+	print ("numebr of places to fix: {}".format(len(indices_to_places_to_fix)))
 	run_localise.reset_keras([model])
 	if loc_method == 'localiser':
 		print (indices_to_places_to_fix) # loggin

@@ -163,7 +163,7 @@ def load_data(which, path_to_data,
 
 		test_data[0] = np.asarray(test_data[0])
 		test_data[1] = np.asarray(test_data[1])
-	elif which in ['GTSRB', 'imdb']: # GTSRB
+	elif which in ['GTSRB', 'imdb', 'reuters']: # GTSRB
 		import pickle
 		# train
 		if which == 'GTSRB' and with_hist:

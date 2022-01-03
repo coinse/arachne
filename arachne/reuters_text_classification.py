@@ -11,7 +11,7 @@ def build_simple_ReusterLSTM_model(input_shape, num_labels):
     """
     """
     inputs = tf.keras.Input(shape = input_shape)
-    outs = CuDNNLSTM(units = 32)(inputs)
+    outs = CuDNNLSTM(units = 128)(inputs)
     outs = Dropout(rate = 0.25)(outs)
     outs = Dense(num_labels, activation='softmax')(outs)
 
@@ -47,8 +47,9 @@ def train_and_save_model(
             monitor = 'val_acc', 
             mode = 'max', 
             verbose = 1, 
+            save_weights_only =True,
             save_best_only = True)
-        ]	
+        ]   
 
     print (train_X.shape, train_y.shape)
     print (val_X.shape, val_y.shape)
@@ -71,6 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("-train", "--train_datafile", type = str)
     parser.add_argument("-test", "--test_datafile", type = str)
     #parser.add_argument("-dst", "--dest", type = str)
+    parser.add_argument("-only_best_eval", action = "store_true")    
 
     args = parser.parse_args()
 
@@ -90,23 +92,32 @@ if __name__ == "__main__":
     patience = 100
     lr = 0.001
 
-    dest = "data/models/lstm/reuters/"
+    dest = "data/models/lstm/reuters/n_64"
     os.makedirs(dest, exist_ok=True)
-    checkpoint_path = os.path.join(dest, "/cp.best.ckpt") 
+    checkpoint_path = os.path.join(dest, "cp.best.ckpt") 
 
     model = build_simple_ReusterLSTM_model(input_shape, num_labels)
-    train_and_save_model(
-        model, checkpoint_path, 
-        train_X, data_util.format_label(train_y, num_labels), test_X, data_util.format_label(test_y, num_labels), 
-        lr = lr, num_epoch = num_epoch, patience = patience, batch_size = batch_size)
+    if not args.only_best_eval:
+        train_and_save_model(
+            model, checkpoint_path, 
+            train_X, data_util.format_label(train_y, num_labels), test_X, data_util.format_label(test_y, num_labels), 
+            lr = lr, num_epoch = num_epoch, patience = patience, batch_size = batch_size)
 
-    score, acc = model.evaluate(test_X, test_y, batch_size = batch_size)
-    print('Test score:', score)
-    print('Test accuracy:', acc)
+        score, acc = model.evaluate(test_X, data_util.format_label(test_y, num_labels), batch_size = batch_size)
+        print('Test score:', score)
+        print('Test accuracy:', acc)
 
     destfile = os.path.join(dest, "reuter_lstm.h5")
     tf.keras.models.save_model(model, destfile)
 
+    print ("evaluate with the best weights")
     model.load_weights(checkpoint_path)
+    score, acc = model.evaluate(test_X, data_util.format_label(test_y, num_labels), batch_size = batch_size)
+    print ("For best:")
+    print('\tTest score:', score)
+    print('\tTest accuracy:', acc)
     best_mdl_destfile = os.path.join(dest, "reuter_lstm_best.h5")
     tf.keras.models.save_model(model, best_mdl_destfile)
+
+
+

@@ -5,11 +5,12 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, CuDNNLSTM, Dropout
 import os
+import utils.data_util as data_util
 
 def build_simple_ReusterLSTM_model(input_shape, num_labels):
     """
     """
-    inputs = tf.keras.Input(input_shape = input_shape)
+    inputs = tf.keras.Input(shape = input_shape)
     outs = CuDNNLSTM(units = 32)(inputs)
     outs = Dropout(rate = 0.25)(outs)
     outs = Dense(num_labels, activation='softmax')(outs)
@@ -24,6 +25,8 @@ def train_and_save_model(
     lr = 0.001, num_epoch = 5000, patience = 100, batch_size = 64):
     """
     """
+
+    model.summary()
     optimizer = tf.keras.optimizers.Adam(lr = lr)
     model.compile(
         loss = tf.keras.losses.categorical_crossentropy,
@@ -47,6 +50,9 @@ def train_and_save_model(
             save_best_only = True)
         ]	
 
+    print (train_X.shape, train_y.shape)
+    print (val_X.shape, val_y.shape)
+
     # or batch_size = 128
     model.fit(train_X, train_y, 
         epochs = num_epoch, 
@@ -69,13 +75,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # get data
-    with open(args.train_datafile) as f:
-        train_data, test_data = pickle.load(f)
+    with open(args.train_datafile, 'rb') as f:
+        train_X, train_y = pickle.load(f)
 
-    train_X, train_y = train_data
-    test_X, test_y = test_data
+    with open(args.test_datafile, 'rb') as f:
+        test_X, test_y = pickle.load(f)
+ 
+    print (train_X.shape, train_y.shape)
+    print (test_X.shape, test_y.shape)
     num_labels = 46
-    input_shape =  train_data.shape[1:] # (300, 50)
+    input_shape =  train_X.shape[1:] # (300, 50)
     batch_size = 128
     num_epoch = 5000
     patience = 100
@@ -88,7 +97,7 @@ if __name__ == "__main__":
     model = build_simple_ReusterLSTM_model(input_shape, num_labels)
     train_and_save_model(
         model, checkpoint_path, 
-        train_X, train_y, test_X, test_y, 
+        train_X, data_util.format_label(train_y, num_labels), test_X, data_util.format_label(test_y, num_labels), 
         lr = lr, num_epoch = num_epoch, patience = patience, batch_size = batch_size)
 
     score, acc = model.evaluate(test_X, test_y, batch_size = batch_size)

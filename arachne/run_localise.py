@@ -17,7 +17,7 @@ def get_target_weights(model, path_to_keras_model, indices_to_target = None, tar
 	import re
 
 	# target only the layer with its class type in this list, but if target_all, then return all trainables
-	targeting_clname_pattns = ['Dense*', 'Conv*', 'LSTM*'] #if not target_all else None
+	targeting_clname_pattns = ['Dense*', 'Conv*', '.*LSTM*'] #if not target_all else None
 	is_target = lambda clname,targets: (targets is None) or any([bool(re.match(t,clname)) for t in targets])
 	#if target_all: # some, like BatchNormalization has trainable weights. Not sure how to filter that out. so, comment out for the temporary use
 	#	indices_to_target = None
@@ -194,6 +194,7 @@ def compute_gradient_to_loss(path_to_keras_model, idx_to_target_layer, X, y,
 	for chunk in chunks:
 		#_gradient = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk].reshape(-1,1)})[0]
 		#gradients.append(_gradient)
+		print ("**", tensor_grad, y_tensor, y[chunk].shape)
 		_gradients = K.get_session().run(tensor_grad, feed_dict={model.input: X[chunk], y_tensor: y[chunk]})# .reshape(-1,1)})
 		for i,_gradient in enumerate(_gradients):
 			gradients[i].append(_gradient)
@@ -765,6 +766,7 @@ def compute_FI_and_GL(
 			# will be 
 			# this should be fixed to process a list of weights (or we can call it twice), and accept other loss function
 			#tensor_w_kernel, tensor_w_recurr_kernel = model.layers[idx_to_tl].weights[:2]
+			print ("target", target_y.shape, idx_to_tl)
 			grad_scndcr = compute_gradient_to_loss(
 				path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True, loss_func = loss_func)
 		#elif is_Attention(lname):
@@ -974,7 +976,6 @@ def localise_by_chgd_unchgd(
 	from collections.abc import Iterable
 	#from scipy.stats import ks_2samp
 	loc_start_time = time.time()
-
 	print ("Layers to inspect", list(target_weights.keys()))
 	#print ("indices to chgd, unchgd", indices_to_chgd, indices_to_unchgd)
 	# compute FI and GL with changed inputs
@@ -1550,14 +1551,15 @@ def localise_by_random_selection(number_of_place_to_fix, target_weights):
 		else: # to handle the layers with more than one weights (e.g., LSTM)
 			for idx_to_w, a_t_w in enumerate(t_w):
 				l_indices = list(np.ndindex(a_t_w.shape))
-				total_indices.extend(list(zip([idx_to_tl, idx_to_w] * len(l_indices), l_indices)))
-
+				#print ("_", idx_to_tl, idx_to_w, a_t_w.shape, len(l_indices))
+				total_indices.extend(list(zip([(idx_to_tl, idx_to_w)] * len(l_indices), l_indices)))
+		#print ("ex {}:".format(idx_to_tl), total_indices[-1])
 	np.random.shuffle(total_indices)
 	if number_of_place_to_fix > 0 and number_of_place_to_fix < len(total_indices):
 		selected_indices = np.random.choice(np.arange(len(total_indices)), number_of_place_to_fix, replace = False)
 		indices_to_places_to_fix = [total_indices[idx] for idx in selected_indices]
 	else:
 		indices_to_places_to_fix = total_indices
-	
+
 	return indices_to_places_to_fix
 

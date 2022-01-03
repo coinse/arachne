@@ -38,6 +38,7 @@ class Searcher(object):
 		at_indices = None, 
 		batch_size = None, 
 		is_multi_label = True,
+		is_lstm = False,
 		act_func = None):
 
 		"""
@@ -56,12 +57,12 @@ class Searcher(object):
 			else:	
 				self.labels = labels
 				self.ground_truth_labels = self.np.argmax(self.labels, axis = 1)
-			self.lstm_mdl = False # curretly
+			#self.lstm_mdl = False # curretly
 		else:
 			self.labels = labels
 			self.ground_truth_labels = labels
-			self.lstm_mdl = True
-
+			#self.lstm_mdl = True
+		self.lstm_mdl = is_lstm
 		self.model_name = "model"
 		self.model_name_format = self.model_name + ".{}"
 
@@ -790,6 +791,8 @@ class Searcher(object):
 			print ("\t", num_of_patched == len(self.indices_to_wrong) and num_of_violated == 0)
 			return True, num_of_patched
 		else:
+			print ("in early stop checking", "{} ({}), {} ({})".format(
+				num_of_patched, perc_num_of_patched, num_of_violated, perc_num_of_violated))
 			return False, num_of_patched
 
 

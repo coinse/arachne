@@ -23,7 +23,7 @@ def get_weights(model):
 	return kernel_and_bias_pairs
 
 
-def run_model(mdl, X, y, which_data, is_multi_label = True):
+def run_model(mdl, X, y, which_data, is_multi_label = True, ret_raw = False):
 	"""
 	"""
 	import pandas as pd
@@ -35,12 +35,15 @@ def run_model(mdl, X, y, which_data, is_multi_label = True):
 		pred_labels = np.argmax(predcs, axis = 1)
 	else:
 		pred_labels = np.round(predcs).flatten()
+		predcs = predcs.flatten()
 
 	aft_preds = []
-	aft_preds_column = ['index', 'true', 'pred', 'flag']
+	aft_preds_column = ['index', 'true', 'pred', 'flag'] if not ret_raw else ['index', 'true', 'pred', 'pred_v', 'flag']
 	for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
-		aft_preds.append([i, true_label, pred_label, true_label == pred_label])
-	
+		if not ret_raw:
+			aft_preds.append([i, true_label, pred_label, true_label == pred_label])
+		else:
+			aft_preds.append([i, true_label, pred_label, predcs[i], true_label == pred_label])
 	aft_pred_df = pd.DataFrame(aft_preds, columns = aft_preds_column)
 	return aft_pred_df
 
@@ -63,6 +66,7 @@ def gen_and_run_model(mdl, path_to_patch, X, y, num_label,
 	else:
 		formated_y = y
 
+	print (formated_y.shape, is_multi_label)
 	if not has_lstm_layer:
 		k_fn_mdl_lst = kfunc_util.generate_base_mdl(
 			mdl, X, indices_to_tls = indices_to_tls, batch_size = batch_size, act_func = act_func)

@@ -27,6 +27,7 @@ class DE_searcher(Searcher):
 		patch_aggr = None,
 		batch_size = None,
 		act_func = None,
+		is_lstm = False,
 		is_multi_label = True,
 		at_indices = None):
 
@@ -42,6 +43,7 @@ class DE_searcher(Searcher):
 				path_to_keras_model = path_to_keras_model,
 				batch_size = batch_size,
 				act_func = act_func,
+				is_lstm = is_lstm,
 				is_multi_label = is_multi_label,
 				at_indices = at_indices)
 

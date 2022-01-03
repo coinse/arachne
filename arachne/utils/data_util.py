@@ -360,11 +360,11 @@ def get_test_val_dataset_by_perc(pred_file, percent = 0.1, seed = None, idx = 0)
 	target_idx = idx; eval_idx = np.abs(1 - target_idx)
 	
 	df = pd.read_csv(pred_file, index_col = 'index')
-	indices_to_misclf = df.loc[df.true != df.pred].index.values
+	indices_to_misclf = np.int32(df.loc[df.true != df.pred].index.values)
 	indices_misclf_1 = [idx for idx in indices_to_misclf if idx % 2 == target_idx]
 	indices_misclf_2 = [idx for idx in indices_to_misclf if idx % 2 == eval_idx]
 
-	indices_to_corrclf = df.loc[df.true == df.pred].index.values
+	indices_to_corrclf = np.int32(df.loc[df.true == df.pred].index.values)
 	indices_corrclf_1 = [idx for idx in indices_to_corrclf if idx % 2 == target_idx]
 	indices_corrclf_2 = [idx for idx in indices_to_corrclf if idx % 2 == eval_idx]
 
@@ -372,12 +372,12 @@ def get_test_val_dataset_by_perc(pred_file, percent = 0.1, seed = None, idx = 0)
 	np.random.seed(seed)
 	sampled_indices_to_misclf = np.random.choice(indices_misclf_1, num_to_sample, replace=False)
 	target_indices = np.append(sampled_indices_to_misclf, indices_corrclf_1)
-	np.random.shuffle(target_indices)
+	target_indices.sort()
 	
 	eval_indices = np.append(indices_misclf_2, indices_corrclf_2)
-	np.random.shuffle(eval_indices)
+	eval_indices.sort()
 
-	return target_indices, eval_indices
+	return sampled_indices_to_misclf, np.int32(target_indices), eval_indices
 
 
 def return_chunks(num, batch_size = None):

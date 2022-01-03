@@ -330,7 +330,7 @@ def is_LSTM(lname):
 	"""
 	"""
 	import re
-	pattns = ['LSTM']
+	pattns = ['.*LSTM*']
 	return any([bool(re.match(t,lname)) for t in pattns])
 
 
@@ -412,10 +412,12 @@ def predict_with_new_delat(fn_mdl, deltas, min_idx_to_tl, init_biases, init_weig
 	# prepare a new model to run by updating the weights from deltas
 	for idx_to_tl, delta in deltas.items(): # either idx_to_tl or (idx_to_tl, i)
 		#print ("** delta: {} **".format(idx_to_tl))
+		#print ("\t", delta.shape)
 		if isinstance(idx_to_tl, Iterable):
 			idx_to_t_mdl_l, idx_to_w = idx_to_tl
 		else:
 			idx_to_t_mdl_l = idx_to_tl
+		print (init_biases[idx_to_t_mdl_l].shape)
 		#
 		# index of idx_to_tl (from deltas) in the local model
 		local_idx_to_l = idx_to_t_mdl_l - min_idx_to_tl + 1 

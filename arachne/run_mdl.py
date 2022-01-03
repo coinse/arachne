@@ -11,6 +11,7 @@ def compare(init_pred_df, aft_pred_df):
 	"""
 	num_patched = len(init_pred_df.loc[(init_pred_df.flag == False) & (aft_pred_df.flag == True)])
 	num_broken = len(init_pred_df.loc[(init_pred_df.flag == True) & (aft_pred_df.flag == False)])
+	print (init_pred_df)
 	init_acc = np.sum(init_pred_df.true == init_pred_df.pred)/len(init_pred_df)
 
 	aft_acc = np.sum(aft_pred_df.true == aft_pred_df.pred)/len(aft_pred_df)
@@ -131,7 +132,9 @@ elif args.rq in [3,5]:
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
 		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
 	used_X, used_y = used_data
-	eval_X, eval_y = eval_data 
+	eval_X, eval_y = eval_data
+	print ("used", used_X.shape, used_y.shape)	
+	print ("eval", eval_X.shape, eval_y.shape)
 elif args.rq == 4:
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(X=X, y=y, rq=args.rq, file=args.index_file)
 	used_X, used_y = used_data
@@ -139,26 +142,26 @@ elif args.rq == 4:
 else:
 	pass
 
+##
+if args.which_data == 'imdb':
+        has_lstm_layer = True; is_multi_label = False if 'multi' not in args.path_to_init_model else True
+else:
+        has_lstm_layer = False; is_multi_label = True
+
 # get weights
 pred_name = os.path.basename(path_to_patch).replace("model", "pred")[:-4]
 
 init_model = load_model(args.path_to_init_model, compile = False)
-init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data)
+init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data, is_multi_label = is_multi_label)
 if args.on_both or args.rq in [3,4,5]: 
-	init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data)
-
+	init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data, is_multi_label = is_multi_label)
+	print ("here done")
 ####
 input_reshape = args.which_data	== 'fashion_mnist'
 need_act = args.which_data == 'GTSRB'
 
-##
-if args.which_data == 'imdb':
-	has_lstm_layer = True; is_multi_label = False
-else:
-	has_lstm_layer = False; is_multi_label = True
-##
-
 # for rq2, this doesn't apply and for RQ3, this always apply, since RQ3 is about the generaliation of patches
+init_model.summary()
 if args.on_both or args.rq in [3,4,5]: 
 	print ("=========================For evaluation============================")
 	#aft_pred_df_eval = gen_and_run_model(init_model, path_to_patch, eval_X, eval_y, num_label,
@@ -172,9 +175,12 @@ if args.on_both or args.rq in [3,4,5]:
 
 	print ('For test:')
 	compare(init_pred_df_eval, aft_pred_df_eval)
+	print ("compared done for eval")
 
 print ("=========================Used for patching============================")
 init_model.summary()
+#print (len(eval_X), len(eval_y), len(used_X), len(used_y))
+#print (eval_X.shape, eval_y.shape, used_X.shape, used_y.shape)
 #aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label,
 #    input_reshape = input_reshape, need_act = need_act, batch_size = args.batch_size)
 aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label, 

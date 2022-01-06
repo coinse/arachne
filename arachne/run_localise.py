@@ -396,6 +396,7 @@ def compute_FI_and_GL(
 
 	## Now, start localisation !!! ##
 	from sklearn.preprocessing import Normalizer
+	from collections.abc import Iterable
 	norm_scaler = Normalizer(norm = "l1")
 
 	total_cands = {}
@@ -477,40 +478,79 @@ def compute_FI_and_GL(
 			print ("Vals", FIs.shape, grad_scndcr.shape)	
 			# G end
 		elif model_util.is_C2D(lname):
-			kernel_shape = t_w.shape[:2] # kernel == filter
+			is_channel_first = layer_config['data_format'] == 'channels_first'
+			if idx_to_tl == 0 or idx_to_tl - 1 == 0:
+				prev_output_v = target_X
+			else:
+				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+				prev_output_v = t_model.predict(target_X)
+			tr_prev_output_v = np.moveaxis(prev_output_v, [1,2,3],[3,1,2]) if is_channel_first else prev_output_v
+
+			kernel_shape = t_w.shape[:2] # kernel == filter 
 			#true_ws_shape = t_w.shape[2:] # this is (Channel_in (=prev_output.shape[1]), Channel_out (=output.shape[1]))
 			strides = layer_config['strides']
 			padding_type =  layer_config['padding']
-
+			print ("Padding type", padding_type)
 			if padding_type == 'valid':
 				paddings = [0,0]
-			elif padding_type == 'same':
-				#P = ((S-1)*W-S+F)/2
-				#paddings = [int(((strides[i]-1)*true_ws_shape[i]-strides[i]+kernel_shape[i])/2) for i in range(2)]
-				paddings = [0,0] # since, we are getting the padded input
 			else:
-				print ("padding type: {} not supported".format(padding_type))
-				paddings = [0,0]
+				if padding_type == 'same':
+					#P = ((S-1)*W-S+F)/2
+					true_ws_shape = [t_w.shape[0], t_w.shape[-1]] # Channel_in, Channel_out
+					paddings = [int(((strides[i]-1)*true_ws_shape[i]-strides[i]+kernel_shape[i])/2) for i in range(2)]
+				elif not isinstance(padding_type, str) and isinstance(padding_type, Iterable): # explicit paddings given
+					paddings = list(padding_type)
+					if len(padding) == 1:
+						paddings = [paddings[0], paddings[0]]
+				else:
+					print ("padding type: {} not supported".format(padding_type))
+					paddings = [0,0]
+					assert False
+
+				# add padding
+				shape_before_padding = tr_prev_output_v.shape
+				if is_channel_first:
+					paddings_per_axis = [[0,0], [0,0], [paddings[0], paddings[0]], [paddings[1], paddings[1]]]
+				else:
+					paddings_per_axis = [[0,0], [paddings[0], paddings[0]], [paddings[1], paddings[1]], [0,0]]
+				tr_prev_output_v = np.pad(tr_prev_output_v, paddings_per_axis, mode = 'constant', constant_values = 0) # zero-padding
+				print ("Before padding: {}, after paddings: {}".format(shape_before_padding, tr_prev_output_v.shape))
 
 			#num_kernels = prev_output.shape[1] # Channel_in
-			num_kernels = int(prev_output.shape[1]) # Channel_in
+			print ("Is channels first", is_channel_first)
+			print (prev_output, prev_output_v.shape, tr_prev_output_v.shape)
+			if is_channel_first:
+				num_kernels = int(prev_output.shape[1]) # Channel_in
+				#num_kernels = int(tr_prev_output_v.shape[1]) # Channel_in
+			else: # channels_last
+				assert layer_config['data_format'] == 'channels_last', layer_config['data_format']
+				num_kernels = int(prev_output.shape[-1]) # Channel_in
+				#num_kernels = int(tr_prev_output_v.shape[-1]) # Channel_in
+			print ("t_w***", t_w.shape)
 			assert num_kernels == t_w.shape[2], "{} vs {}".format(num_kernels, t_w.shape[2])
 
 			# H x W				
 			#input_shape = prev_output.shape[2:] # the last two (front two are # of inputs and # of kernels (Channel_in))
-			input_shape = [int(v) for v in prev_output.shape[2:]] # the last two (front two are # of inputs and # of kernels (Channel_in))
+			if is_channel_first:
+				input_shape = [int(v) for v in prev_output.shape[2:]] # the last two (front two are # of inputs and # of kernels (Channel_in))
+				#input_shape = [int(v) for v in tr_prev_output_v.shape[2:]] # the last two (front two are # of inputs and # of kernels (Channel_in))
+			else:
+				input_shape = [int(v) for v in prev_output.shape[1:-1]]
+				#input_shape = [int(v) for v in tr_prev_output_v.shape[1:-1]]
 
-			# (W1−F+2P)/S+1, W1 = input volumne , F = kernel, P = padding
+			# (W1−F+2P)/S+1, W1 = input volumne , F = kernel, P = padding 
+			print ("prev output shape", prev_output.shape, tr_prev_output_v.shape, kernel_shape, paddings, strides, input_shape)
 			n_mv_0 = int((input_shape[0] - kernel_shape[0] + 2 * paddings[0])/strides[0] + 1) # H_out
 			n_mv_1 = int((input_shape[1] - kernel_shape[1] + 2 * paddings[1])/strides[1] + 1) # W_out
 
 			k = 0 # for logging
-			n_output_channel = t_w.shape[-1] # Channel_out
+			n_output_channel = t_w.shape[-1]  # Channel_out
 			from_front = []
 			#from_front_tensors = []
 			# move axis for easier computation
 			print ("range", n_output_channel, n_mv_0, n_mv_1) # currenlty taking too long -> change to compute on gpu
-		
+			print (input_shape[0] - kernel_shape[0], 2 * paddings[0], strides[0], (input_shape[0] - kernel_shape[0] + 2 * paddings[0])/strides[0])
+
 			# for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
 			# 	#print ("All nodes", [n.name for n in tf.get_default_graph().as_graph_def().node])
 			# 	l_from_front_tensors = []
@@ -569,22 +609,31 @@ def compute_FI_and_GL(
 			# 	from_front.extend(outputs)
 			
 			###############
-			if idx_to_tl == 0 or idx_to_tl - 1 == 0:
-				prev_output_v = target_X
-			else:
-				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
-				prev_output_v = t_model.predict(target_X)
-			tr_prev_output_v = np.moveaxis(prev_output_v, [1,2,3],[3,1,2])
+			#if idx_to_tl == 0 or idx_to_tl - 1 == 0:
+			#	prev_output_v = target_X
+			#else:
+			#	t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output)
+			#	prev_output_v = t_model.predict(target_X)
+			#tr_prev_output_v = np.moveaxis(prev_output_v, [1,2,3],[3,1,2]) if is_channel_first else prev_output_v
 			#tensors_for_FI = generate_FI_tensor_cnn(t_w, prev_output_v)
 			tensors_for_FI = generate_FI_tensor_cnn_v2(t_w)
-			
+		
+			print (	"axis", n_output_channel, n_mv_0, n_mv_1, tr_prev_output_v.shape, tr_prev_output_v.shape)
 			for idx_ol in tqdm(range(n_output_channel)): # t_w.shape[-1]
 				for i in range(n_mv_0): # H
 					for j in range(n_mv_1): # W
+						#print ("Current", i,j)
+						#if is_channel_first:
 						curr_prev_output_slice = tr_prev_output_v[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:]
+						#print ("--", curr_prev_output_slice.shape, i*strides[0], i*strides[0]+kernel_shape[0])
 						curr_prev_output_slice = curr_prev_output_slice[:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]
-						
+						#print ("==", curr_prev_output_slice.shape, j*strides[1], j*strides[1]+kernel_shape[1])
+						#print (curr_prev_output_slice.shape, t_w.shape, idx_ol, t_w[:,:,:,idx_ol].shape)
 						output = curr_prev_output_slice * t_w[:,:,:,idx_ol] 
+						#else:
+						#	curr_prev_output_slice = tr_prev_output_v[:,:,i*strides[0]:i*strides[0]+kernel_shape[0],:]
+						#	curr_prev_output_slice = curr_prev_output_slice[:,:,:,j*strides[1]:j*strides[1]+kernel_shape[1]]
+
 						output = np.abs(output) 
 						sum_output = np.nan_to_num(np.sum(output), posinf = 0.)
 						output = output/sum_output
@@ -597,22 +646,30 @@ def compute_FI_and_GL(
 			#from_front = np.asarray(outputs)	
 			from_front = np.asarray(from_front)
 			print ("From front", from_front.shape) # [Channel_out * n_mv_0 * n_mv_1, F1, F2, Channel_in]
-			from_front = from_front.reshape(
-				(n_output_channel,n_mv_0,n_mv_1,kernel_shape[0],kernel_shape[1],int(prev_output.shape[1])))
+			if is_channel_first:
+				from_front = from_front.reshape(
+					(n_output_channel,n_mv_0,n_mv_1,kernel_shape[0],kernel_shape[1],int(prev_output.shape[1])))
+			else:# channels_last
+				from_front = from_front.reshape(
+					(n_mv_0,n_mv_1,n_output_channel,kernel_shape[0],kernel_shape[1],int(prev_output.shape[-1])))
+
 			print ("reshaped", from_front.shape)
 			from_front = np.moveaxis(from_front, [0,1,2], [3,4,5])
-			print ("axis moved", from_front.shape) # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
-
+			print ("axis moved", from_front.shape) # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1] or [F1,F2,Channel_in, n_mv_0, n_mv_1,Channel_out]
+			
 			from_behind = compute_gradient_to_output(path_to_keras_model, idx_to_tl, target_X, by_batch = True) # [Channel_out, H_out(n_mv_0), W_out(n_mv_1)]
 			print ("From behind", from_behind.shape)
 			#from_behind = from_behind.reshape(-1,) # [Channel_out * n_mv_0 * n_mv_1,]
-			
+			print (from_behind.shape, from_front.shape)
 			t1 = time.time()
-			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1]
+			FIs = from_front * from_behind # [F1,F2,Channel_in, Channel_out, n_mv_0, n_mv_1] (channels_firs) or [F1,F2,Channel_in,n_mv_0, n_mv_1,Channel_out] (channels_last)
 			t2 = time.time()
 			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
 			#FIs = np.mean(np.mean(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
-			FIs = np.sum(np.sum(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
+			if is_channel_first:
+				FIs = np.sum(np.sum(FIs, axis = -1), axis = -1) # [F1, F2, Channel_in, Channel_out]
+			else:
+				FIs = np.sum(np.sum(FIs, axis = -2), axis = -2) # [F1, F2, Channel_in, Channel_out] 
 			t3 = time.time()
 			print ('Time for computing mean for FIs: {}'.format(t3 - t2))
 			## Gradient
@@ -633,16 +690,20 @@ def compute_FI_and_GL(
 			t_w_kernel, t_w_recurr_kernel = t_w # t_w_kernel: (input_feature_size, 4 * num_units). t_w_recurr_kernel: (num_units, 4 * num_units)
 			
 			# get the previous output, which will be the input of the lstm
-			t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output) # shape = (batch_size, time_steps, input_feature_size)
-			#if idx_to_tl == 0: # or idx_to_tl - 1 == 0: # input is already formated at the preprocessing stage
-			#	prev_output = target_X
-			#else:
-			prev_output = t_model.predict(target_X)
-			
+			print ("**idx to tl", idx_to_tl)
+			if model_util.is_Input(type(model.layers[idx_to_tl - 1]).__name__):
+				prev_output = target_X
+			else:
+				t_model = Model(inputs = model.input, outputs = model.layers[idx_to_tl - 1].output) # shape = (batch_size, time_steps, input_feature_size)
+				#if idx_to_tl == 0: # or idx_to_tl - 1 == 0: # input is already formated at the preprocessing stage
+				#	prev_output = target_X
+				#else:
+				prev_output = t_model.predict(target_X)
 			# the input's shape should be (batch_size, time_step, num_features)
 			
 			print ("idx to tl", idx_to_tl, prev_output.shape)
 			print (model.layers[idx_to_tl])
+
 			assert len(prev_output.shape) == 3, prev_output.shape
 			num_features = prev_output.shape[-1] # the dimension of features that will be processed by the model
 			
@@ -740,23 +801,28 @@ def compute_FI_and_GL(
 			t1 = time.time()
 			#FIs_combined = np.multiply(from_front, from_behind) # shape = (N_k_rk_w, num_units) 
 			FIs_combined = from_front * from_behind
+			print ("FI combiend", FIs_combined.shape)
 			t2 = time.time()
 			print ('Time for multiplying front and behind results: {}'.format(t2 - t1))
 			
 			# reshaping
 			FIs_kernel = np.zeros(t_w_kernel.shape) # t_w_kernel's shape (num_features, num_units * 4)
 			FIs_recurr_kernel = np.zeros(t_w_recurr_kernel.shape) # t_w_recurr_kernel's shape (num_units, num_units * 4)
+			#print ("wgihts", FIs_kernel.shape, FIs_recurr_kernel.shape)
 			for i, FI_p_gate in enumerate(np.array_split(FIs_combined, 4, axis = 0)): # from (4 * N_k_rk_w, num_units) to 4 * (N_k_rk_w, num_units)
 				# FI_p_gate's shape = (N_k_rk_w, num_units) -> will divided into (num_features, num_units) & (num_units, num_units)
 				# local indices that will split FI_p_gate (shape = (N_k_rk_w, num_units))
 				# since we append the weights in order of a kernel weight and a recurrent kernel weight
 				indices_to_features = np.arange(num_features)
 				indices_to_units = np.arange(num_units) + num_features
-
+				#print ("FI_p_gate shape", FI_p_gate.shape)
+				#print ("\t", indices_to_features.shape, indices_to_units.shape)
 				#FIs_kernel[indices_to_features + (i * N_k_rk_w)] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
 				#FIs_recurr_kernel[indices_to_units + (i * N_k_rk_w)] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
-				FIs_kernel[:, i * num_features:(i+1) * num_units] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
-				FIs_recurr_kernel[:, i * num_features:(i+1) * num_units] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
+				print (FIs_kernel.shape, FI_p_gate.shape, len(indices_to_features))
+				print (i, num_features,num_units, i*num_features, (i+1)*num_units, i * num_features - (i+1) * num_units)
+				FIs_kernel[:, i * num_units:(i+1) * num_units] = FI_p_gate[indices_to_features] # shape = (num_features, num_units)
+				FIs_recurr_kernel[:, i * num_units:(i+1) * num_units] = FI_p_gate[indices_to_units] # shape = (num_units, num_units)
 
 			t3 =time.time()
 			FIs = [FIs_kernel, FIs_recurr_kernel] # [(num_features, num_units*4), (num_units, num_units*4)]
@@ -996,19 +1062,21 @@ def localise_by_chgd_unchgd(
 		path_to_keras_model = path_to_keras_model)
 
 	indices_to_tl = list(total_cands_chgd.keys()) 
-	costs_and_keys = []
+	costs_and_keys = []; indices_to_nodes = []
 	shapes = {}
-	for idx_to_tl in indices_to_tl:
+	for idx_to_tl in tqdm(indices_to_tl):
 		if not model_util.is_LSTM(target_weights[idx_to_tl][1]): # we have only one weight to process
 			#assert not isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
 			cost_from_chgd = total_cands_chgd[idx_to_tl]['costs']
 			cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs']
 			## key: more influential to changed behaviour and less influential to unchanged behaviour
 			costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
+			#costs_combined = cost_from_chgd
 			shapes[idx_to_tl] = total_cands_chgd[idx_to_tl]['shape']
 
 			for i,c in enumerate(costs_combined):
 				costs_and_keys.append(([idx_to_tl, i], c))
+				indices_to_nodes.append([idx_to_tl, np.unravel_index(i, shapes[idx_to_tl])])
 		else: # 
 			#assert isinstance(total_cands_unchgd[idx_to_tl]['shape'], Iterable), type(total_cands_unchgd[idx_to_tl]['shape'])
 			num = len(total_cands_unchgd[idx_to_tl]['shape'])
@@ -1018,29 +1086,29 @@ def localise_by_chgd_unchgd(
 				cost_from_unchgd = total_cands_unchgd[idx_to_tl]['costs'][idx_to_pair]
 				## key: more influential to changed behaviour and less influential to unchanged behaviour
 				costs_combined = cost_from_chgd/(1. + cost_from_unchgd) # shape = (N,2)
+				#costs_combined = cost_from_chgd
 				shapes[idx_to_tl].append(total_cands_chgd[idx_to_tl]['shape'][idx_to_pair])
 
 				for i,c in enumerate(costs_combined):
 					costs_and_keys.append(([(idx_to_tl, idx_to_pair), i], c))
+					indices_to_nodes.append([(idx_to_tl, idx_to_pair), np.unravel_index(i, shapes[idx_to_tl][idx_to_pair])])
 
 	costs = np.asarray([vs[1] for vs in costs_and_keys])
 	print ("Indices", indices_to_tl)
 	print ("the number of total cands: {}".format(len(costs)))
 	# a list of [index to the target layer, index to a neural weight]
-	#indices_to_nodes = [[vs[0][0], np.unravel_index(vs[0][1], shapes[vs[0][0]])] for vs in costs_and_keys]
-	indices_to_nodes = []
-	for vs in costs_and_keys:
-		if not isinstance(vs[0][0], Iterable): # if only a single weight has been handles, vs[0][0] should be an integer (i.e., index to the target layer)
-			_idx_to_tl = vs[0][0]
-			indices_to_nodes.append([_idx_to_tl, np.unravel_index(vs[0][1], shapes[_idx_to_tl])])
-		else:
-			_idx_to_tl, idx_to_w = vs[0][0]
-			indices_to_nodes.append([(_idx_to_tl, idx_to_w), np.unravel_index(vs[0][1], shapes[_idx_to_tl][idx_to_w])])
-
+	#indices_to_nodes = []
+	#for vs in tqdm(costs_and_keys):
+	#	if not isinstance(vs[0][0], Iterable): # if only a single weight has been handles, vs[0][0] should be an integer (i.e., index to the target layer)
+	#		_idx_to_tl = vs[0][0]
+	#		indices_to_nodes.append([_idx_to_tl, np.unravel_index(vs[0][1], shapes[_idx_to_tl])])
+	#	else:
+	#		_idx_to_tl, idx_to_w = vs[0][0]
+	#		indices_to_nodes.append([(_idx_to_tl, idx_to_w), np.unravel_index(vs[0][1], shapes[_idx_to_tl][idx_to_w])])
 
 	t4 = time.time()
-	#while len(curr_nodes_to_lookat) > 0:
 	_costs = costs.copy()
+	print ("Cost shape", costs.shape, _costs.shape)
 	is_efficient = np.arange(costs.shape[0])
 	next_point_index = 0 # Next index in the is_efficient array to search for
 	while next_point_index < len(_costs):

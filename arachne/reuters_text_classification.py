@@ -7,17 +7,21 @@ from tensorflow.keras.layers import Dense, CuDNNLSTM, Dropout
 import os
 import utils.data_util as data_util
 
-def build_simple_ReusterLSTM_model(input_shape, num_labels):
+def build_simple_ReusterLSTM_model(input_shape, num_labels, num_units = 128, ver = 1):
     """
     """
     inputs = tf.keras.Input(shape = input_shape)
-    outs = CuDNNLSTM(units = 128)(inputs)
+
+    outs = CuDNNLSTM(units = num_units)(inputs) # 32 
     outs = tf.keras.layers.BatchNormalization()(outs)
-    outs = Dropout(rate = 0.25)(outs)
-    outs = Dense(256, activation='softmax')(outs)
-    outs = tf.keras.layers.BatchNormalization()(outs)
-    outs = Dropout(rate = 0.25)(outs)
-    outs = Dense(num_labels, activation='softmax')(outs)
+    outs = Dropout(rate = 0.5)(outs)
+
+    if ver == 1:
+        outs = Dense(num_units * 2, activation = 'relu')(outs)
+        outs = tf.keras.layers.BatchNormalization()(outs)
+        outs = Dropout(rate = 0.5)(outs)
+
+    outs = Dense(num_labels, activation = 'softmax')(outs)
 
     model = Model(inputs = inputs, outputs = outs)
     return model 
@@ -26,10 +30,9 @@ def build_simple_ReusterLSTM_model(input_shape, num_labels):
 def train_and_save_model(
     model, destfile, 
     train_X, train_y, val_X, val_y, 
-    lr = 0.001, num_epoch = 5000, patience = 100, batch_size = 64):
+    lr = 2e-4, num_epoch = 500, patience = 100, batch_size = 128):
     """
     """
-
     model.summary()
     optimizer = tf.keras.optimizers.Adam(lr = lr)
     model.compile(
@@ -51,7 +54,7 @@ def train_and_save_model(
             monitor = 'val_acc', 
             mode = 'max', 
             verbose = 1, 
-            save_weights_only =True,
+            #save_weights_only =True,
             save_best_only = True)
         ]   
 
@@ -74,10 +77,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-train", "--train_datafile", type = str)
     parser.add_argument("-test", "--test_datafile", type = str)
-    #parser.add_argument("-dst", "--dest", type = str)
-    parser.add_argument("-only_best_eval", action = "store_true")    
+    parser.add_argument("-dst", "--dest", type = str, 
+        default = "data/models/lstm/reuters/lstm_dnn_dnn/temp")
+    parser.add_argument("-only_best_eval", action = "store_true", 
+        help = "if given, execute only the evaluation of $dest/reuter_lstm.h5")    
+    parser.add_argument("-num_units", type = int, default = 128)
 
     args = parser.parse_args()
+
+    ver = 1
     # get data
     with open(args.train_datafile, 'rb') as f:
         train_X, train_y = pickle.load(f)
@@ -87,29 +95,31 @@ if __name__ == "__main__":
  
     print (train_X.shape, train_y.shape)
     print (test_X.shape, test_y.shape)
+
+    # parameter setting
     num_labels = 46
-    input_shape =  train_X.shape[1:] # (300, 50 or 100 or 300)
+    input_shape = train_X.shape[1:] # (300, 50  or 100 or 300)) (1st axis: time steps, 2nd axis: the number of features)
     batch_size = 128
-    num_epoch = 5000
+    num_epoch = 500 #0
     patience = 100
-    lr = 0.001
+    lr = 2e-4
 
-    dest = "data/models/lstm/reuters/lstm_dnn_dnn/temp"
-    os.makedirs(dest, exist_ok=True)
-    checkpoint_path = os.path.join(dest, "cp.best.ckpt") 
+    os.makedirs(args.dest, exist_ok=True)
+    checkpoint_path = os.path.join(args.dest, "cp.best.ckpt") 
 
-    model = build_simple_ReusterLSTM_model(input_shape, num_labels)
+    model = build_simple_ReusterLSTM_model(input_shape, num_labels, num_units = args.num_units, ver = ver)
     if not args.only_best_eval:
         train_and_save_model(
             model, checkpoint_path, 
-            train_X, data_util.format_label(train_y, num_labels), test_X, data_util.format_label(test_y, num_labels), 
+            train_X, data_util.format_label(train_y, num_labels), 
+            test_X, data_util.format_label(test_y, num_labels), 
             lr = lr, num_epoch = num_epoch, patience = patience, batch_size = batch_size)
 
         score, acc = model.evaluate(test_X, data_util.format_label(test_y, num_labels), batch_size = batch_size)
         print('Test score:', score)
         print('Test accuracy:', acc)
 
-    destfile = os.path.join(dest, "reuter_lstm.h5")
+    destfile = os.path.join(args.dest, "reuter_lstm.h5")
     tf.keras.models.save_model(model, destfile)
 
     print ("evaluate with the best weights")
@@ -118,7 +128,7 @@ if __name__ == "__main__":
     print ("For best:")
     print('\tTest score:', score)
     print('\tTest accuracy:', acc)
-    best_mdl_destfile = os.path.join(dest, "reuter_lstm_best.h5")
+    best_mdl_destfile = os.path.join(args.dest, "reuter_lstm_best.h5")
     tf.keras.models.save_model(model, best_mdl_destfile)
 
 

@@ -12,6 +12,10 @@ def build_simple_ReusterLSTM_model(input_shape, num_labels):
     """
     inputs = tf.keras.Input(shape = input_shape)
     outs = CuDNNLSTM(units = 128)(inputs)
+    outs = tf.keras.layers.BatchNormalization()(outs)
+    outs = Dropout(rate = 0.25)(outs)
+    outs = Dense(256, activation='softmax')(outs)
+    outs = tf.keras.layers.BatchNormalization()(outs)
     outs = Dropout(rate = 0.25)(outs)
     outs = Dense(num_labels, activation='softmax')(outs)
 
@@ -63,7 +67,6 @@ def train_and_save_model(
         validation_data = (val_X, val_y))
 
 
-
 if __name__ == "__main__":
     import argparse
     import pickle 
@@ -75,7 +78,6 @@ if __name__ == "__main__":
     parser.add_argument("-only_best_eval", action = "store_true")    
 
     args = parser.parse_args()
-
     # get data
     with open(args.train_datafile, 'rb') as f:
         train_X, train_y = pickle.load(f)
@@ -86,13 +88,13 @@ if __name__ == "__main__":
     print (train_X.shape, train_y.shape)
     print (test_X.shape, test_y.shape)
     num_labels = 46
-    input_shape =  train_X.shape[1:] # (300, 50)
+    input_shape =  train_X.shape[1:] # (300, 50 or 100 or 300)
     batch_size = 128
     num_epoch = 5000
     patience = 100
     lr = 0.001
 
-    dest = "data/models/lstm/reuters/n_64"
+    dest = "data/models/lstm/reuters/lstm_dnn_dnn/temp"
     os.makedirs(dest, exist_ok=True)
     checkpoint_path = os.path.join(dest, "cp.best.ckpt") 
 

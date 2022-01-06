@@ -103,8 +103,8 @@ def load_data(which, path_to_data,
 		#
 		train_data = [[],[]]
 		sorted_train_vs = [train_vs[n] for n in names_in_train]
-		train_data[0] = [vs[0] for vs in sorted_train_vs]
-		train_data[1] = [vs[1] for vs in sorted_train_vs]
+		train_data[0] = np.array([np.moveaxis(vs[0],[0],[-1]) for vs in sorted_train_vs])
+		train_data[1] = np.array([vs[1] for vs in sorted_train_vs])
 		
 		test_data = [[],[]]
 		test_vs = {}
@@ -112,8 +112,8 @@ def load_data(which, path_to_data,
 			test_vs[image_names[0]] = [images.numpy()[0], image_labels.item()]
 		#
 		sorted_test_vs = [test_vs[n] for n in names_in_test]
-		test_data[0] = [vs[0] for vs in sorted_test_vs]
-		test_data[1] = [vs[1] for vs in sorted_test_vs]
+		test_data[0] = np.array([np.moveaxis(vs[0],[0],[-1]) for vs in sorted_test_vs])
+		test_data[1] = np.array([vs[1] for vs in sorted_test_vs])
 	elif which in ['fashion_mnist', 'cifar10']:# != 'GTSRB':
 		import torch
 		import torchvision

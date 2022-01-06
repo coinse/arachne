@@ -108,81 +108,81 @@ def get_vgg19_mdl_from_scratch_v2(num_classes = 2, input_shape = (32,32,3), batc
 	img_input = tf.keras.Input(shape = input_shape)
 
 	# Block 1
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block1_padding1')(img_input)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block1_padding1')(img_input)
 	x = layers.Conv2D(
-			64, (3, 3), activation='relu', padding='valid', name='block1_conv1', data_format = data_format)(img_input)
+			64, (3, 3), activation='relu', padding = 'same', name='block1_conv1', data_format = data_format)(img_input)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block1_padding2')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block1_padding2')(x)
 	x = layers.Conv2D(
-			64, (3, 3), activation='relu', padding='valid', name='block1_conv2', data_format = data_format)(x)
+			64, (3, 3), activation='relu', padding = 'same', name='block1_conv2', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
 	x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
 
 	# Block 2
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block2_padding1')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block2_padding1')(x)
 	x = layers.Conv2D(
-			128, (3, 3), activation='relu', padding='valid', name='block2_conv1', data_format = data_format)(x)
+			128, (3, 3), activation='relu', padding = 'same', name='block2_conv1', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block2_padding2')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block2_padding2')(x)
 	x = layers.Conv2D(
-			128, (3, 3), activation='relu', padding='valid', name='block2_conv2', data_format = data_format)(x)
+			128, (3, 3), activation='relu', padding = 'same', name='block2_conv2', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
 	x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
 
 	# Block 3
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding1')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding1')(x)
 	x = layers.Conv2D(
-			256, (3, 3), activation='relu', padding='valid', name='block3_conv1', data_format = data_format)(x)
+			256, (3, 3), activation='relu', padding = 'same', name='block3_conv1', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding2')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding2')(x)
 	x = layers.Conv2D(
-			256, (3, 3), activation='relu', padding='valid', name='block3_conv2', data_format = data_format)(x)
+			256, (3, 3), activation='relu', padding = 'same', name='block3_conv2', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding3')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding3')(x)
 	x = layers.Conv2D(
-			256, (3, 3), activation='relu', padding='valid', name='block3_conv3', data_format = data_format)(x)
+			256, (3, 3), activation='relu', padding = 'same', name='block3_conv3', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding4')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block3_padding4')(x)
 	x = layers.Conv2D(
-			256, (3, 3), activation='relu', padding='valid', name='block3_conv4', data_format = data_format)(x)
+			256, (3, 3), activation='relu', padding = 'same', name='block3_conv4', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
 	x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
 
 	# Block 4
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding1')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding1')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block4_conv1', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block4_conv1', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding2')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding2')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block4_conv2', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block4_conv2', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding3')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding3')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block4_conv3', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block4_conv3', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding4')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block4_padding4')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block4_conv4', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block4_conv4', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
 	x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
 
 	# Block 5
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding1')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding1')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block5_conv1', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block5_conv1', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding2')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding2')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block5_conv2', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block5_conv2', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding3')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding3')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block5_conv3', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block5_conv3', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
-	x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding4')(x)
+	#x = layers.ZeroPadding2D(padding=(1,1), data_format = data_format, name='block5_padding4')(x)
 	x = layers.Conv2D(
-			512, (3, 3), activation='relu', padding='valid', name='block5_conv4', data_format = data_format)(x)
+			512, (3, 3), activation='relu', padding = 'same', name='block5_conv4', data_format = data_format)(x)
 	if batch_norm: x = layers.BatchNormalization(axis = 1)(x)
 	x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
 	
@@ -223,7 +223,7 @@ def train(mdl, train_X, train_y, test_X, test_y, destfile,
 			monitor = 'val_acc', 
 			mode = 'max', 
 			verbose = 1,
-			save_weights_only =True, 
+			#save_weights_only =True, 
 			save_best_only = True)
 		]	
 
@@ -279,9 +279,12 @@ args = parser.parse_args()
 
 data_format = 'channels_last'
 dropout_rate = 0.
+num_epoch = 1 #500
+patience = 0 # 100
 
 which = 'lfw_vgg'
 which_data = 'lfw'
+
 path_to_female_names = 'data/lfw_np/female_names_lfw.txt'
 train_data, test_data = data_util.load_data(which_data, args.datadir, 
 	path_to_female_names = path_to_female_names)
@@ -307,7 +310,7 @@ else:
 
 train(mdl, train_data[0], data_util.format_label(train_data[1], 2), 
 	test_data[0], data_util.format_label(test_data[1],2), destfile, 
-	num_epoch = 500, patience = 100, batch_size = 64)
+	num_epoch = num_epoch, patience = patience, batch_size = 64)
 
 saved_model = tf.keras.models.load_model(destfile)
 
@@ -317,17 +320,17 @@ _, test_acc = saved_model.evaluate(test_data[0], data_util.format_label(test_dat
 
 print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
 
-checkpoint_path = os.path.join(args.dest, "cp.best.ckpt") 
-mdl.load_weights(checkpoint_path)
-best_mdl_destfile = os.path.join(args.dest, "LFW_gender_classifier_best.h5")
+#checkpoint_path = os.path.join(args.dest, "cp.best.ckpt") 
+#mdl.load_weights(checkpoint_path)
+new_mdl_destfile = os.path.join(args.dest, "LFW_gender_classifier_v2.h5")
 
 if args.version == 2:
 	frame_mdl = get_vgg19_mdl_from_scratch_v2(
 		num_classes = 2, input_shape = (32,32,3), batch_norm = False, dropout_rate = dropout_rate, data_format = data_format)
 
 	# get weights
-	weights_from_transfered_learning = get_weights_of_transfered_vgg19(mdl)
+	weights_from_transfered_learning = get_weights_of_transfered_vgg19(saved_model)
 	filled_mdl = update_weights_of_frame_model(frame_mdl, weights_from_transfered_learning)
 	tf.keras.models.save_model(filled_mdl, best_mdl_destfile)
-else:
-	tf.keras.models.save_model(mdl, best_mdl_destfile)
+#else:
+#	tf.keras.models.save_model(mdl, best_mdl_destfile)

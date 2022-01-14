@@ -93,6 +93,9 @@ parser.add_argument("-rq", type = int, default = 0, help = "should be one of: 2,
 parser.add_argument("-top_n", type = int, default = 0, help = "required for rq3")
 parser.add_argument("-seed", type = int, help = "required for rq2")
 parser.add_argument("-on_both", action='store_true')
+parser.add_argument("-female_lst_file", action = 'store',
+	default = None, help = 'data/lfw_np/female_names_lfw.txt', type = str)
+
 args = parser.parse_args()
 
 if not os.path.exists(args.path_to_patch): # pattern is given instead of a concrete path
@@ -110,7 +113,7 @@ else:
 	dest = args.dest
 os.makedirs(dest, exist_ok = True)
 
-train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = False)
+train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = False, path_to_female_names = args.female_lst_file)
 train_X,train_y = train_data
 X,y = test_data
 print ('Training: {}, Test: {}'.format(len(train_y), len(y)))
@@ -145,6 +148,8 @@ else:
 ##
 if args.which_data == 'imdb':
         has_lstm_layer = True; is_multi_label = False if 'multi' not in args.path_to_init_model else True
+elif args.which_data == 'us_airline':
+	has_lstm_layer = True; is_multi_label = True
 else:
         has_lstm_layer = False; is_multi_label = True
 
@@ -171,6 +176,7 @@ if args.on_both or args.rq in [3,4,5]:
 
 	combined_df = combine_init_aft_predcs(init_pred_df_eval, aft_pred_df_eval)
 	filename = os.path.join(dest, pred_name + ".eval.pkl")
+	print ("results written to {}".format(filename))
 	combined_df.to_pickle(filename)
 
 	print ('For test:')
@@ -186,7 +192,9 @@ init_model.summary()
 aft_pred_df_used = gen_and_run_model(init_model, path_to_patch, used_X, used_y, num_label, 
 	has_lstm_layer = has_lstm_layer, is_multi_label = is_multi_label, need_act = need_act, batch_size = args.batch_size)
 combined_df = combine_init_aft_predcs(init_pred_df_used, aft_pred_df_used)
+print ("=====")
 filename = os.path.join(dest, pred_name + ".train.pkl")
+print ("results write to {}".format(filename))
 combined_df.to_pickle(filename)
 
 print ('For train:')

@@ -77,7 +77,7 @@ def get_lfw_data(is_train = True):
 	return {'name':names, 'at':at_arr, 'true':true_label_arr, 'pred':pred_label_arr}
 
 
-def load_data(which, path_to_data, 
+def load_data(which, path_to_data,
 	is_input_2d = False, 
 	path_to_female_names = None, 
 	with_hist = True):
@@ -137,7 +137,7 @@ def load_data(which, path_to_data,
 		
 		for data in trainloader:
 			images, labels = data
-			if which == 'fashion_mnist':
+			if which == 'fashion_mnist' and is_input_2d is not None:
 				if is_input_2d: # for RQ1s
 					train_data[0].append(images.numpy()[0].reshape(-1,))
 				else:
@@ -152,7 +152,7 @@ def load_data(which, path_to_data,
 		test_data = [[],[]]
 		for data in testloader:
 			images, labels = data
-			if which == 'fashion_mnist': 
+			if which == 'fashion_mnist' and is_input_2d is not None: 
 				if is_input_2d: # for RQ1
 					test_data[0].append(images.numpy()[0].reshape(-1,))
 				else:
@@ -163,7 +163,7 @@ def load_data(which, path_to_data,
 
 		test_data[0] = np.asarray(test_data[0])
 		test_data[1] = np.asarray(test_data[1])
-	elif which in ['GTSRB', 'imdb', 'reuters']: # GTSRB
+	elif which in ['GTSRB', 'imdb', 'reuters', 'us_airline']: # GTSRB
 		import pickle
 		# train
 		if which == 'GTSRB' and with_hist:

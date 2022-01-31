@@ -27,12 +27,14 @@ parser.add_argument("-dest", default = ".", type = str)
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = float)
 parser.add_argument("-female_lst_file", action = 'store', 
 	default = 'data/lfw_np/female_names_lfw.txt', type = str)
+parser.add_argument("-batch_size", type = int, default = None)
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
 
 which = 'lfw_vgg'
 which_data = 'lfw'
+print ("datadir", args.datadir, args.female_lst_file)
 train_data, test_data = data_util.load_data(which_data, args.datadir, 
 	path_to_female_names = args.female_lst_file)
 
@@ -79,9 +81,11 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	loc_method = "localiser",
 	patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
 	path_to_keras_model = args.path_to_keras_model,
-	predef_indices_to_wrong = indices,
+	predef_indices_to_chgd = indices,
 	seed = args.seed,
-	patch_aggr = args.patch_aggr)
+	patch_aggr = args.patch_aggr,
+	batch_size = args.batch_size,
+	target_all = True)
 		
 t2 = time.time()
 print ("Time for patching: {}".format(t2 - t1))

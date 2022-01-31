@@ -23,12 +23,13 @@ def get_weights(model):
 	return kernel_and_bias_pairs
 
 
-def run_model(mdl, X, y, which_data, is_multi_label = True, ret_raw = False):
+def run_model(mdl, X, y, is_multi_label = True, ret_raw = False):
 	"""
 	"""
 	import pandas as pd
 	
-	predcs = mdl.predict(X) #if which_data != 'fashion_mnist' else mdl.predict(X).reshape(len(X),-1)
+	predcs = mdl.predict(X) #if which_data != 'fashion_mnist' else mdl.predict(X).reshape(len(X),-1) # need to check whether this always work 
+	#print ("preds", predcs.shape, X.shape)
 	if len(predcs.shape) > 3:
 		predcs = np.squeeze(predcs, axis = 1)
 	if is_multi_label:
@@ -36,7 +37,6 @@ def run_model(mdl, X, y, which_data, is_multi_label = True, ret_raw = False):
 	else:
 		pred_labels = np.round(predcs).flatten()
 		predcs = predcs.flatten()
-
 	aft_preds = []
 	aft_preds_column = ['index', 'true', 'pred', 'flag'] if not ret_raw else ['index', 'true', 'pred', 'pred_v', 'flag']
 	for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):

@@ -130,7 +130,7 @@ def build_partially_fronzen_model(mdl, X, indices_to_tls, indices_to_tneurons):
 	return fn, t_ws, ys
 
 
-def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
+def build_mdl_lst(org_mdl, prev_out_shape, indices_to_tls):
 	"""
 	New 
 	"""
@@ -140,6 +140,8 @@ def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
 	import tensorflow.keras.backend as K
 	from collections.abc import Iterable
 
+	mdl = tf.keras.models.clone_model(org_mdl)
+	
 	# dictionary to describe the network graph
 	network_dict = {'input_layers_of': {}, 'new_output_tensor_of': {}}
 
@@ -179,7 +181,6 @@ def build_mdl_lst(mdl, prev_out_shape, indices_to_tls):
 
 		if len(layer_input) == 1:
 			layer_input = layer_input[0]
-		
 		x = layer(layer_input)
 		# Set new output tensor (the original one, or the one of the replaced layer)
 		network_dict['new_output_tensor_of'].update({layer_name: x}) # x is the output of the layer "layer_name" (current one)
@@ -454,13 +455,17 @@ def build_k_frame_model(mdl, X, indices_to_tls, act_func = None):
 					t_w = tf.placeholder(dtype = w.dtype, shape = w.shape)
 					t_b = tf.constant(b, dtype = b.dtype)
 					
+					if layer.get_config()['data_format'] == 'channels_first':
+						data_format  = 'NCHW'
+					else: # channels_last
+						data_format = 'NHWC'
 					x = tf.nn.conv2d(layer_input, 
 							t_w,
 							strides = list(layer.get_config()['strides'])*2, 
 							padding = layer.get_config()['padding'].upper(), 
-							data_format = 'NCHW',  
+							data_format = data_format,  
 							name = layer_name)
-					x = tf.nn.bias_add(x, t_b, data_format = 'NCHW')
+					x = tf.nn.bias_add(x, t_b, data_format = data_format)
 					if act_func is not None: # tf.nn.relu
 						x = act_func(x)
 					t_ws.append(t_w)

@@ -31,38 +31,58 @@ parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
 parser.add_argument("-on_train", action = "store_true", help = "if given, then evaluate on the training data")
 parser.add_argument("-top_n", type = int, default = None)
+parser.add_argument("-female_lst_file", action = 'store', 
+	default = 'data/lfw_np/female_names_lfw.txt', type = str)
+parser.add_argument("-loc_method", action = "store", default = 'localiser')
 
 args = parser.parse_args()
 
 os.makedirs(args.dest, exist_ok = True)
 
-train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist))
-target_data = test_data if not args.on_train else train_data
-target_X, target_y = target_data
-
 iter_num = args.iter_num
-num_label = args.num_label 
+num_label = args.num_label
 if args.top_n is None:
 	top_n = args.seed # to target a unique type of misbehaviour per run
-else: # mainly for RQ4
+else: # mainly for rq4 and rq5
 	top_n = args.top_n
 
-outs = data_util.get_balanced_dataset(args.target_indices_file, top_n, idx = 0)
-if not isinstance(outs, Iterable):
-	print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))
-	sys.exit()
-else:
-	(misclf_key, abs_indices, new_test_indices, _) = outs
-	target_data = (target_X[new_test_indices], target_y[new_test_indices]) 
-	indices = [new_test_indices.index(idx) for idx in abs_indices]
+if args.which_data != 'fm_for_rq5':
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = bool(args.w_hist), path_to_female_names = args.female_lst_file)
+	target_data = test_data if not args.on_train else train_data
+	target_X, target_y = target_data
+	outs = data_util.get_balanced_dataset(args.target_indices_file, top_n, idx = 0)
+	if not isinstance(outs, Iterable):
+		print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))
+		sys.exit()
+	else:
+		(misclf_key, abs_indices, new_test_indices, _) = outs
+		target_data = (target_X[new_test_indices], target_y[new_test_indices])
+		indices = [new_test_indices.index(idx) for idx in abs_indices]
 
-print ("Processing: {}".format("{}-{}".format(misclf_key[0], misclf_key[1])))
+	misclf_true, misclf_pred = misclf_key
+else: 
+	assert not args.on_train, "for rq5 + fm, we only support running on the half of test data"
+	target_data = data_util.load_rq5_fm_test_val(args.datadir, which_type = "val") # retrive the half of the test data, denoted as validation data
+	target_X, target_y = target_data	
+
+	top_n_misclf, indices_to_misclf, indices_to_corrclf = data_util.get_dataset_for_rq5(args.target_indices_file, top_n)	
+	misclf_true, misclf_pred = top_n_misclf	
+	
+	new_test_indices = list(np.append(indices_to_misclf, indices_to_corrclf))
+	target_data = (target_X[new_test_indices], target_y[new_test_indices])
+	# to get the local indices of misclassified inputs
+	indices = [new_test_indices.index(idx) for idx in indices_to_misclf]
+	print ("___", indices_to_misclf)
+
+print ("Processing: {}".format("{}-{}".format(misclf_true, misclf_pred)))
 #num_of_sampled_correct = num_test - num_entire_misclfs
 #print ("The number of correct samples: {}".format(num_of_sampled_correct))
-
-#num_wrong_inputs_to_patch = len(indices)
-#print ('pre_defined', num_wrong_inputs_to_patch)	
+num_wrong_inputs_to_patch = len(indices)
+print ('pre_defined', num_wrong_inputs_to_patch)	
+print (indices)
 t1 = time.time()
+#print (len(abs_indices))
+
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 	num_label,
 	target_data,
@@ -70,13 +90,19 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	max_search_num = iter_num, 
 	search_method = 'DE',
 	which = args.which,
-	loc_method = "localiser",
-	patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_key[0],misclf_key[1])),
+	loc_method = args.loc_method,
+	patch_target_key = "misclf-{}-{}".format(args.patch_key,"{}-{}".format(misclf_true,misclf_pred)),
 	path_to_keras_model = args.path_to_keras_model,
 	predef_indices_to_chgd = indices, 
 	seed = args.seed,
 	patch_aggr = args.patch_aggr,
 	batch_size = args.batch_size,
+	is_multi_label = True, #True if args.which != 'lstm' else False,  
+	#loc_dest = "new_loc/rq6/all/use_both/pa2",
+	#loc_dest = "new_loc/lstm/us_airline/top_{}/pa{}".format(top_n, args.patch_aggr),
+	#loc_dest = "new_loc/lstm/us_airline/pos_and_neg/pa{}".format(args.patch_aggr),
+	loc_dest = "new_loc/rq5/fm_for_rq5",
+	#loc_dest = "new_loc/lstm/us_airline/only_the_last", #"new_loc/rq6/all/use_both/pa3", #,"new_loc/lstm/us_airline", # "rq2_loc_reuter/only_last", #"new_loc/rq6/all/use_both",
 	target_all = True)
 		
 t2 = time.time()

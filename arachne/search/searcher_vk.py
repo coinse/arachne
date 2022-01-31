@@ -63,6 +63,7 @@ class Searcher(object):
 			self.ground_truth_labels = labels
 			#self.lstm_mdl = True
 		self.lstm_mdl = is_lstm
+		print ("This model is a lstm model: {}".format(self.lstm_mdl))
 		self.model_name = "model"
 		self.model_name_format = self.model_name + ".{}"
 
@@ -499,7 +500,7 @@ class Searcher(object):
 		new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
 		##
 		combined_losses	= (new_losses_of_correct, new_losses_of_wrong)
-
+		#print ("==", "**", self.is_multi_label, self.lstm_mdl, self.num_label, num_corr_true, self.np.sum(1/(losses_of_correct[indices_to_corr_false] + 1)), num_wrong_true, self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1)))
 		return predictions, correct_predictions, combined_losses
 		#return sess, (predictions, correct_predictions, combined_losses)
 		
@@ -622,6 +623,7 @@ class Searcher(object):
 		num_wrong_true = len(self.indices_to_wrong) - len(indices_to_wrong_false)
 		new_losses_of_wrong = num_wrong_true + self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1))
 		##
+		print ("==", "**", self.is_multi_label, self.lstm_mdl, self.num_label, num_corr_true, self.np.sum(1/(losses_of_correct[indices_to_corr_false] + 1)), num_wrong_true, self.np.sum(1/(losses_of_wrong[indices_to_wrong_false] + 1)))
 		combined_losses	= (new_losses_of_correct, new_losses_of_wrong)
 		return predictions, correct_predictions, combined_losses
 		

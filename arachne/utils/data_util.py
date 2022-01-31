@@ -76,6 +76,53 @@ def get_lfw_data(is_train = True):
 
 	return {'name':names, 'at':at_arr, 'true':true_label_arr, 'pred':pred_label_arr}
 
+def combine(list_of_imgs):
+	"""
+	"""
+	combined = list_of_imgs[0]
+	for i in range(1, len(list_of_imgs)):
+		combined = np.append(combined, list_of_imgs[i], axis = 0)
+	org_shape = combined.shape
+	combined = combined.reshape(org_shape[0], 1, org_shape[1], org_shape[2])
+	return combined	
+
+
+def load_rq5_fm_test_val(datadir, which_type = "both"):
+	"""
+	"""
+	import pickle, os
+	def get_labels(list_of_imgs):
+		labels = []
+		for i in range(len(list_of_imgs)):
+			for j in range(len(list_of_imgs[i])):
+				labels.append(i)
+		return np.int32(np.array(labels))
+
+	test_datafile = os.path.join(datadir, 'fmnist_test.pkl')
+	val_datafile = os.path.join(datadir, 'fmnist_val.pkl')
+	if which_type == 'both':
+		with open(test_datafile, 'rb') as f:
+			test_X = pickle.load(f)
+		test_data = [combine(test_X)/255, get_labels(test_X)]
+
+		with open(val_datafile, 'rb') as f:
+			val_X = pickle.load(f)
+		val_data =  [combine(val_X)/255, get_labels(val_X)]
+		return {'test':test_data, 'val':val_data}
+	elif which_type	== 'test':
+		with open(test_datafile, 'rb') as f:
+			test_X = pickle.load(f)
+		test_data = [combine(test_X)/255, get_labels(test_X)]
+		return test_data
+	elif which_type == 'val':
+		with open(val_datafile, 'rb') as f:
+			val_X = pickle.load(f)
+		val_data =  [combine(val_X)/255, get_labels(val_X)]
+		return val_data
+	else:
+		print ("Wrong type: {}".format(which_type))
+		assert False
+
 
 def load_data(which, path_to_data,
 	is_input_2d = False, 
@@ -137,9 +184,10 @@ def load_data(which, path_to_data,
 		
 		for data in trainloader:
 			images, labels = data
-			if which == 'fashion_mnist' and is_input_2d is not None:
+			if which == 'fashion_mnist': # and bool(is_input_2d):
 				if is_input_2d: # for RQ1s
-					train_data[0].append(images.numpy()[0].reshape(-1,))
+					#train_data[0].append(images.numpy()[0].reshape(-1,))
+					train_data[0].append(images.numpy()[0]) # for rq5
 				else:
 					train_data[0].append(images.numpy()[0].reshape(1,-1))
 			else:
@@ -152,9 +200,10 @@ def load_data(which, path_to_data,
 		test_data = [[],[]]
 		for data in testloader:
 			images, labels = data
-			if which == 'fashion_mnist' and is_input_2d is not None: 
+			if which == 'fashion_mnist': # and is_input_2d is not None: 
 				if is_input_2d: # for RQ1
-					test_data[0].append(images.numpy()[0].reshape(-1,))
+					#test_data[0].append(images.numpy()[0].reshape(-1,))
+					test_data[0].append(images.numpy()[0]) # for rq5
 				else:
 					test_data[0].append(images.numpy()[0].reshape(1,-1))
 			else:
@@ -299,7 +348,8 @@ def get_balanced_dataset(pred_file, top_n, idx = 0):
 	idx = 0 or 1 -> to which half, 0 = front half, 1 = latter half
 	"""
 	import pandas as pd
-	
+	from collections.abc import Iterable
+
 	idx = idx if idx == 0 else 1 # only 0 or 1
 	target_idx = idx; eval_idx = np.abs(1 - target_idx)
 	
@@ -314,7 +364,9 @@ def get_balanced_dataset(pred_file, top_n, idx = 0):
 	indices_to_corr_eval = [_idx for i,_idx in enumerate(indices_to_corr) if i % 2 == eval_idx]
 
 	np.random.seed(0)
-	if top_n < len(sorted_keys):
+	if top_n >= len(sorted_keys):
+		assert False, "{} is provided when there is only {} number of misclfs".format(top_n, len(sorted_keys))
+	else:
 		misclf_key = sorted_keys[top_n]
 		misclf_indices = misclfds_idx_target[misclf_key]
 
@@ -322,16 +374,16 @@ def get_balanced_dataset(pred_file, top_n, idx = 0):
 		for sorted_k in sorted_keys: # this means that all incorrect ones are include in new_data
 			new_data_indices.extend(misclfds_idx_target[sorted_k])
 			new_test_indices.extend(misclfds_idx_eval[sorted_k])
-			
+		
 		new_data_indices += indices_to_corr_target
 		new_test_indices += indices_to_corr_eval
 
 		np.random.shuffle(new_data_indices)
 		np.random.shuffle(new_test_indices)	
-
+			
 		return (misclf_key, misclf_indices, new_data_indices, new_test_indices)
-	else:
-		return len(sorted_keys)
+	#else:
+	#	return len(sorted_keys)
 
 
 def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
@@ -388,6 +440,22 @@ def return_chunks(num, batch_size = None):
 		num_split = 1
 	chunks = np.array_split(np.arange(num), num_split)
 	return chunks
+
+
+def get_dataset_for_rq5(pred_file, top_n):
+	"""
+	"""
+	import pandas as pd
+	df = pd.read_csv(pred_file, index_col = 'index')
+	misclf_df = df.loc[df.true != df.pred]
+	misclf_cnts = dict(misclf_df.groupby(['true','pred']).size())
+	sorted_misclf_cnts = sorted([vs for vs in misclf_cnts.items()], key = lambda v:v[1], reverse = True)
+	top_n_misclf = sorted_misclf_cnts[int(top_n)][0]
+ 
+	indices_to_misclf = df.loc[(df.true == top_n_misclf[0]) & (df.pred == top_n_misclf[1])].index.values
+	indices_to_corrclf = df.loc[df.true == df.pred].index.values
+
+	return top_n_misclf, indices_to_misclf, indices_to_corrclf
 
 
 

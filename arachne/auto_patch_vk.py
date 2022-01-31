@@ -103,12 +103,7 @@ def patch(
 		indices_to_target = data_util.split_into_wrong_and_correct(correct_predictions)
 		#check whether given predef_indices_to_chgd to wrong is actually correct
 		if predef_indices_to_chgd is not None:  # Since, here, we asssume an ideal model
-			print ("**", predef_indices_to_chgd[0])
 			diff = set(predef_indices_to_chgd) - set(indices_to_target['wrong'])
-			#print (len(set(predef_indices_to_chgd)), len(set(indices_to_target['wrong'])))
-			#print (np.argmax(predictions, axis = 1)[list(diff)[0]])
-			#print (np.argmax(data_y, axis = 1)[list(diff)[0]])
-			
 			assert len(diff) == 0, diff 
 		indices_to_target['wrong'] = predef_indices_to_chgd
 	else: # only loc, so do not need to care about correct and wrong classification
@@ -210,7 +205,6 @@ def patch(
 		# comment out end for loc result saving 
 	elif loc_method == 'localiser':
 		if loc_file is None or not (os.path.exists(loc_file)):
-			print (len(indices_to_correct_for_loc), len(indices_to_selected_wrong))
 			print ("Now ready to localiser")
 			### *** Now this may return (idx_to_tl, idx_to_w (0 for kerenl and 1 for recurr_kernel)) 
 			print ("x", X_for_loc.shape)
@@ -223,13 +217,12 @@ def patch(
 				target_weights,
 				path_to_keras_model = path_to_keras_model, 
 				is_multi_label = is_multi_label)
-			#indices_to_places_to_fix = [((1, 1), (8, 261)), ((1, 1), (57, 320)), ((1, 1), (57, 333)), ((1, 1), (57, 346)), ((1, 1), (91, 380)), ((1, 1), (108, 353)), (2, (43, 0)), (2, (63, 0)), (2, (67, 0)), (2, (108, 0))]
 			print ("Places to fix", indices_to_places_to_fix)
 			output_df = pd.DataFrame({'layer':[vs[0] for vs in indices_to_places_to_fix], 'weight':[vs[1] for vs in indices_to_places_to_fix]})
 			loc_dest = os.path.join(loc_dest, "new_loc/{}/c_loc/on_test/".format(which))
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
-			#output_df.to_pickle(destfile)
+			output_df.to_pickle(destfile)
 			
 			#print ("Saved to", destfile)
 			#with open(os.path.join(loc_dest, "loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all))), 'wb') as f:
@@ -270,6 +263,7 @@ def patch(
 		#	pickle.dump(indices_to_places_to_fix, f)
 
 	t2 = time.time()
+	
 	print ("Time taken for localisation: %f" % (t2 - t1))
 	print ("places to fix", indices_to_places_to_fix)	
 	print ("numebr of places to fix: {}".format(len(indices_to_places_to_fix)))
@@ -319,7 +313,8 @@ def patch(
 			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
 
 		places_to_fix = indices_to_places_to_fix
-		searcher.set_indices_to_wrong(indices_to_selected_wrong)
+		searcher.set_indices_to_wrong(indices_to_selected_wrong)	
+		#searcher.set_indices_to_wrong(np.random.choice(indices_to_selected_wrong, 30, replace = False))
 		name_key = str(0) if patch_target_key is None else str(patch_target_key)
 		patched_model_name, saved_path = searcher.search(places_to_fix, name_key = name_key)
 	else:

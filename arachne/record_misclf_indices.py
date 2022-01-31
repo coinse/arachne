@@ -70,7 +70,6 @@ elif args.which_data in ['GTSRB', 'imdb', 'reuters', 'lfw', 'us_airline']: # gts
 		X,y = train_data
 	else:
 		X,y = test_data
-
 else:# will be deleted later
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
 	if bool(args.is_train):
@@ -98,8 +97,6 @@ if args.which_data in ['cifar10', 'GTSRB', 'imdb', 'reuters', 'simple_lstm', 'lf
 else:
 	if loaded_model.inputs[0].shape[1:] == images.numpy()[0].shape:
 		predicteds = loaded_model.predict(X)
-		print ("haere", loaded_model.inputs)
-		print ("\t", X.shape)
 	else:
 		if is_input_2d:
 			print (loaded_model.inputs)

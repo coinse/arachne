@@ -60,7 +60,7 @@ class LFWFolder(data.Dataset):
         img_dir = os.path.join(root, split)
         self.image_names = os.listdir(img_dir)
         self.image_paths = list(map(lambda x: os.path.join(img_dir, x), self.image_names))
-        
+
         with open(path_to_female_names, 'r') as f:
             self.female_names = set(map(lambda x: x.strip(), f.readlines()))
         

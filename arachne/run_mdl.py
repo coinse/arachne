@@ -41,11 +41,22 @@ def get_data_for_evaluation(**kwargs):
 		return (indices_to_targeted, used_data)
 	elif rq in [3,5]:
 		top_n = kwargs['n']
-		outs = data_util.get_balanced_dataset(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
-		assert len(outs) == 4, index_file
+		if 'pos_neg' in kwargs.keys() and kwargs['pos_neg']:
+			outs_0_2 = data_util.get_balanced_dataset(index_file, 1, idx = 0) # idx = 0 -> 0 is used for patch generation
+			misclf_key_0_2, misclf_indices_0_2, new_data_indices, new_test_indices = outs_0_2
+			outs_2_0 = data_util.get_balanced_dataset(index_file, 4, idx = 0)
+			misclf_key_2_0, misclf_indices_2_0, _, _ = outs_2_0	
+			print ("Processing: {} and {}".format(
+				"{}-{}".format(misclf_key_0_2[0], misclf_key_0_2[1]), 
+				"{}-{}".format(misclf_key_2_0[0], misclf_key_2_0[1])))
+			misclf_indices = list(misclf_indices_0_2) + list(misclf_indices_2_0)
+			misclf_key = "pos_neg"
+		else:
+			outs = data_util.get_balanced_dataset(index_file, top_n, idx = 0) # idx = 0 -> 0 is used for patch generation
+			#assert len(outs) == 4, index_file
+			misclf_key, misclf_indices, new_data_indices, new_test_indices = outs	
+			print ("Processing: {},{}".format(misclf_key[0], misclf_key[1]))
 
-		misclf_key, misclf_indices, new_data_indices, new_test_indices = outs	
-		print ("Processing: {},{}".format(misclf_key[0], misclf_key[1]))
 		used_X = data_X[new_data_indices]; eval_X = data_X[new_test_indices]
 		used_misclf_X = data_X[misclf_indices]
 		used_y = data_y[new_data_indices]; eval_y = data_y[new_test_indices]
@@ -95,7 +106,7 @@ parser.add_argument("-seed", type = int, help = "required for rq2")
 parser.add_argument("-on_both", action='store_true')
 parser.add_argument("-female_lst_file", action = 'store',
 	default = None, help = 'data/lfw_np/female_names_lfw.txt', type = str)
-
+parser.add_argument("-is_pos_neg", action='store_true')
 args = parser.parse_args()
 
 if not os.path.exists(args.path_to_patch): # pattern is given instead of a concrete path
@@ -113,12 +124,16 @@ else:
 	dest = args.dest
 os.makedirs(dest, exist_ok = True)
 
-train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = False, path_to_female_names = args.female_lst_file)
-train_X,train_y = train_data
-X,y = test_data
-print ('Training: {}, Test: {}'.format(len(train_y), len(y)))
-indices = np.arange(len(y))
 num_label = args.num_label
+
+if args.which_data != 'fm_for_rq5':
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir, with_hist = False, path_to_female_names = args.female_lst_file)
+	train_X,train_y = train_data
+	X,y = test_data
+	print ('Training: {}, Test: {}'.format(len(train_y), len(y)))
+else:
+	data = data_util.load_rq5_fm_test_val(args.datadir, which_type = "both") # retrive the half of the test data, denoted as validation data
+#indices = np.arange(len(y))
 
 if args.rq == 2:
 	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'seed':args.seed}
@@ -132,12 +147,19 @@ if args.rq == 2:
 		used_X, used_y = train_X, train_y
 		eval_X, eval_y = X,y
 elif args.rq in [3,5]:
-	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
-		X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n)
-	used_X, used_y = used_data
-	eval_X, eval_y = eval_data
-	print ("used", used_X.shape, used_y.shape)	
-	print ("eval", eval_X.shape, eval_y.shape)
+	if args.which_data != 'fm_for_rq5':
+		(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(
+			X=X, y=y, rq=args.rq, file=args.index_file, n=args.top_n, pos_neg = args.is_pos_neg)
+		used_X, used_y = used_data
+		eval_X, eval_y = eval_data
+		print ("used", used_X.shape, used_y.shape)	
+		print ("eval", eval_X.shape, eval_y.shape)
+	else:
+		used_X, used_y = data['val']
+		eval_X, eval_y = data['test']
+		print ("used", used_X.shape, used_y.shape)
+		print ("eval", eval_X.shape, eval_y.shape)
+
 elif args.rq == 4:
 	(used_data, eval_data, used_misclf_data) = get_data_for_evaluation(X=X, y=y, rq=args.rq, file=args.index_file)
 	used_X, used_y = used_data
@@ -157,9 +179,9 @@ else:
 pred_name = os.path.basename(path_to_patch).replace("model", "pred")[:-4]
 
 init_model = load_model(args.path_to_init_model, compile = False)
-init_pred_df_used = run_model(init_model, used_X, used_y, args.which_data, is_multi_label = is_multi_label)
+init_pred_df_used = run_model(init_model, used_X, used_y, is_multi_label = is_multi_label)
 if args.on_both or args.rq in [3,4,5]: 
-	init_pred_df_eval = run_model(init_model, eval_X, eval_y, args.which_data, is_multi_label = is_multi_label)
+	init_pred_df_eval = run_model(init_model, eval_X, eval_y, is_multi_label = is_multi_label)
 	print ("here done")
 ####
 input_reshape = args.which_data	== 'fashion_mnist'
@@ -206,8 +228,5 @@ if args.rq == 2:
 	total_targeted = len(indices_to_targeted)
 	print ("Out of {}, {} are corrected: {}%".format(
 		total_targeted, num_corrected, np.round(100*num_corrected/total_targeted, decimals = 2)))
-#elif args.rq == 3:
-#	# RQ3 spec
-#	pass 
 
 

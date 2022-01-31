@@ -1,5 +1,5 @@
 from os import stat
-from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import LSTM, CuDNNLSTM
 import tensorflow as tf
 from tensorflow.keras.models import Model
 import numpy as np 
@@ -33,17 +33,21 @@ class LSTM_Layer(object):
 		print ("time step is {}".format(time_steps))
 		assert time_steps is not None, "For this time_steps should be given"
 		kernel_w, recurr_kernel_w, bias = self.init_lstm_layer.get_weights()
-		
-		inputs = tf.keras.Input(shape =input_shape[1:])
-		h_state_input = tf.keras.Input(shape = (input_shape[-1],))
-		c_state_input = tf.keras.Input(shape = (input_shape[-1],))
-		new_lstm = LSTM(self.init_lstm_layer.units, 
+		# change to accept variout shapes of inputs -> both all & per time-step
+		print ("Input shape", input_shape)
+		inputs = tf.keras.Input(shape = (None, None)) #[None] + list(input_shape[2:])))# input_shape[1:])
+		h_state_input = tf.keras.Input(shape = (None,))#(input_shape[-1],))
+		c_state_input = tf.keras.Input(shape = (None,))#(input_shape[-1],))
+		#new_lstm = LSTM(
+		new_lstm = CuDNNLSTM(
+			self.init_lstm_layer.units, 
 			kernel_initializer=tf.constant_initializer(kernel_w),
 			recurrent_initializer=tf.constant_initializer(recurr_kernel_w),
 			bias_initializer=tf.constant_initializer(bias),
 			return_sequences = False, 
-			return_state=True,
-			input_shape = input_shape)
+			return_state=True)#,
+			#input_shape = input_shape)
+
 		skip = ['units', 'kernel_initializer', 'recurrent_initializer', 'bias_initializer', 'input_shape', 'return_state']
 		for k,v in self.init_lstm_layer.__dict__.items():
 			if k not in skip:
@@ -59,15 +63,26 @@ class LSTM_Layer(object):
 		mdl2.summary()
 
 		h_states = []; cell_states = []
+		print ("prev", prev_output.shape)
+		print (mdl2.summary())
 		for t in range(time_steps):
+			curr_prev_output = prev_output[:,t:t+1,:]
+			#print ("curr output", curr_prev_output.shape)
+			#print (mdl2.inputs[0].shape, len(mdl2.inputs[0].shape), len(curr_prev_output.shape))
+			if len(mdl2.inputs[0].shape) < len(curr_prev_output.shape):
+				curr_prev_output = np.squeeze(curr_prev_output, axis = 1)
+
 			if t == 0:
-				_, h_state, cell_state = mdl2.predict(prev_output[:,t:t+1,:])
+				#print ("when t is 0", curr_prev_output.shape)
+				_, h_state, cell_state = mdl2.predict(curr_prev_output)
+				#print ("out", h_state.shape, cell_state.shape)
 			else:
-				_, h_state, cell_state = mdl.predict([prev_output[:,t:t+1,:], h_state, cell_state])
+				#print (curr_prev_output.shape)
+				#print (h_state.shape, cell_state.shape)
+				_, h_state, cell_state = mdl.predict([curr_prev_output, h_state, cell_state])
+			#print ('{}th time-step'.format(t), h_state.shape, cell_state.shape)
 			h_states.append(h_state) 
 			cell_states.append(cell_state) 
-		print (mdl.output)
-		print (mdl2.output)
 		h_states = np.asarray(h_states) # shape = (time_steps, batch_size, num_units)
 		h_states = np.moveaxis(h_states, [0,1], [1,0]) # shape = (batch_size, time_steps, num_units)
 		

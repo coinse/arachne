@@ -64,7 +64,7 @@ elif args.which_data in ['GTSRB', 'imbd']: # gtsrb
 		X,y = test_data
 
 else:# will be deleted later
-	rain_data, test_data = data_util.load_data(args.which_data, args.datadir)
+	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
 	if bool(args.is_train):
 		X,y = train_data
 	else:

@@ -3,27 +3,37 @@ Train an LSTM-based model to categorise the newswires in the reuters dataset
 """
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, CuDNNLSTM, Dropout
+from tensorflow.keras.layers import Dense, CuDNNLSTM, Dropout, Embedding
 import os
 import utils.data_util as data_util
+import numpy as np
 
 def build_simple_ReusterLSTM_model(input_shape, num_labels, num_units = 128, ver = 1):
     """
     """
     inputs = tf.keras.Input(shape = input_shape)
-
-    outs = CuDNNLSTM(units = num_units)(inputs) # 32 
+    outs = Dropout(rate = 0.3)(outs)
+    outs = CuDNNLSTM(units = num_units)(outs)  
     outs = tf.keras.layers.BatchNormalization()(outs)
     outs = Dropout(rate = 0.5)(outs)
 
     if ver == 1:
-        outs = Dense(num_units * 2, activation = 'relu')(outs)
+        outs = Dense(np.max([num_units*2, num_labels*2]), activation = 'relu')(outs)
+        outs = tf.keras.layers.BatchNormalization()(outs)
+        outs = Dropout(rate = 0.3)(outs)
+    elif ver == 2:
+        outs = Dense(np.max([num_units*4, num_labels*4]), activation = 'relu')(outs)
+        outs = tf.keras.layers.BatchNormalization()(outs)
+        outs = Dropout(rate = 0.5)(outs)
+        outs = Dense(num_labels*2, activation = 'relu')(outs)
         outs = tf.keras.layers.BatchNormalization()(outs)
         outs = Dropout(rate = 0.5)(outs)
 
     outs = Dense(num_labels, activation = 'softmax')(outs)
 
     model = Model(inputs = inputs, outputs = outs)
+    model.summary()
+    sys.exit()
     return model 
 
 
@@ -54,7 +64,7 @@ def train_and_save_model(
             monitor = 'val_acc', 
             mode = 'max', 
             verbose = 1, 
-            #save_weights_only =True,
+            save_weights_only =True,
             save_best_only = True)
         ]   
 
@@ -125,7 +135,10 @@ if __name__ == "__main__":
     print ("evaluate with the best weights")
     model.load_weights(checkpoint_path)
     score, acc = model.evaluate(test_X, data_util.format_label(test_y, num_labels), batch_size = batch_size)
+    train_score, train_acc = model.evaluate(train_X, data_util.format_label(train_y, num_labels), batch_size = batch_size)
     print ("For best:")
+    print('\tTrain score:', train_score)
+    print('\tTrain accuracy:', train_acc)
     print('\tTest score:', score)
     print('\tTest accuracy:', acc)
     best_mdl_destfile = os.path.join(args.dest, "reuter_lstm_best.h5")

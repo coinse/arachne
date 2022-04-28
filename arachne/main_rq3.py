@@ -98,10 +98,12 @@ patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.pa
 	patch_aggr = args.patch_aggr,
 	batch_size = args.batch_size,
 	is_multi_label = True, #True if args.which != 'lstm' else False,  
-	#loc_dest = "new_loc/rq6/all/use_both/pa2",
+	loc_dest = "new_loc/rq6/all/use_both/new/pa1",
 	#loc_dest = "new_loc/lstm/us_airline/top_{}/pa{}".format(top_n, args.patch_aggr),
 	#loc_dest = "new_loc/lstm/us_airline/pos_and_neg/pa{}".format(args.patch_aggr),
-	loc_dest = "new_loc/rq5/fm_for_rq5",
+	#loc_dest = "new_loc/rq5/fm_for_rq5/pa10",
+	#loc_dest = "new_loc/rq6/all/use_both/pa2.5",
+	loc_file = "new_loc/rq6/all/use_both/new/pa1/new_loc/lfw_vgg/c_loc/on_test/loc.misclf-rq6.0.0-0-1.1.pkl",
 	#loc_dest = "new_loc/lstm/us_airline/only_the_last", #"new_loc/rq6/all/use_both/pa3", #,"new_loc/lstm/us_airline", # "rq2_loc_reuter/only_last", #"new_loc/rq6/all/use_both",
 	target_all = True)
 		

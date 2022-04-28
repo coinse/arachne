@@ -244,10 +244,13 @@ class DE_searcher(Searcher):
 		#max_value = self.np.max(init_weight_value)
 		#bounds = self.set_bounds(num_places_to_fix, init_weight_value) # for clipping
 		bounds = []
+		self.mean_values = []; self.std_values = []
 		for idx_to_tl, _ in places_to_fix: # ** HAVE CHANGED TO HANDLE (idx_to_tl, idx_to_w (0 or 1))
 			_init_weight = self.init_weights[idx_to_tl]
 			mean_value = self.np.mean(_init_weight)
+			self.mean_values.append(mean_value)
 			std_value = self.np.std(_init_weight)
+			self.std_values.append(std_value)
 			#min_value = self.np.min(_init_weight)
 			#max_value = self.np.max(_init_weight)
 			bounds.append(self.set_bounds(_init_weight)) # for clipping
@@ -259,11 +262,16 @@ class DE_searcher(Searcher):
 		pop_size = 100 
 		toolbox = self.base.Toolbox()
 
-		def sample_from_noraml(loc = mean_value, scale = std_value):
-			return self.np.random.normal(loc = mean_value, scale = std_value, size = 1)[0]
+		#def sample_from_noraml(loc = mean_value, scale = std_value):
+		#	return self.np.random.normal(loc = mean_value, scale = std_value, size = 1)[0]
+		def init_indiv():
+			v_sample = lambda mean_v,std_v: self.np.random.normal(loc = mean_v, scale = std_v, size = 1)[0]
+			ind = self.np.float32(list(map(v_sample, self.mean_values, self.std_values)))
+			return ind	
 
-		toolbox.register("attr_float", sample_from_noraml, loc = mean_value, scale = std_value)
-		toolbox.register("individual", self.tools.initRepeat, self.creator.Individual, toolbox.attr_float, num_places_to_fix)
+		#toolbox.register("attr_float", sample_from_noraml, loc = mean_value, scale = std_value)
+		#toolbox.register("individual", self.tools.initRepeat, self.creator.Individual, toolbox.attr_float, num_places_to_fix)
+		toolbox.register("individual", self.tools.initIterate, self.creator.Individual, init_indiv) #:w, mean_values, std_values)
 		toolbox.register("population", self.tools.initRepeat, list, toolbox.individual)
 		toolbox.register("select", self.np.random.choice, size = 3, replace=False)
 		toolbox.register("evaluate", self.eval)
@@ -283,10 +291,7 @@ class DE_searcher(Searcher):
 		# 	self.sess = self.model_util.generate_session(graph = self.empty_graph)
 		# else:
 		# 	self.sess = sess
-		#print (toolbox.individual()) 
-		#print (type(toolbox.individual()))
 		pop = toolbox.population(n = pop_size)
-
 		#print ('===pop===')
 		#print ("\t Places to fix ({}): {}".format(
 		#	num_places_to_fix, 

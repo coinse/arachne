@@ -119,7 +119,7 @@ else:
 	path_to_patch = args.path_to_patch
 
 if args.dest is None:
-	dest = os.path.join(os.path.dirname(path_to_patch), 'pred')
+	dest = os.path.join(os.path.dirname(path_to_patch), 'repli_pred')
 else:
 	dest = args.dest
 os.makedirs(dest, exist_ok = True)

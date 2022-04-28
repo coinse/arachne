@@ -421,7 +421,7 @@ def compute_FI_and_GL(
 		#t_w_tensor = model.layers[idx_to_tl].weights[0]
 		############ FI ############
 		model = load_model(path_to_keras_model, compile = False)
-		print (model.summary())
+		#print (model.summary())
 		if idx_to_tl == 0: # meaning the model doesn't specify the input layer explicitly
 			prev_output = target_X
 		else:

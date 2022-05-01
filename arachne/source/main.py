@@ -52,7 +52,8 @@ if args.which_data != 'fm_for_rq5':
 
 	target_data = test_data if not args.on_train else train_data
 	target_X, target_y = target_data
-	outs = data_util.get_balanced_dataset(args.target_indices_file, top_n, idx = 0)
+	outs = data_util.get_balanced_dataset(
+		args.target_indices_file, top_n, idx = 0)
 
 	if not isinstance(outs, Iterable):
 		print ("There are only {} number of unqiue misclassification types. vs {}".format(outs, top_n))

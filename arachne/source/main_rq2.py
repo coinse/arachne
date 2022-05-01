@@ -14,8 +14,6 @@ parser.add_argument("-which", action = "store",
 	help = 'simple_cm, simple_fm', type = str)
 parser.add_argument('-which_data', action = "store",
 	default = 'cifar10', type = str, help = 'fashion_mnist,cifaf10,GTSRB')
-parser.add_argument("-tensor_name_file", action = "store",
-	default = "data/tensor_names/tensor.lastLayer.names ", type = str)
 parser.add_argument("-loc_method", action = "store", default = 'localiser')
 parser.add_argument("-patch_target_key", action = "store", default = "best")
 parser.add_argument("-path_to_keras_model", action = 'store', default = None)

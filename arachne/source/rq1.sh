@@ -63,7 +63,7 @@ else
 		mkdir $logdir/gtsrb
 	fi 
 
-	GTSRB_indices="$index_dir/GTSRB/rq1/wo_hist/test/GTSRB.init_pred.indices.csv"
+	GTSRB_indices="$index_dir/GTSRB/simple/test/GTSRB.init_pred.indices.csv"
 	#for seed in {0..34}
 	#do
 	python3 main_rq1.py \

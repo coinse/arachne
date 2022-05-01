@@ -2,13 +2,10 @@
 RQ2 script
 """
 import argparse
-import os, sys
+import os
 import utils.data_util as data_util
 import auto_patch_vk as auto_patch
 import time
-import numpy as np
-import gc
-
 
 parser = argparse.ArgumentParser()
 
@@ -29,7 +26,8 @@ parser.add_argument("-dest", action = "store", default = ".")
 parser.add_argument("-patch_aggr", action = 'store', default = None, type = int)
 parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
-parser.add_argument("-target_layer_idx", action = "store", default = -1, type = int)
+parser.add_argument("-target_layer_idx", action = "store", 
+	default = -1, type = int, help = "an index to the layer to localiser nws")
 
 args = parser.parse_args()
 os.makedirs(args.dest, exist_ok = True)
@@ -43,6 +41,7 @@ predef_indices_to_wrong = data_util.get_misclf_for_rq2(
 num_label = args.num_label
 iter_num = args.iter_num
 t1 = time.time()
+
 patched_model_name, indices_to_target_inputs, indices_to_patched = auto_patch.patch(
 	num_label,
 	test_data,

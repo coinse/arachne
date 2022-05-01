@@ -152,7 +152,7 @@ class DE_searcher(Searcher):
 		else:
 			final_fitness = losses_of_correct + self.patch_aggr * losses_of_target	
 
-		num_still_correct = len(self.indices_to_correct) - num_violated # N_intac
+		#num_still_correct = len(self.indices_to_correct) - num_violated # N_intac
 		# log
 		#print ("New fitness (num_violatd, num_patched)",
 		#	self.patch_aggr, losses_of_correct, losses_of_target, num_violated, num_patched, final_fitness)

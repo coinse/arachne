@@ -289,8 +289,7 @@ def patch(
 			batch_size = batch_size,
 			act_func = tf.nn.relu if which == 'GTSRB' else None,
 			is_multi_label = is_multi_label,
-			is_lstm = 'lstm' in which, 
-			at_indices = None if which != 'lfw_vgg' else new_indices_to_target)
+			is_lstm = 'lstm' in which)
 
 		places_to_fix = indices_to_places_to_fix
 		searcher.set_indices_to_wrong(indices_to_selected_wrong)	

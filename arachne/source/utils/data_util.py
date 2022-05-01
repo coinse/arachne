@@ -4,6 +4,7 @@ A module for data related functions
 import numpy as np
 import random
 
+
 def divide_into_val_and_test(X, y, num_label = 10, is_val = True, half_n = 500):
 	"""
 	divide test data into two folds

@@ -2,7 +2,6 @@
 to apply stored patches to a model
 """
 from utils import model_util
-from gen_frame_graph import generate_empty_graph
 import numpy as np
 import tensorflow as tf
 

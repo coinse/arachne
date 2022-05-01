@@ -9,7 +9,7 @@ from utils.eval_util import read_and_add_flag, combine_init_aft_predcs
 import numpy as np
 
 LAYER = -1 # all layers
-Faulty_mdl_path = "data/models/faulty_models/by_tweak/chg/0_001/mv" # final_data/models/rq1_faulty_mdl/
+Faulty_mdl_path = "../data/models/faulty_models/by_tweak/chg/0_001/mv" # final_data/models/rq1_faulty_mdl/
 
 def return_target_fault_id(afile, seed):
 	if afile is None:
@@ -92,14 +92,12 @@ if __name__ == "__main__":
 	if path_to_faulty_model is None:
 		print ('Seed {} not our target for layer {}'.format(args.seed, LAYER))
 		sys.exit()
-	print (path_to_faulty_model, gt_file)
 
 	# is_input_2d = True => to match the format with faulty model
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
 	train_X, train_y = train_data
 	num_train = len(train_y)
 	test_X, test_y = test_data
-
 	# set X and y for the localisation 
 	X,y = train_data if not args.on_test else test_data
 
@@ -108,14 +106,12 @@ if __name__ == "__main__":
 
 	if args.aft_pred_file is None:
 		from tensorflow.keras.models import load_model
-
 		faulty_mdl = load_model(path_to_faulty_model, compile = False)
 		predcs = faulty_mdl.predict(X) if args.which_data != 'fashion_mnist' else faulty_mdl.predict(X).reshape(len(X),-1)
 		pred_labels = np.argmax(predcs, axis = 1)
-		
 		corr_predictions = pred_labels == y	
 		acc = np.sum(corr_predictions)/corr_predictions.shape[0]
-		#print ("Acc: {} -> {}".format(init_acc, acc))
+		print ("Acc: {} -> {}".format(init_acc, acc))
 		aft_preds = []
 		aft_preds_column = ['index', 'true', 'pred', 'flag']
 		for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
@@ -137,7 +133,6 @@ if __name__ == "__main__":
 	indices_to_chgd = chgds.index.values
 	#print ("Indices to changed", indices_to_chgd, len(indices_to_chgd))
 	indices_to_unchgd = unchgds.index.values
-
 	indices_to_places_to_fix, entire_k_and_cost = auto_patch.patch(
 		args.num_label,
 		(X,y),
@@ -153,8 +148,7 @@ if __name__ == "__main__":
 		only_loc = True,
 		loc_dest = "results/rq1")
 
-	#print ("Localised nerual weights({}):".format(len(indices_to_places_to_fix)))
-	# evaluation 
+	# for evaluation 
 	gt_df = pd.read_pickle(gt_file)
 	gts_layer = gt_df.layer.values
 	gts_weight = gt_df.w_idx.values
@@ -175,10 +169,9 @@ if __name__ == "__main__":
 					localised_at.append(i)
 					print("Include", i, l_idx, w_idx, _indices_to_w)
 	
-	if args.loc_method == 'localiser':
-		print ("Localised within the pareto front of the length of {}".format(len(indices_to_places_to_fix)))
-	
-	print ("\tAt", localised_at)
-	print ('\t', [idx/len(entire_k_and_cost) 
-		if entire_k_and_cost is not None else idx/len(indices_to_places_to_fix) for idx in localised_at])
+	#if args.loc_method == 'localiser':
+	#	print ("Localised within the pareto front of the length of {}".format(len(indices_to_places_to_fix)))
+	#print ("\tAt", localised_at)
+	#print ('\t', [idx/len(entire_k_and_cost) 
+	#	if entire_k_and_cost is not None else idx/len(indices_to_places_to_fix) for idx in localised_at])
 

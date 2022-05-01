@@ -2,9 +2,10 @@
 
 datadir=$1
 loc_method=$2 # localiser (BL), gradient_loss (GL), random (Random)
+which_data=$3
 seed=0 #$3
-indexdir="final_data/indices" # "indices"
-fid_filedir="final_data/rq1/fault_ids/"
+index_dir="../final_data/indices" # "indices"
+fid_filedir="../final_data/rq1/fault_ids/"
 logdir="logs/rq1"
 
 if [ ! -d "$logdir" ]; then

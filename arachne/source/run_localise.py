@@ -392,6 +392,7 @@ def compute_FI_and_GL(
 				assert layer_config['data_format'] == 'channels_last', layer_config['data_format']
 				num_kernels = int(prev_output.shape[-1]) # Channel_in
 			assert num_kernels == t_w.shape[2], "{} vs {}".format(num_kernels, t_w.shape[2])
+			#print ("t_w***", t_w.shape)
 
 			# H x W				
 			if is_channel_first:
@@ -452,7 +453,6 @@ def compute_FI_and_GL(
 			# will be [F1, F2, Channel_in, Channel_out]
 			grad_scndcr = compute_gradient_to_loss(
 				path_to_keras_model, idx_to_tl, target_X, target_y, by_batch = True, loss_func=loss_func)	
-
 		elif model_util.is_LSTM(lname): #
 			from scipy.special import expit as sigmoid
 			num_weights = 2 

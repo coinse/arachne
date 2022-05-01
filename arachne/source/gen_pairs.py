@@ -139,11 +139,11 @@ if __name__ == "__main__":
 	gtsrb_mdl_path = "data/models/GTSRB_NEW/simple/gtsrb.model.0.wh.0.h5"
 
 	if args.which_data == 'cifar10':
-		target_weights = get_target_weights(None, c10_mdl_path, indices_to_target = None, target_all = True)
+		target_weights = get_target_weights(None, c10_mdl_path, indices_to_target = None)
 	elif args.which_data == 'fashion_mnist':
-		target_weights = get_target_weights(None, fm_mdl_path, indices_to_target = None, target_all = True)
+		target_weights = get_target_weights(None, fm_mdl_path, indices_to_target = None)
 	else:
-		target_weights = get_target_weights(None, gtsrb_mdl_path, indices_to_target = None, target_all = True)
+		target_weights = get_target_weights(None, gtsrb_mdl_path, indices_to_target = None)
 
 	
 	dest = os.path.join(args.loc_dir, "pairs/{}".format(args.loc_which))

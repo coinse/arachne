@@ -77,8 +77,7 @@ def patch(
 	model = load_model(path_to_keras_model, compile = False)
 	target_weights = run_localise.get_target_weights(model,
 		path_to_keras_model, 
-		indices_to_target = indices_to_target_layers, 
-		target_all = target_all)
+		indices_to_target = indices_to_target_layers)
 
 	#print ('Total {} layers are targeted'.format(target_weights.keys()))
 	# compute prediction & corr_predictions
@@ -182,7 +181,7 @@ def patch(
 			'weight':[vs[1] for vs in indices_to_places_to_fix]}) 
 		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
-		#print ("Saved to", destfile)
+		print ("Saved to", destfile)
 		if only_loc:
 			all_cost_file = os.path.join(loc_dest, 
 				"loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all)))
@@ -207,7 +206,7 @@ def patch(
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
-			#print ("Saved to", destfile)
+			print ("Saved to", destfile)
 			if only_loc:
 				all_cost_file = os.path.join(loc_dest, 
 					"loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all)))
@@ -243,10 +242,11 @@ def patch(
 		destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 		output_df.to_pickle(destfile)
 
-	#t2 = time.time()
-	#print ("Time taken for localisation: %f" % (t2 - t1))
-	#print ("places to fix", indices_to_places_to_fix)	
-	#print ("numebr of places to fix: {}".format(len(indices_to_places_to_fix)))
+	t2 = time.time()
+	print ("Time taken for localisation: %f" % (t2 - t1))
+	if not only_loc:
+		print ("places to fix", indices_to_places_to_fix)	
+		print ("numebr of places to fix: {}".format(len(indices_to_places_to_fix)))
 	run_localise.reset_keras([model])
 	#if loc_method == 'localiser':
 	#	print (indices_to_places_to_fix) # logging

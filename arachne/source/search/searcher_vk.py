@@ -2,8 +2,6 @@
 """
 import time
 
-from apricot import model
-
 
 class Searcher(object):
 	"""docstring for Searcher"""
@@ -682,7 +680,7 @@ class Searcher(object):
 			float: percentage of the number of patched)
 		"""
 		predictions = self.predict_with_new_delat(deltas)
-				# due to the data dimention of fashion_mnist,
+                # due to the data dimention of fashion_mnist,
 		if predictions.shape != self.labels.shape:
 			to_this_shape = self.labels.shape
 			predictions = self.np.reshape(predictions, to_this_shape)
@@ -767,6 +765,7 @@ class Searcher(object):
 
 		return num_violated, num_patched	
 
+
 	# def check_early_stop(self, 
 	# 	new_weight_value, 
 	# 	fitness_value, 
@@ -782,8 +781,9 @@ class Searcher(object):
 			True (early stop)
 			False (not yet)
 		"""
-		if model_name is None: model_name = self.model_name
-		
+		if model_name is None:
+		 	model_name = self.model_name
+
 		num_of_patched, perc_num_of_patched = self.get_number_of_patched(new_weights)
 		num_of_violated, perc_num_of_violated = self.get_number_of_violated(new_weights)
 

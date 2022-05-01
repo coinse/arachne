@@ -197,7 +197,7 @@ class DE_searcher(Searcher):
 		hof = self.tools.HallOfFame(1, similar = self.np.array_equal)
 
 		# update fitness
-		print ("Places to fix", places_to_fix)
+		#print ("Places to fix", places_to_fix)
 		for ind in pop:
 			ind.fitness.values = toolbox.evaluate(ind, places_to_fix)
 			ind.model_name = None 
@@ -275,7 +275,7 @@ class DE_searcher(Searcher):
 			prev_best = best
 
 			# check for two stop coniditions
-			if self.is_the_performance_unchanged(best, places_to_fix):
+			if self.is_the_performance_unchanged(best):
 				print ("Performance has not been changed over {} iterations".format(
 					self.num_iter_unchanged))
 				break

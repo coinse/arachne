@@ -25,7 +25,7 @@ then
     indices_file="$index_dir/fm/test/fashion_mnist.init_pred.indices.csv"
 
     python3 main.py \
-    -datadir $datadir \
+    -datadir $datadir/fm \
     -which simple_fm \
     -which_data $which_data \
     -patch_key ${patch_key}.${seed} \
@@ -36,6 +36,7 @@ then
     -dest $dest/fm \
     -patch_aggr $patch_aggr \
     -batch_size 10192 > $logdir/fm/$seed.fm.out &
+    wait $!
 elif [ $which_data == 'cifar10' ]
 then
     if [ ! -d "$logdir/c10" ]; then 
@@ -44,7 +45,7 @@ then
     indices_file="$index_dir/cm/test/cifar10.init_pred.indices.csv"
     
     python3 main.py \
-    -datadir $datadir \
+    -datadir $datadir/cm \
     -which simple_cm \
     -which_data $which_data \
     -patch_key ${patch_key}.${seed} \
@@ -54,6 +55,7 @@ then
     -target_indices_file $indices_file \
     -dest $dest/cm \
     -patch_aggr $patch_aggr > $logdir/c10/$seed.c10.out &
+    wait $!
 elif [ $which_data == 'GTSRB' ]
 then
     if [ ! -d "$logdir/gtsrb" ]; then 
@@ -62,7 +64,7 @@ then
     indices_file="$index_dir/GTSRB/simple/test/GTSRB.init_pred.indices.csv"
     
     python3 main.py \
-    -datadir $datadir \
+    -datadir $datadir/gtsrb/prepared \
     -which GTSRB \
     -which_data $which_data \
     -patch_key ${patch_key}.${seed} \
@@ -74,6 +76,7 @@ then
     -batch_size 10192  \
     -patch_aggr $patch_aggr \
     -num_label 43 > $logdir/gtsrb/$seed.gtsrb.out &
+    wait $!
 else
     echo "unsupported data: $which_data"
 fi

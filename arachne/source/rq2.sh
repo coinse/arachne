@@ -37,7 +37,7 @@ then
     -target_indices_file $indices_file \
     -dest $dest/fm/$loc_method \
     -patch_aggr $patch_aggr \
-    -batch_size 10192 > $logdir/fm/$loc_method.$seed.c10.out &
+    -batch_size 10192 > $logdir/fm/$loc_method.$seed.fm.out &
 elif [ $which_data == 'cifar10' ]
 then
     if [ ! -d "$logdir/c10" ]; then 

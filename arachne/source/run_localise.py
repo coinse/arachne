@@ -414,9 +414,10 @@ def compute_FI_and_GL(
 						curr_prev_output_slice = tr_prev_output_v[:,i*strides[0]:i*strides[0]+kernel_shape[0],:,:]
 						curr_prev_output_slice = curr_prev_output_slice[:,:,j*strides[1]:j*strides[1]+kernel_shape[1],:]
 						output = curr_prev_output_slice * t_w[:,:,:,idx_ol] 
-						output = np.abs(output) 
-						sum_output = np.nan_to_num(np.sum(output), posinf = 0.)
+						sum_output = np.sum(np.abs(output))
 						output = output/sum_output
+						sum_output = np.nan_to_num(output, posinf = 0.)
+
 						output = np.mean(output, axis = 0) 
 						
 						from_front.append(output)

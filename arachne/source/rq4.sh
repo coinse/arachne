@@ -12,7 +12,7 @@ model_dir="../final_data/models/simple"
 iter_num=100
 
 index_dir="../final_data/indices"
-logdir="logs/rq3"
+logdir="logs/rq4"
 
 if [ ! -d "$logdir" ]; then
     mkdir $logdir

@@ -27,6 +27,7 @@ then
     indices_file="$index_dir/cnn1/test/cifar10.init_pred.indices.csv"
     which_data='cifar10'
     num_label=10
+    datadir=$datadir/cm
 elif [ $which == 'cnn2' ]
 then
     if [ ! -d "$logdir/cnn2" ]; then 
@@ -36,6 +37,7 @@ then
     indices_file="$index_dir/cnn2/test/cifar10.init_pred.indices.csv"
     which_data='cifar10'
     num_label=10
+    datadir=$datadir/cm
 elif [ $which == 'cnn3' ]
 then
     if [ ! -d "$logdir/cnn3" ]; then 
@@ -45,6 +47,7 @@ then
     indices_file="$index_dir/cnn3/test/cifar10.init_pred.indices.csv"
     which_data='cifar10'
     num_label=10
+    datadir=$datadir/cm
 elif [ $which == 'GTSRB' ]
 then
     if [ ! -d "$logdir/GTSRB" ]; then 
@@ -54,15 +57,17 @@ then
     indices_file="$index_dir/GTSRB/test/GTSRB.init_pred.indices.csv"
     which_data='GTSRB'
     num_label=43
+    datadir=$datadir/gtsrb/prepared
 elif [ $which == 'fm' ]
 then
     if [ ! -d "$logdir/fm" ]; then 
         mkdir $logdir/fm 
     fi
-    path_to_keras_model="$model_dir/saved_models/fmnist/fm_v2.h5"
+    path_to_keras_model="$model_dir/fm_v2.h5"
     num_label=10
     which_data='fm_for_rq5'
     indices_file="$index_dir/fm/for_rq5/val/fashion_mnist.init_pred.indices.csv"
+    datadir=$datadir/fm/for_rq5
 else # should implement a complex model for fashion_mnist
     echo "Not supported ".$which
     exit 0

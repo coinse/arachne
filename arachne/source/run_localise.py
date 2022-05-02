@@ -10,6 +10,9 @@ from tqdm import tqdm
 import lstm_layer_v1 as lstm_layer
 import utils.model_util as model_util
 
+# "divided by zeros" is handleded afterward
+np.seterr(divide='ignore', invalid='ignore')
+
 def get_target_weights(model, path_to_keras_model, indices_to_target = None):
 	"""
 	return indices to weight layers denoted by indices_to_target, or return all trainable layers
@@ -417,9 +420,7 @@ def compute_FI_and_GL(
 						sum_output = np.sum(np.abs(output))
 						output = output/sum_output
 						sum_output = np.nan_to_num(output, posinf = 0.)
-
 						output = np.mean(output, axis = 0) 
-						
 						from_front.append(output)
 			
 			from_front = np.asarray(from_front)

@@ -58,14 +58,14 @@ def read_tensor_name(tensor_name_file):
 	return tensor_names
 
 
-def get_lfw_data(is_train = True):
+def get_lfw_data(path_to_namedir, is_train = True):
 	"""
 	"""
-	import pickle
+	import pickle, os
 	if is_train:
-		datafile = "data/lfw_np/LFW_train_info.pkl"
+		datafile = os.path.join(path_to_namedir, "LFW_train_info.pkl")
 	else:
-		datafile = "data/lfw_np/LFW_test_info.pkl"
+		datafile = os.path.join(path_to_namedir, "LFW_test_info.pkl")
 	
 	with open(datafile, 'rb') as f:
 		data = pickle.load(f)
@@ -127,15 +127,20 @@ def load_rq5_fm_test_val(datadir, which_type = "both"):
 
 def load_data(which, path_to_data,
 	is_input_2d = False, 
-	path_to_female_names = None):
+	path_to_female_names = None, 
+	path_to_namedir = None):
 	import tensorflow as tf
 	import os
 	
 	if which == 'lfw':
 		from utils.data_loader import get_LFW_loader
+		if path_to_namedir is None:
+			path_to_namedir = os.path.dirname(path_to_female_names)
 
-		names_in_train = sorted(get_lfw_data(is_train = True)['name'])
-		names_in_test = sorted(get_lfw_data(is_train = False)['name'])
+		names_in_train = sorted(get_lfw_data(
+			path_to_namedir, is_train = True)['name'])
+		names_in_test = sorted(get_lfw_data(
+			path_to_namedir, is_train = False)['name'])
 
 		trainloader = get_LFW_loader(image_path = path_to_data,
 			split='train', batch_size=1, path_to_female_names = path_to_female_names)

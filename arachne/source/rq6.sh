@@ -15,7 +15,7 @@ if [ ! -d "$logdir" ]; then
 fi
 
 python3 main.py \
--datadir $datadir/lfw_data\
+-datadir $datadir/lfw_data \
 -which lfw_vgg \
 -which_data lfw \
 -patch_key rq6.0.$seed \

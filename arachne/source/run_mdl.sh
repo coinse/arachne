@@ -33,7 +33,7 @@ if [ $rq == 2 ] || [ $rq == 3 ] || [ $rq == 4 ]; then
         num_label=10
     elif [ $which_data == 'GTSRB' ]; then
         model="$model_dir/gtsrb.model.0.wh.0.h5"
-        datadir="$datadir/gtsrb/prepared"
+        datadir="$datadir/gtsrb"
         indices_file="$index_dir/GTSRB/simple/test/GTSRB.init_pred.indices.csv"
         num_label=43
     else
@@ -83,7 +83,7 @@ elif [ $rq == 5 ]; then
         indices_file="$index_dir/GTSRB/test/GTSRB.init_pred.indices.csv"
         which_data='GTSRB'
         num_label=43
-        datadir=$datadir/gtsrb/prepared
+        datadir=$datadir/gtsrb
     elif [ $which == 'fm' ]
     then
         model="$model_dir/fm_v2.h5"
@@ -113,12 +113,12 @@ elif [ $rq == 6 ]; then
     which_data='lfw'
     num_label=2
     indices_file="$index_dir/lfw/test/lfw.init_pred.indices.csv"
-    female_lst_file="$datadir/lfw_np/female_names_lfw.txt"
+    female_lst_file="$datadir/lfw/lfw_np/female_names_lfw.txt"
 
     python3 run_mdl.py \
     -init_mdl $model \
     -patch $path_to_patch \
-    -datadir $datadir/lfw_data \
+    -datadir $datadir/lfw/lfw_data \
     -index_file $indices_file \
     -which_data $which_data \
     -num_label $num_label \

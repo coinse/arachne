@@ -1,5 +1,3 @@
-from os import stat
-#from tensorflow.keras.layers import LSTM, CuDNNLSTM
 import tensorflow as tf
 from tensorflow.keras.models import Model
 import numpy as np 
@@ -23,22 +21,23 @@ class LSTM_Layer(object):
 		return init_hidden_states, init_cell_states
 
 
-	def gen_lstm_layer_from_another(self, prev_output):#, time_steps = None):
+	def gen_lstm_layer_from_another(self, prev_output):
 		"""
-		generate a model with a single lstm_layer that returns the sequences of hidden state and cell state 
+		generate a model with a single lstm_layer that returns 
+		the sequences of hidden state and cell state 
 		based on the exisitng one (self.init_lstm_layer)
 		"""
 		from tensorflow.keras.layers import LSTM, CuDNNLSTM
-		input_shape = self.init_lstm_layer.input_shape
+		#input_shape = self.init_lstm_layer.input_shape
 		time_steps = prev_output.shape[1]
-		print ("time step is {}".format(time_steps))
+		#print ("time step is {}".format(time_steps))
 		assert time_steps is not None, "For this time_steps should be given"
 		kernel_w, recurr_kernel_w, bias = self.init_lstm_layer.get_weights()
 		# change to accept variout shapes of inputs -> both all & per time-step
-		print ("Input shape", input_shape)
-		inputs = tf.keras.Input(shape = (None, None)) #[None] + list(input_shape[2:])))# input_shape[1:])
-		h_state_input = tf.keras.Input(shape = (None,))#(input_shape[-1],))
-		c_state_input = tf.keras.Input(shape = (None,))#(input_shape[-1],))
+		#print ("Input shape", input_shape)
+		inputs = tf.keras.Input(shape = (None, None)) 
+		h_state_input = tf.keras.Input(shape = (None,))
+		c_state_input = tf.keras.Input(shape = (None,))
 		#new_lstm = LSTM(
 		new_lstm = CuDNNLSTM(
 			self.init_lstm_layer.units, 
@@ -46,10 +45,11 @@ class LSTM_Layer(object):
 			recurrent_initializer=tf.constant_initializer(recurr_kernel_w),
 			bias_initializer=tf.constant_initializer(bias),
 			return_sequences = False, 
-			return_state=True)#,
-			#input_shape = input_shape)
+			return_state=True)
 
-		skip = ['units', 'kernel_initializer', 'recurrent_initializer', 'bias_initializer', 'input_shape', 'return_state']
+		skip = ['units', 
+			'kernel_initializer', 'recurrent_initializer', 'bias_initializer', 
+			'input_shape', 'return_state']
 		for k,v in self.init_lstm_layer.__dict__.items():
 			if k not in skip:
 				new_lstm.__dict__.update({k:v})
@@ -68,27 +68,25 @@ class LSTM_Layer(object):
 		print (mdl2.summary())
 		for t in range(time_steps):
 			curr_prev_output = prev_output[:,t:t+1,:]
-			#print ("curr output", curr_prev_output.shape)
-			#print (mdl2.inputs[0].shape, len(mdl2.inputs[0].shape), len(curr_prev_output.shape))
 			if len(mdl2.inputs[0].shape) < len(curr_prev_output.shape):
 				curr_prev_output = np.squeeze(curr_prev_output, axis = 1)
 
 			if t == 0:
-				#print ("when t is 0", curr_prev_output.shape)
 				_, h_state, cell_state = mdl2.predict(curr_prev_output)
-				#print ("out", h_state.shape, cell_state.shape)
 			else:
-				#print (curr_prev_output.shape)
-				#print (h_state.shape, cell_state.shape)
 				_, h_state, cell_state = mdl.predict([curr_prev_output, h_state, cell_state])
-			#print ('{}th time-step'.format(t), h_state.shape, cell_state.shape)
 			h_states.append(h_state) 
 			cell_states.append(cell_state) 
-		h_states = np.asarray(h_states) # shape = (time_steps, batch_size, num_units)
-		h_states = np.moveaxis(h_states, [0,1], [1,0]) # shape = (batch_size, time_steps, num_units)
+
+		# shape = (time_steps, batch_size, num_units)
+		h_states = np.asarray(h_states) 
+		# shape = (batch_size, time_steps, num_units)
+		h_states = np.moveaxis(h_states, [0,1], [1,0])
 		
-		cell_states = np.asarray(cell_states) # shape = (time_steps, batch_size, num_units)
-		cell_states = np.moveaxis(cell_states, [0,1], [1,0]) # shape = (batch_size, time_steps, num_units)
+		# shape = (time_steps, batch_size, num_units)
+		cell_states = np.asarray(cell_states) 
+		# shape = (batch_size, time_steps, num_units)
+		cell_states = np.moveaxis(cell_states, [0,1], [1,0]) 
 
 		return h_states, cell_states
 

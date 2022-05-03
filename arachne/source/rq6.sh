@@ -15,7 +15,7 @@ if [ ! -d "$logdir" ]; then
 fi
 
 python3 main.py \
--datadir $datadir/lfw_data \
+-datadir $datadir/lfw/lfw_data \
 -which lfw_vgg \
 -which_data lfw \
 -patch_key rq6.0.$seed \
@@ -26,7 +26,7 @@ python3 main.py \
 -dest $dest \
 -patch_aggr $pa \
 -batch_size 512 \
--female_lst_file $datadir/lfw_np/female_names_lfw.txt \
+-female_lst_file $datadir/lfw/lfw_np/female_names_lfw.txt \
 -top_n 0 \
 -num_label 2 > $logdir/pa$pa.$seed.out &
 wait $!

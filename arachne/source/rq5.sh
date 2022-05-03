@@ -57,7 +57,7 @@ then
     indices_file="$index_dir/GTSRB/test/GTSRB.init_pred.indices.csv"
     which_data='GTSRB'
     num_label=43
-    datadir=$datadir/gtsrb/prepared
+    datadir=$datadir/gtsrb
 elif [ $which == 'fm' ]
 then
     if [ ! -d "$logdir/fm" ]; then 

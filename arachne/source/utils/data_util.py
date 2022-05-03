@@ -111,7 +111,7 @@ def load_data(which, path_to_data,
 		sorted_test_vs = [test_vs[n] for n in names_in_test]
 		test_data[0] = np.array([np.moveaxis(vs[0],[0],[-1]) for vs in sorted_test_vs])
 		test_data[1] = np.array([vs[1] for vs in sorted_test_vs])
-	elif which in ['fashion_mnist', 'cifar10']:# != 'GTSRB':
+	elif which in ['fashion_mnist', 'cifar10']:
 		import torch
 		import torchvision
 		import torchvision.transforms as transforms
@@ -152,7 +152,6 @@ def load_data(which, path_to_data,
 			images, labels = data
 			if which == 'fashion_mnist': # and is_input_2d is not None: 
 				if is_input_2d: # for RQ1
-					#test_data[0].append(images.numpy()[0].reshape(-1,))
 					test_data[0].append(images.numpy()[0]) # for rq5
 				else:
 					test_data[0].append(images.numpy()[0].reshape(1,-1))

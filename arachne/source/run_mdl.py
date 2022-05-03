@@ -186,4 +186,3 @@ if args.rq == 2: # additionaly analysis for RQ2: for the selected 10%
 		total_targeted, num_corrected, 
 		np.round(
 			100*num_corrected/total_targeted, decimals = 2)))
-

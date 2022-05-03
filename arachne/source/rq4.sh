@@ -67,7 +67,7 @@ then
     indices_file="$index_dir/GTSRB/simple/test/GTSRB.init_pred.indices.csv"
     
     python3 main.py \
-    -datadir $datadir/gtsrb/prepared \
+    -datadir $datadir/gtsrb \
     -which GTSRB \
     -which_data $which_data \
     -patch_key ${patch_key}.${seed} \

@@ -3,7 +3,7 @@
 datadir=$1 
 dest=$2 
 
-seed=0 # 0 .. 29
+seed=20 # 0 .. 29
 patch_key=rq7
 iter_num=100
 patch_aggr=1
@@ -21,6 +21,10 @@ if [ ! -d "$logdir" ]; then
     mkdir $logdir
 fi
 
+top_n=0
+
+for seed in {0..29}
+do
 python3 main.py \
 -datadir $datadir/us_airline \
 -which $which \
@@ -36,3 +40,4 @@ python3 main.py \
 -top_n 0 \
 -num_label $num_label > $logdir/us_airline.pa$patch_aggr.rq7.$top_n.$seed.out &
 wait $!
+done 

@@ -17,7 +17,7 @@ batch_size=512
 #fi
 index_dir="../final_data/indices"
 
-if [ $rq -eq 'rq2' ] || [ $rq -eq 'rq3' ] || [ $rq -eq 'rq4' ]; then 
+if [ $rq == 2 ] || [ $rq == 3 ] || [ $rq == 4 ]; then 
     # set an index & model file 
     model_dir="../final_data/models/simple"
 
@@ -26,12 +26,12 @@ if [ $rq -eq 'rq2' ] || [ $rq -eq 'rq3' ] || [ $rq -eq 'rq4' ]; then
         datadir="$datadir/fm"
         indices_file="$index_dir/fm/test/fashion_mnist.init_pred.indices.csv"
         num_label=10
-    elif [ $which_data -eq 'cifar10' ]; then 
+    elif [ $which_data == 'cifar10' ]; then 
         model="$model_dir/cifar_simple_90p.h5"
         datadir="$datadir/cm"
         indices_file="$index_dir/cm/test/cifar10.init_pred.indices.csv"
         num_label=10
-    elif [ $which_data -eq 'GTSRB' ]; then
+    elif [ $which_data == 'GTSRB' ]; then
         model="$model_dir/gtsrb.model.0.wh.0.h5"
         datadir="$datadir/gtsrb/prepared"
         indices_file="$index_dir/GTSRB/simple/test/GTSRB.init_pred.indices.csv"
@@ -41,11 +41,11 @@ if [ $rq -eq 'rq2' ] || [ $rq -eq 'rq3' ] || [ $rq -eq 'rq4' ]; then
         exit 1 
     fi
     # 
-    if [ $rq -eq 'rq4' ]; then top_n=0; fi
-    
-    python3 run_mdl.py 
+    if [ $rq == 4 ]; then top_n=0; fi
+
+    python3 run_mdl.py \
     -init_mdl $model \
-    -patch $path_to_patch \ 
+    -patch $path_to_patch \
     -datadir $datadir \
     -index_file $indices_file \
     -which_data $which_data \
@@ -53,7 +53,7 @@ if [ $rq -eq 'rq2' ] || [ $rq -eq 'rq3' ] || [ $rq -eq 'rq4' ]; then
     -batch_size $batch_size \
     -rq $rq \
     -top_n $top_n #> $logdir/$rq/log.out &
-elif [ $rq -eq 'rq5' ]; then
+elif [ $rq == 5 ]; then
     model_dir="../final_data/models/rq5"
 
     if [ $which == 'cnn1' ]
@@ -96,9 +96,9 @@ elif [ $rq -eq 'rq5' ]; then
         exit 0
     fi
 
-    python3 run_mdl.py 
+    python3 run_mdl.py \
     -init_mdl $model \
-    -patch $path_to_patch \ 
+    -patch $path_to_patch \
     -datadir $datadir \
     -index_file $indices_file \
     -which_data $which_data \
@@ -107,7 +107,7 @@ elif [ $rq -eq 'rq5' ]; then
     -rq $rq \
     -top_n $top_n #> $logdir/$rq/log.out &
 
-elif [ $rq -eq 'rq6' ]; then 
+elif [ $rq == 6 ]; then 
     model_dir="../final_data/models/rq6"
     model="$model_dir/LFW_gender_classifier_best.h5"
     which_data='lfw'
@@ -115,9 +115,9 @@ elif [ $rq -eq 'rq6' ]; then
     indices_file="$index_dir/lfw/test/lfw.init_pred.indices.csv"
     female_lst_file="$datadir/lfw_np/female_names_lfw.txt"
 
-    python3 run_mdl.py 
+    python3 run_mdl.py \
     -init_mdl $model \
-    -patch $path_to_patch \ 
+    -patch $path_to_patch \
     -datadir $datadir/lfw_data \
     -index_file $indices_file \
     -which_data $which_data \
@@ -125,9 +125,9 @@ elif [ $rq -eq 'rq6' ]; then
     -batch_size $batch_size \
     -rq $rq \
     -top_n $top_n \
-    -female_lst_file female_lst_file  #> $logdir/$rq/log.out &
+    -female_lst_file $female_lst_file  #> $logdir/$rq/log.out &
 
-elif [ $rq -eq 'rq7' ]; then 
+elif [ $rq == 7 ]; then 
     model_dir="../final_data/models/rq7"
     model="$model_dir/tweets.sa.mdl.best.h5"
     datadir="$datadir/us_airline"
@@ -135,9 +135,9 @@ elif [ $rq -eq 'rq7' ]; then
     num_label=3
     indices_file="$index_dir/lstm/test/us_airline.init_pred.indices.csv"
 
-    python3 run_mdl.py 
+    python3 run_mdl.py \
     -init_mdl $model \
-    -patch $path_to_patch \ 
+    -patch $path_to_patch \
     -datadir $datadir \
     -index_file $indices_file \
     -which_data $which_data \

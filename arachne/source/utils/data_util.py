@@ -136,7 +136,6 @@ def load_data(which, path_to_data,
 		from utils.data_loader import get_LFW_loader
 		if path_to_namedir is None:
 			path_to_namedir = os.path.dirname(path_to_female_names)
-
 		names_in_train = sorted(get_lfw_data(
 			path_to_namedir, is_train = True)['name'])
 		names_in_test = sorted(get_lfw_data(

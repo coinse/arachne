@@ -18,7 +18,7 @@ if [ ! -d "$logdir" ]; then
     mkdir $logdir
 fi
 
-if [ $which_data == 'fashion_mnist' ]
+if [ $which_data -eq 'fashion_mnist' ]
 then
     if [ ! -d "$logdir/fm" ]; then 
         mkdir $logdir/fm 
@@ -38,7 +38,7 @@ then
     -dest $dest/fm/$loc_method \
     -patch_aggr $patch_aggr \
     -batch_size 10192 > $logdir/fm/$loc_method.$seed.fm.out &
-elif [ $which_data == 'cifar10' ]
+elif [ $which_data -eq 'cifar10' ]
 then
     if [ ! -d "$logdir/c10" ]; then 
         mkdir $logdir/c10
@@ -57,7 +57,7 @@ then
     -target_indices_file $indices_file \
     -dest $dest/cm/$loc_method \
     -patch_aggr $patch_aggr > $logdir/c10/$loc_method.$seed.c10.out &
-elif [ $which_data == 'GTSRB' ]
+elif [ $which_data -eq 'GTSRB' ]
 then
     # GTSRB
     if [ ! -d "$logdir/gtsrb" ]; then 

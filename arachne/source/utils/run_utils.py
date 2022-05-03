@@ -27,9 +27,8 @@ def run_model(mdl, X, y, is_multi_label = True, ret_raw = False):
 	"""
 	import pandas as pd
 	
-	predcs = mdl.predict(X) #if which_data != 'fashion_mnist' else mdl.predict(X).reshape(len(X),-1) # need to check whether this always work 
-	#print ("preds", predcs.shape, X.shape)
-	if len(predcs.shape) > 3:
+	predcs = mdl.predict(X)  
+	if len(predcs.shape) >= 3:
 		predcs = np.squeeze(predcs, axis = 1)
 	if is_multi_label:
 		pred_labels = np.argmax(predcs, axis = 1)
@@ -37,7 +36,10 @@ def run_model(mdl, X, y, is_multi_label = True, ret_raw = False):
 		pred_labels = np.round(predcs).flatten()
 		predcs = predcs.flatten()
 	aft_preds = []
-	aft_preds_column = ['index', 'true', 'pred', 'flag'] if not ret_raw else ['index', 'true', 'pred', 'pred_v', 'flag']
+	if not ret_raw:
+		aft_preds_column = ['index', 'true', 'pred', 'flag']
+	else:
+		aft_preds_column = ['index', 'true', 'pred', 'pred_v', 'flag']
 	for i, (true_label, pred_label) in enumerate(zip(y, pred_labels)):
 		if not ret_raw:
 			aft_preds.append([i, true_label, pred_label, true_label == pred_label])
@@ -65,7 +67,6 @@ def gen_and_run_model(mdl, path_to_patch, X, y, num_label,
 	else:
 		formated_y = y
 
-	print (formated_y.shape, is_multi_label)
 	if not has_lstm_layer:
 		k_fn_mdl_lst = kfunc_util.generate_base_mdl(
 			mdl, X, indices_to_tls = indices_to_tls, batch_size = batch_size, act_func = act_func)
@@ -79,15 +80,12 @@ def gen_and_run_model(mdl, path_to_patch, X, y, num_label,
 		# compute previous outputs
 		min_idx_to_tl = np.min([idx if not isinstance(idx, Iterable) else idx[0] for idx in indices_to_tls])
 		prev_l = mdl.layers[min_idx_to_tl-1 if min_idx_to_tl > 0 else 0]
-		print ("min idx: {}".format(min_idx_to_tl))
-		print ("\t", prev_l)
 		if model_util.is_Input(type(prev_l).__name__): # previous layer is an input layer
 			prev_outputs = X
 		else: # otherwise, compute the output of the previous layer
 			t_mdl = Model(inputs = mdl.input, outputs = prev_l.output)	
 			prev_outputs = t_mdl.predict(X)
 		##
-		print ('prev output shape', prev_outputs.shape[1:])	
 		k_fn_mdl = build_mdl_lst(mdl, prev_outputs.shape[1:],indices_to_tls)
 		init_weights = {}
 		init_biases = {}
@@ -109,7 +107,7 @@ def gen_and_run_model(mdl, path_to_patch, X, y, num_label,
 		chunks = data_util.return_chunks(len(X), batch_size = batch_size)
 		predictions = model_util.predict_with_new_delat(k_fn_mdl, patch, min_idx_to_tl, init_biases, init_weights, prev_outputs, chunks)
 
-	if len(predictions.shape) > len(formated_y) and predictions.shape[1] == 1:
+	if len(predictions.shape) > len(formated_y.shape) and predictions.shape[1] == 1:
 		predictions = np.squeeze(predictions, axis = 1)
 
 	if is_multi_label:

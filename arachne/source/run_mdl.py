@@ -11,16 +11,19 @@ def compare(init_pred_df, aft_pred_df):
 	"""
 	num_patched = len(init_pred_df.loc[
 		(init_pred_df.flag == False) & (aft_pred_df.flag == True)])
+	rr = num_patched/np.sum(init_pred_df.true != init_pred_df.pred)
 	num_broken = len(init_pred_df.loc[
 		(init_pred_df.flag == True) & (aft_pred_df.flag == False)])
-
-	init_acc = np.sum(init_pred_df.true == init_pred_df.pred)/len(init_pred_df)
-	aft_acc = np.sum(aft_pred_df.true == aft_pred_df.pred)/len(aft_pred_df)
-	print ("\tpatched: {}, broken: {} & acc: {} -> {}".format(
-		num_patched, num_broken, 
-		init_acc, aft_acc))
-
-
+	br = num_broken/np.sum(init_pred_df.true == init_pred_df.pred)
+	#init_acc = np.sum(init_pred_df.true == init_pred_df.pred)/len(init_pred_df)
+	#aft_acc = np.sum(aft_pred_df.true == aft_pred_df.pred)/len(aft_pred_df)
+	#print ("\tpatched: {}, broken: {} & acc: {} -> {}".format(
+	#	num_patched, num_broken, 
+	#	np.round(init_acc, decimals =4), np.round(aft_acc, decimals = 4)))
+	print ("\tpatched: {} (overall RR: {:.4f}), broken: {} (BR: {:.4f})".format(
+		num_patched, np.round(rr, decimals=4), 
+		num_broken, np.round(br, decimals=4)))
+	
 def get_data_for_evaluation(**kwargs):
 	"""
 	"""
@@ -140,6 +143,7 @@ pred_name = os.path.basename(path_to_patch).replace("model", "pred")[:-4]
 
 init_model = load_model(args.path_to_init_model, compile = False)
 init_pred_df_used = run_model(init_model, used_X, used_y)
+
 if args.rq != 2:
 	init_pred_df_eval = run_model(init_model, eval_X, eval_y)
 
@@ -172,13 +176,13 @@ filename = os.path.join(dest, pred_name + ".train.pkl")
 print ("results written into {}".format(filename))
 combined_df.to_pickle(filename)
 print ('For Patch (Validation set):')
-compare(init_pred_df_used, aft_pred_df_used)
 
+compare(init_pred_df_used, aft_pred_df_used)
 if args.rq == 2: # additionaly analysis for RQ2: for the selected 10%
 	target_df = combined_df.iloc[indices_to_targeted]
 	num_corrected = np.sum((target_df.true == target_df.new_pred).values)
 	total_targeted = len(indices_to_targeted)
-	print ("Out of {}, {} are corrected: {}%".format(
+	print ("Out of {}, {} are corrected: {}% (RR)".format(
 		total_targeted, num_corrected, 
 		np.round(
 			100*num_corrected/total_targeted, decimals = 2)))

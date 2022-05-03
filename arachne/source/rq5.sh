@@ -84,7 +84,7 @@ do
     -path_to_keras_model $path_to_keras_model \
     -iter_num $iter_num \
     -target_indices_file $indices_file \
-    -dest $dest \
+    -dest $dest/$which \
     -patch_aggr $patch_aggr \
     -batch_size 512 \
     -top_n $top_n \

@@ -69,7 +69,7 @@ else
 	python3 main_rq1.py \
 	-init_pred_file $GTSRB_indices \
 	-num_label 43 \
-	-datadir $datadir/gtsrb/prepared/ \
+	-datadir $datadir/gtsrb \
 	-which GTSRB \
 	-which_data GTSRB \
 	-loc_method $loc_method \

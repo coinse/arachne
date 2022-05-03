@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model, Model
 import tensorflow.keras.backend as K
 from tqdm import tqdm
-import lstm_layer_v1 as lstm_layer
+import lstm_layer
 import utils.model_util as model_util
 
 # "divided by zeros" is handleded afterward

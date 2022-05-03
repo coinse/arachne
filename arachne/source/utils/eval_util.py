@@ -4,7 +4,6 @@ def read_and_add_flag(filename):
 	"""
 	"""
 	df = pd.read_csv(filename)
-	indices = df.index.values
 	df['flag'] = df.true == df.pred
 	return df
 

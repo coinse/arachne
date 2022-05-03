@@ -2,61 +2,6 @@
 A module for data related functions
 """
 import numpy as np
-import random
-
-
-def divide_into_val_and_test(X, y, num_label = 10, is_val = True, half_n = 500):
-	"""
-	divide test data into two folds
-	"""
-	new_indices = []
-	
-	if half_n <= 0: 
-		cnts = {}
-		for ay in y:
-			if ay not in cnts.keys():
-				cnts[ay] = 0
-			cnts[ay] += 1
-		
-		assert len(cnts.keys()) == num_label, "{} vs {}".format(len(cnts.keys()), num_label)
-	else:
-		cnts = None
-
-	for class_idx in range(num_label):
-		class_img_idxs = np.where(np.asarray(y) == class_idx)[0]
-		if half_n > 0: 
-			if is_val:
-				new_indices.extend(list(class_img_idxs[:half_n]))
-			else:
-				new_indices.extend(list(class_img_idxs[half_n:]))
-		else:
-			if is_val:
-				new_indices.extend(list(class_img_idxs[:int(cnts[class_idx]/2)]))
-			else:
-				new_indices.extend(list(class_img_idxs[int(cnts[class_idx]/2):]))
-
-	new_X = X[new_indices]
-	new_y = y[new_indices]
-
-	return new_X, new_y, new_indices
-
-
-def read_tensor_name(tensor_name_file):
-	"""
-	"""
-	import os
-	assert os.path.exists(tensor_name_file), "%s does not exist" % (tensor_name_file)
-	tensor_names = {}
-	with open(tensor_name_file) as f:
-		lines = [line.strip() for line in f.readlines()]
-		for line in lines:
-			terms = line.split(",")
-			assert len(terms) >= 2, "%s should contain at least two terms" % (line)
-			tensor_key = terms[0]
-			tensor_names[tensor_key] = terms[1] if len(terms) == 2 else terms[1:]
-
-	return tensor_names
-
 
 def get_lfw_data(path_to_namedir, is_train = True):
 	"""
@@ -74,8 +19,9 @@ def get_lfw_data(path_to_namedir, is_train = True):
 	at_arr = np.asarray([data[n]['at'] for n in names])
 	true_label_arr = np.asarray([data[n]['true'] for n in names]) 
 	pred_label_arr = np.asarray([data[n]['pred'] for n in names])
+	return {'name':names, 'at':at_arr, 
+			'true':true_label_arr, 'pred':pred_label_arr}
 
-	return {'name':names, 'at':at_arr, 'true':true_label_arr, 'pred':pred_label_arr}
 
 def combine(list_of_imgs):
 	"""
@@ -142,9 +88,11 @@ def load_data(which, path_to_data,
 			path_to_namedir, is_train = False)['name'])
 
 		trainloader = get_LFW_loader(image_path = path_to_data,
-			split='train', batch_size=1, path_to_female_names = path_to_female_names)
+			split='train', batch_size=1, 
+			path_to_female_names = path_to_female_names)
 		testloader = get_LFW_loader(image_path = path_to_data,
-			split='test', batch_size=1, path_to_female_names = path_to_female_names)
+			split='test', batch_size=1, 
+			path_to_female_names = path_to_female_names)
 
 		train_vs = {}
 		for image_names, images, image_labels in trainloader:
@@ -219,15 +167,12 @@ def load_data(which, path_to_data,
 		# train
 		with open(os.path.join(path_to_data, "train_data.pkl"), 'rb') as f:
 			train_data = pickle.load(f)
-
-		#train_data = [np.moveaxis(train_data_dict['data'], [1], [-1]), train_data_dict['label']]
 		if isinstance(train_data, dict):
 			train_data = [train_data['data'], train_data['label']]
+		
 		# test
 		with open(os.path.join(path_to_data, "test_data.pkl"), 'rb') as f:
 			test_data = pickle.load(f)
-
-		#test_data = [np.moveaxis(test_data_dict['data'], [1], [-1]), test_data_dict['label']]
 		if isinstance(test_data, dict):
 			test_data = [test_data['data'], test_data['label']]
 	else: # for simple_lstm or airline_passengers
@@ -270,7 +215,8 @@ def split_into_wrong_and_correct(correct_predictions):
 	"""
 	Spilt wrong and correct classification result
 	Ret (dict):
-		ret = {'wrong':indices_to_wrong(list), 'correct':indices_to_correct(list)}
+		ret = {'wrong':indices_to_wrong(list), 
+			'correct':indices_to_correct(list)}
 	"""
 	indices = {'wrong':[], 'correct':[]}
 	indices_to_wrong, = np.where(correct_predictions == False)
@@ -280,13 +226,9 @@ def split_into_wrong_and_correct(correct_predictions):
 	return indices
 
 
-def split_into_chgd_and_unchgd():
-	"""
-	"""
-	pass
-
-
-def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = True):
+def get_misclf_indices(misclf_indices_file, 
+	target_indices = None, 
+	use_all = True):
 	"""
 	"""
 	import pandas as pd 
@@ -313,7 +255,8 @@ def get_misclf_indices(misclf_indices_file, target_indices = None, use_all = Tru
 def get_misclf_indices_balanced(df, idx = 0):
 	"""
 	"""
-	misclf_types = list(set([tuple(pair) for pair in df[["true","pred"]].values]))
+	misclf_types = list(set(
+		[tuple(pair) for pair in df[["true","pred"]].values]))
 	ret_misclfds = {}
 	for misclf_type in misclf_types:
 		misclf_type = tuple(misclf_type)
@@ -321,7 +264,6 @@ def get_misclf_indices_balanced(df, idx = 0):
 		indices_to_misclf = df.loc[
 			(df.true == true_label) & (df.pred == pred_label)].index.values
 	
-		#np.random.shuffle(indices_to_misclf)
 		if len(indices_to_misclf) >= 2:
 			indices_1, indices_2 = np.array_split(indices_to_misclf, 2)
 			ret_misclfds[misclf_type] = indices_1 if idx == 0 else indices_2
@@ -355,7 +297,7 @@ def get_balanced_dataset(pred_file, top_n, idx = 0):
 	df = pd.read_csv(pred_file, index_col = 'index')
 	misclf_df = df.loc[df.true != df.pred]
 	misclfds_idx_target = get_misclf_indices_balanced(misclf_df, idx = target_idx)
-	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) # for patch generation
+	sorted_keys = sort_keys_by_cnt(misclfds_idx_target) 
 	misclfds_idx_eval = get_misclf_indices_balanced(misclf_df, idx = eval_idx)
 
 	indices_to_corr = df.loc[df.true == df.pred].sort_values(by=['true']).index.values
@@ -364,25 +306,24 @@ def get_balanced_dataset(pred_file, top_n, idx = 0):
 
 	np.random.seed(0)
 	if top_n >= len(sorted_keys):
-		assert False, "{} is provided when there is only {} number of misclfs".format(top_n, len(sorted_keys))
+		msg = "{} is provided when there is only {} number of misclfs".format(
+			top_n, len(sorted_keys))
+		assert False, msg
 	else:
 		misclf_key = sorted_keys[top_n]
 		misclf_indices = misclfds_idx_target[misclf_key]
 
 		new_data_indices = []; new_test_indices = []
-		for sorted_k in sorted_keys: # this means that all incorrect ones are include in new_data
+		for sorted_k in sorted_keys: 
+			# this means that all incorrect ones are include in new_data
 			new_data_indices.extend(misclfds_idx_target[sorted_k])
 			new_test_indices.extend(misclfds_idx_eval[sorted_k])
 		
 		new_data_indices += indices_to_corr_target
 		new_test_indices += indices_to_corr_eval
-
 		np.random.shuffle(new_data_indices)
 		np.random.shuffle(new_test_indices)	
-			
 		return (misclf_key, misclf_indices, new_data_indices, new_test_indices)
-	#else:
-	#	return len(sorted_keys)
 
 
 def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
@@ -395,7 +336,9 @@ def get_misclf_for_rq2(pred_file, percent = 0.1, seed = None):
 
 	np.random.seed(seed)
 	indices_to_misclf = np.random.choice(
-		misclf_df.index.values, num_to_sample if num_to_sample >= 1 else 1, replace=False)
+		misclf_df.index.values, 
+		num_to_sample if num_to_sample >= 1 else 1, 
+		replace=False)
 	
 	return indices_to_misclf
 
@@ -417,12 +360,13 @@ def get_dataset_for_rq5(pred_file, top_n):
 	df = pd.read_csv(pred_file, index_col = 'index')
 	misclf_df = df.loc[df.true != df.pred]
 	misclf_cnts = dict(misclf_df.groupby(['true','pred']).size())
-	sorted_misclf_cnts = sorted([vs for vs in misclf_cnts.items()], key = lambda v:v[1], reverse = True)
+	sorted_misclf_cnts = sorted(
+		[vs for vs in misclf_cnts.items()], key = lambda v:v[1], reverse = True)
 	top_n_misclf = sorted_misclf_cnts[int(top_n)][0]
  
-	indices_to_misclf = df.loc[(df.true == top_n_misclf[0]) & (df.pred == top_n_misclf[1])].index.values
+	indices_to_misclf = df.loc[
+		(df.true == top_n_misclf[0]) & (df.pred == top_n_misclf[1])].index.values
 	indices_to_corrclf = df.loc[df.true == df.pred].index.values
-
 	return top_n_misclf, indices_to_misclf, indices_to_corrclf
 
 

@@ -1,8 +1,7 @@
 """
-methods related to generating and using a keras backend function for a model,
+methods related to generating and using a keras backend function for a model
 """
 import numpy as np
-#BATCH_SIZE = 5096
 
 def compute_predictions(k_fn_mdl_lst, ys, tws, batch_size = None, into_label = False):
 	"""
@@ -25,26 +24,6 @@ def compute_preds_and_losses(k_fn_mdl_lst, ys, tws, batch_size = None):
 	"""
 	preds_and_losses = compute_kfunc(k_fn_mdl_lst, ys, tws, batch_size = batch_size)
 	return preds_and_losses
-
-
-#def compute_kfunc(k_fn_mdl_lst, ys, tws, idx, batch_size = None):
-#	"""
-#	comptue k functon for ys and tws 
-#	"""
-#	if len(k_fn_mdl_lst) == 1:
-#		k_fn_mdl = k_fn_mdl_lst[0]
-#		outputs = k_fn_mdl(tws + [ys])[idx]
-#	else:
-#		num = len(ys)
-#		chunks = return_chunks(num, batch_size)
-#		outputs = None
-#		for k_fn_mdl, chunk in zip(k_fn_mdl_lst, chunks):
-#			a_outputs = k_fn_mdl(tws + [ys[chunk]])[idx]
-#			if outputs is None:
-#				outputs = a_outputs
-#			else:
-#				outputs = np.append(outputs, a_outputs, axis = 0)
-#	return outputs
 
 
 def compute_kfunc(k_fn_mdl_lst, ys, tws, batch_size = None):
@@ -99,18 +78,14 @@ def gen_pred_and_loss_ops(pred_shape, pred_dtype, y_shape, y_dtype, loss_func):
 	import tensorflow as tf
 	import tensorflow.keras.backend as K
 
-	#pred_tensor = tf.placeholder(dtype = pred_dtype, shape = pred_shape)  	
 	pred_tensor = tf.keras.Input(dtype = pred_dtype, shape = pred_shape[1:])
-	pred_probs = tf.math.softmax(pred_tensor) # softmax -> can just change to numpy (if it takes long)
-	#y_tensor = tf.placeholder(dtype = y_dtype, shape = y_shape) 
+	pred_probs = tf.math.softmax(pred_tensor) 
 	y_tensor = tf.keras.Input(dtype = y_dtype, shape = y_shape[1:]) 
 
 	if len(pred_probs.shape) > 2:
-		to_this_shape = [int(v) for v in y_tensor.shape[1:]]
 		pred_probs = tf.reshape(pred_probs, [-1] + list(y_shape[1:]))
 		
 	if loss_func == 'categorical_cross_entropy':
-		# might be changed as the following two
 		loss_op = tf.keras.metrics.categorical_crossentropy(y_tensor, pred_probs)	
 	elif loss_func == 'binary_crossentropy':
 		pred_shape = pred_probs.shape

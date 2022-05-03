@@ -16,7 +16,7 @@ def compare(init_pred_df, aft_pred_df):
 
 	init_acc = np.sum(init_pred_df.true == init_pred_df.pred)/len(init_pred_df)
 	aft_acc = np.sum(aft_pred_df.true == aft_pred_df.pred)/len(aft_pred_df)
-	print ("\tpatched: {}, broken: {}: {} -> {}".format(
+	print ("\tpatched: {}, broken: {} & acc: {} -> {}".format(
 		num_patched, num_broken, 
 		init_acc, aft_acc))
 
@@ -70,7 +70,6 @@ parser.add_argument("-num_label", type = int, default = 10)
 parser.add_argument("-batch_size", type = int, default = None)
 parser.add_argument("-rq", type = int, default = 0, help = "research question number:2~7")
 parser.add_argument("-top_n", type = int, default = 0, help = "required for rq3")
-parser.add_argument("-seed", type = int, help = "required for rq2")
 parser.add_argument("-female_lst_file", action = 'store',
 	default = None, help = 'data/lfw_np/female_names_lfw.txt', type = str)
 args = parser.parse_args()
@@ -115,10 +114,11 @@ else:
 
 # get data for the prediction
 if args.rq == 2:
-	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'seed':args.seed}
+	seed = int(os.path.basename(path_to_patch).split(".")[-2])
+	params = {'X':X, 'y':y, 'rq':args.rq, 'file':args.index_file, 'seed':seed}
 	(indices_to_targeted, used_data) = get_data_for_evaluation(
 		X=X, y=y, rq=args.rq, 
-		file=args.index_file, seed=args.seed) 
+		file=args.index_file, seed=seed) 
 	used_X, used_y = used_data
 else: 
 	if args.which_data != 'fm_for_rq5':
@@ -143,9 +143,8 @@ init_pred_df_used = run_model(init_model, used_X, used_y)
 if args.rq != 2:
 	init_pred_df_eval = run_model(init_model, eval_X, eval_y)
 
-#init_model.summary() # logging 
 if args.rq != 2:
-	print ("=========================For evaluation============================")
+	print ("===========================For evaluation=============================")
 	aft_pred_df_eval = gen_and_run_model(
 		init_model, path_to_patch, 
 		eval_X, eval_y, num_label, 
@@ -161,7 +160,6 @@ if args.rq != 2:
 	compare(init_pred_df_eval, aft_pred_df_eval)
 
 print ("=========================Used for patching============================")
-#init_model.summary()
 aft_pred_df_used = gen_and_run_model(
 	init_model, path_to_patch, 
 	used_X, used_y, num_label, 

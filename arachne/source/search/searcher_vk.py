@@ -12,7 +12,7 @@ class Searcher(object):
 	kfunc_util = importlib.import_module('utils.kfunc_util')
 	model_util = importlib.import_module('utils.model_util')
 	data_util = importlib.import_module('utils.data_util')
-
+	gen_frame_graph = importlib.import_module('utils.gen_frame_graph')
 	def __init__(self, 
 		inputs, labels,
 		indices_to_correct, indices_to_wrong,
@@ -132,10 +132,9 @@ class Searcher(object):
 			self.prev_outputs = t_mdl.predict(self.inputs)
 
 		# set base model
-		from gen_frame_graph import build_mdl_lst
 		# a list that contains a single model
 		self.fn_mdl_lst = [
-			build_mdl_lst(self.mdl, self.prev_outputs.shape[1:], 
+			self.gen_frame_graph.build_mdl_lst(self.mdl, self.prev_outputs.shape[1:], 
 			sorted(self.indices_to_target_layers))]
 
 		# set chunks

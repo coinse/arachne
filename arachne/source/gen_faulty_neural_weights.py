@@ -15,7 +15,7 @@ def return_chunks(num):
 
 def generate_base_mdl(mdl_path, X, indices_to_target = None, target_all = True, batch_size = None, act_func = None):
 	from tensorflow.keras.models import load_model, Model 
-	from gen_frame_graph import build_k_frame_model
+	from utils.gen_frame_graph import build_k_frame_model
 	from run_localise import get_target_weights
 
 	mdl = load_model(mdl_path, compile = False)

@@ -66,7 +66,7 @@ def gen_and_run_model(mdl, path_to_patch,
 			[patch[idx] for idx in indices_to_tls], 
 			batch_size = batch_size)[0]	
 	else:
-		from gen_frame_graph import build_mdl_lst
+		from utils.gen_frame_graph import build_mdl_lst
 		from tensorflow.keras.models import Model
 		
 		# compute previous outputs

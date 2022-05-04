@@ -14,7 +14,7 @@ if [ ! -d "$logdir" ]; then
     mkdir $logdir
 fi
 
-python3 main.py \
+python3 main_rq3_7.py \
 -datadir $datadir/lfw/lfw_data \
 -which lfw_vgg \
 -which_data lfw \

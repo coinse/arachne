@@ -75,7 +75,7 @@ fi
 
 for top_n in 0 1 2
 do
-    python3 main.py \
+    python3 main_rq3_7.py \
     -datadir $datadir \
     -which $which \
     -which_data $which_data \

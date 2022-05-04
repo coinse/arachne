@@ -25,7 +25,7 @@ then
     fi
     indices_file="$index_dir/fm/test/fashion_mnist.init_pred.indices.csv"
 
-    python3 main.py \
+    python3 main_rq3_7.py \
     -datadir $datadir/fm \
     -which simple_fm \
     -which_data $which_data \
@@ -46,7 +46,7 @@ then
     fi
     indices_file="$index_dir/cm/test/cifar10.init_pred.indices.csv"
 
-    python3 main.py \
+    python3 main_rq3_7.py \
     -datadir $datadir/cm \
     -which simple_cm \
     -which_data $which_data \
@@ -66,7 +66,7 @@ then
     fi 
     indices_file="$index_dir/GTSRB/simple/test/GTSRB.init_pred.indices.csv"
     
-    python3 main.py \
+    python3 main_rq3_7.py \
     -datadir $datadir/gtsrb \
     -which GTSRB \
     -which_data $which_data \

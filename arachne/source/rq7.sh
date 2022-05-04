@@ -25,7 +25,7 @@ top_n=0
 
 for seed in {0..29}
 do
-python3 main.py \
+python3 main_rq3_7.py \
 -datadir $datadir/us_airline \
 -which $which \
 -which_data $which_data \

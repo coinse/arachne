@@ -55,7 +55,7 @@ def return_chunks(num, batch_size = None):
 
 
 def generate_base_mdl(mdl, X, indices_to_tls = None, batch_size = None, act_func = None):
-	from gen_frame_graph import build_k_frame_model
+	from utils.gen_frame_graph import build_k_frame_model
 	
 	indices_to_tls = sorted(indices_to_tls)
 	if batch_size is None:	

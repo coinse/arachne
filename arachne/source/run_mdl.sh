@@ -15,11 +15,11 @@ batch_size=512
 #elif [ ! -d "$logdir/$rq" ]; then 
 #    mkdir $logdir/$rq
 #fi
-index_dir="../final_data/indices"
+index_dir="final_data/indices"
 
 if [ $rq == 2 ] || [ $rq == 3 ] || [ $rq == 4 ]; then 
     # set an index & model file 
-    model_dir="../final_data/models/simple"
+    model_dir="final_data/models/simple"
 
     if [ $which_data == 'fashion_mnist' ]; then
         model="$model_dir/fmnist_simple.h5"
@@ -54,7 +54,7 @@ if [ $rq == 2 ] || [ $rq == 3 ] || [ $rq == 4 ]; then
     -rq $rq \
     -top_n $top_n #> $logdir/$rq/log.out &
 elif [ $rq == 5 ]; then
-    model_dir="../final_data/models/rq5"
+    model_dir="final_data/models/rq5"
 
     if [ $which == 'cnn1' ]
     then
@@ -108,7 +108,7 @@ elif [ $rq == 5 ]; then
     -top_n $top_n #> $logdir/$rq/log.out &
 
 elif [ $rq == 6 ]; then 
-    model_dir="../final_data/models/rq6"
+    model_dir="final_data/models/rq6"
     model="$model_dir/LFW_gender_classifier_best.h5"
     which_data='lfw'
     num_label=2
@@ -128,7 +128,7 @@ elif [ $rq == 6 ]; then
     -female_lst_file $female_lst_file  #> $logdir/$rq/log.out &
 
 elif [ $rq == 7 ]; then 
-    model_dir="../final_data/models/rq7"
+    model_dir="final_data/models/rq7"
     model="$model_dir/tweets.sa.mdl.best.h5"
     datadir="$datadir/us_airline"
     which_data='us_airline'

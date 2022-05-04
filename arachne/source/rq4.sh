@@ -8,10 +8,10 @@ patch_aggr=$4 # 1,2,4,6,8,10
 patch_key="rq4"
 seed=0 # 0 ~ 29
 
-model_dir="../final_data/models/simple"
+model_dir="final_data/models/simple"
 iter_num=100
 
-index_dir="../final_data/indices"
+index_dir="final_data/indices"
 logdir="logs/rq4"
 
 if [ ! -d "$logdir" ]; then

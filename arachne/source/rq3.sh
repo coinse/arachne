@@ -5,7 +5,7 @@ which_data=$2
 dest=$3
 patch_key="rq3"
 
-model_dir="../final_data/models/simple"
+model_dir="final_data/models/simple"
 iter_num=100
 seed=0 # 0 ~ 29 (top 1(=0) ~ 30(=29))
 patch_aggr=10

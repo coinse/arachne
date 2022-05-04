@@ -9,9 +9,9 @@ patch_aggr=10 #
 patch_key="rq5"
 seed=0 # 0 ~ 29
 
-model_dir="../final_data/models/rq5"
+model_dir="final_data/models/rq5"
 iter_num=100
-index_dir="../final_data/indices"
+index_dir="final_data/indices"
 logdir="logs/rq5"
 
 if [ ! -d "$logdir" ]; then

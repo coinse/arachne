@@ -5,9 +5,9 @@ dest=$2
 pa=2
 seed=0 # 0 .. 29
 
-model_dir="../final_data/models/rq6"
+model_dir="final_data/models/rq6"
 iter_num=100
-index_dir="../final_data/indices"
+index_dir="final_data/indices"
 logdir="logs/rq6"
 
 if [ ! -d "$logdir" ]; then

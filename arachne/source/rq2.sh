@@ -6,12 +6,12 @@ which_data=$3
 dest=$4
 patch_target_key="rq2"
 
-model_dir="../final_data/models/simple"
+model_dir="final_data/models/simple"
 seed=0 # 0 ~ 29 (int)
 iter_num=100
 patch_aggr=10
 
-index_dir="../final_data/indices"
+index_dir="final_data/indices"
 logdir="logs/rq2"
 
 if [ ! -d "$logdir" ]; then

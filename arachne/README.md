@@ -2,161 +2,183 @@
 
 ### Preparation
 
-This document explains how to reproduce the six experiments performed to evaluate Arachne.
+This document is to replicate the experiments conducted to evaluate Arachne. 
 
 Models used in the experiments of Arachne can be downloaded through this link: https://www.dropbox.com/s/89sb9m6lf4ia2bh/models.tar.gz?raw=1
-After downloading the zipped file, decompress them to *data* directory. 
-*data* directory is where all data, including both model and image data are stored. 
-```
-tar -zxvf models.tar.gz -C  data
-```
-To prepare the dataset used in the experiments, download LFW dataset through this link (https://www.dropbox.com/s/zrgjb9ramgnc46i/lfw_np.tar.gz?raw=1) and unzip them under *data* directory. 
-FashionMNIST and CIFAR-10 datasets are automatically download in the scripts if they do not exist under a specified data directory.  
+After downloading the zipped file, please decompress them to *final_data* directory \ 
+where all the models as well as image and text datasets used in the experiements will be stored. 
+``` tar -zxvf models.tar.gz -C  data ```
 
-### Arguments
-
-This a list of arguments commonly used in the experimental scripts.
-
-* *localisation_method*: denote a localisation method to use
-  * *localiser*: our bidirectional localisation method (BL)
-  * *gradient_loss*: gradient loss-based selection
-  * *random* : random selection
-
-* *which_data*: denote a dataset type
-  * *fashion_mnist*: FashionMNIST
-  * *cifar10*: CIFAR-10
-  * *lfw*: LFW (facial image dataset)
-
-* *which*: denote a type of model to repair
-  * *cnn1*: CNN1 model used in Apricot
-  * *cnn2*: CNN2 model used in Apricot
-  * *cnn3*: CNN3 model used in Apricot
-  * *simple_fm*: a simple DNN model trained on FashionMNIST dataset
-  * *simple_cm*: a simple DNN model trained on CIFAR-10 dataset
-  * *lfw_vgg*: a VGG16 model trained on LFW dataset
-
-- *simple_fm* and *simple_fm* refer to models used for the experiments in RQs 1 to 4, and *lfw_vgg* denotes a model used for the experiment in RQ6. 
-These models are automatically given in the scripts.
-
-* *datadir*: a path to the data directory. The default value is *data*. 
-	For CIFAR-10 and FashionMNIST, The dataset will be downloaded automatically if it does not exist under the given directory. 
-	For LFW, this argument refers to a directory to which *lfw_np.tar.gz* was unzipped.  
-
-* *dest*: a path to the directory where Arachne will store generated patches.
-* *pkey*: a specific patch key to identify a generated patch. e.g., if `pkey=t1`, `model.t1.json`
+The datasets used in the experiments can be download through this link: .... 
+The downloaded *data.tar* contains the GTSBR, LFW, and Twitter US Airline Sentiment datasets preprocessed for the experiements, 
+and the corresponding index files that contain predictions results along with the indices to each datapoint. \ 
+Please unzip this file under *final_data* directory. 
+FashionMNIST and CIFAR-10 datasets will be automatically downloaded when they are first accessed. 
 
 
-### Experiment (repair)
+### Experiements 
 
 To run an experiment for each RQ, 
 
-For RQ1, 
+#### RQ1
+
+__usage__ <br />
 ```
-./rq1.sh data/fm fashion_mnist $dest localisation_method
+./rq1.sh $datadir $loc_method $which_data $dest
 ```
 
-e.g., to localise the neural weights of a model trained on FashionMNIST dataset with our BL method, 
+`$loc_method` denotes a localisation stratgey to use to locate neural weights. `$loc_method` can be among one of those below: \
+
+  * *localiser*: bidirectional localisation method (BL) (ours)
+  * *gradient_loss*: gradient loss-based selection
+  * *random*: random selection
+
+`$which_data` denotes a datatype; it can be among: 'cifar10', 'fashion_mnist', 'GTSRB'.\
+The output of the localisation will be saved under `$dest/$loc_method`.
+
+__example__ <br />
+To localise the neural weights of a model trained on FashionMNIST dataset (stored under final_data/data) with our BL method, 
 ```
-./rq1.sh data/fm fashion_mnist results/rq1 localiser
+./rq1.sh final_data/data localiser fashion_mnist results/rq1
 ```
 
-For RQ2, 
-```
-./rq2.sh datadir which_data localisation_method pkey dest
-```
-``localisation_method`` can be *localiser* (our method *BL*), *gradient_loss*, and *random*.
+#### RQ2
 
-e.g.,
+__usage__ <br />
 ```
-./rq2.sh data/fm fashion_mnist localiser t1 results/rq2/loc
+./rq2.sh $datadir $loc_method $which_data $dest
 ```
 
-For RQ3,
+`$loc_method` can be *localiser* (our method *BL*), *gradient_loss*, and *random*. \
+The generated patch will be saved under *$dest*, and the localised neural weights will be under *$dest/loc* \
+`$which_data`: the same with RQ1. 
+
+__example__ <br />
+To repair a model trained on FashionMNIST dataset while using BL for the neural weight localisation,  
 ```
-./rq3.sh which_data datadir pkey temp/rq3/
-```
-e.g.,
-```
-./rq3.sh cifar10 data/cm t1 temp/rq3/
+./rq2.sh final_data/data localiser fashion_mnist results/rq2
 ```
 
 
-For RQ4,
+*From RQ3 to RQ7, by default, Arachne uses BL for the weight localisation.*
+
+#### RQ3 
+__usage__ <br />
 ```
-./rq4.sh which_data datadir pkey dest
-```
-e.g., 
-```
-./rq4.sh cifar10 data/cm/ t1 results/rq4/cm
+./rq3.sh $datadir $which_data $dest $top_n
 ```
 
-For RQ5, 
+To repair the top N'th frequent faults, please set `$top_n=N-1`. \ 
+`$which_data`: the same with RQ1. 
+
+__example__ <br />
+To repair the most frequent faults in a FashionMNIST model,  
 ```
-./rq5.sh which datadir pkey resultdir true_label predicted_label
-```
-Here, *true_label* indicates the ground truth label of a input and *pred_label* refers to the predicted label of the input.
-Thus, "*true_label = 3* and *pred_label = 5*" means Arachne will target to repair all misbehaviour that wrongly predict *3* to *5*.
-e.g.,
-```
-./rq5.sh cnn1 data/cm t1 results/rq5/cnn1 3 5
+./rq3.sh final_data/data fashion_mnist $dest 0
 ```
 
-For RQ6, 
+#### RQ4 
+__usage__ <br />
 ```
-./rq6.sh datadir pkey dest
-```
-e.g., 
-```
-./rq6.sh data/lfw/lfw_data/ t1 results/rq6
+./rq4.sh $datadir $which_data $dest $patch_aggr 
 ```
 
-### Evaluation 
+`$patch_aggr` denotes the hyperparameter $alpha$ that balances between correcting given misbehaviour of a model \
+and retaining initially correct behaviour. The greater it is, the more focus Arachne puts in the correction. \
+By default, it will correct the most frequent type of errors. 
 
-To apply the resulting patch to the target model and use this patched model to predict, ```run run_mdl.sh``` as below:
 
-For RQs 2 to 4, (RQ = {rq2,rq3,rq4}, which_data = {fashion_mnist, cifar10})
-```
-./run_mdl.sh RQ path_to_patch datadir dest which_data
-```
-e.g., to evaluate a patch generated to repair *3->5* misbehaviour of a model trained on CIFAR-10 dataset in RQ3, 
-```
-./run_mdl.sh rq3 results/rq3/cm/model.misclf-t1-3-5.json data/cm/ results/rq3/pred cifar10
-```
-
-For RQ5, 
-  * *which* = {*cnn1*, *cnn2*, *cnn3*} 
-  * *path_to_validx_file* = a path to a file that stores the indices to test data used for the repair.\
-    This index file is saved in the same directory where the patch is saved as default, \
-    e.g., \
-      for `results/rq5/cnn1/model.misclf-pkey-true_label-pred_label.json`, *path_to_validx_file* = `results/rq5/cnn1/cnn1.indices_to_val.csv`
+__example__ <br />
+To repair the FashionMNIST model with the dafault value of $alpha$ (=10), 
 
 ```
-./run_mdl.sh rq5 path_to_patch datadir dest which_data which path_to_validx_file
+./rq4.sh final_data/data fashion_mnist $dest 10
 ```
-e.g., to evaluate a patch generated to repair *3->5* misbehaviour of CNN1 model, 
-```./run_mdl.sh rq5 results/rq5/cnn1/model.misclf-t1-3-5.0.json data/cm/ results/rq5/cnn1/pred cifar10 cnn1 results/rq5/cnn1/cnn1.indices_to_val.csv```
 
-For RQ6,
-```
-./run_mdl.sh rq6 path_to_patch datadir dest lfw 
-```
-e.g., \
-```./run_mdl.sh rq6 results/rq6/model.misclf-t1-0-1.json data/lfw/lfw_data/ results/rq6/pred lfw```
+#### RQ5
 
+__usage__ <br />
+```
+./rq5.sh $datadir $which $dest
+```
+
+`$which` denotes the model type. it can be among: *cnn1*, *cnn2*, *cnn3*, *GTSRB*, *fm* (fashion_mnist). 
+By default, it will correct the most frequent type of errors. 
+
+__example__ <br />
+To repair *cnn1* model, 
+
+```
+./rq5.sh final_data cnn1 $dest
+```
+
+#### RQ6
+
+__usage__ <br />
+```
+./rq6.sh $datadir $dest 
+```
+This will repair a gender classification model trained on the LFW dataset for the most frequent type of errors (female to male)
+
+__example__ <br />
+```
+./rq6.sh final_data/data $dest
+```
+
+#### RQ7
+
+__usage__ <br />
+```
+./rq7.sh $datadir $dest 
+```
+This will repair a text sentiment analysis model trained on the Twitter US Airline Sentiment dataset
+for the most frequent type of errors (neutral to negative). 
+
+__example__ <br />
+```
+./rq7.sh final_data/data $dest
+```
+
+
+### Evaluation  
+
+To apply the resulting patch to a target model and use this patched model to predict, please run ```run run_mdl.sh``` as below:
+
+__usage__ <br />
+```
+./run_mdl.sh $rq $datadir $which_data $path_to_patch $top_n $which
+```
+
+`$rq` denotes the research question number, which can be between 1 to 7. \
+`$which_data` denotes the type of data and can be among: *cifar10*, *fashion_mnist*, *GTSRB*, *fm_for_rq5*, *lfw*, *us_airline*. \
+For RQs 5 to 7, this value will be automatically determined; thus, passing "" should be enough. \
+`$path_to_patch` is the path to a patch under evaluation. \ 
+`$top_n` denotes the top N'th frequent faults. This should be the same *top_n* used to generate `$path_to_patch`. \ 
+`$which` is a model type. This is only required for RQ5; thus, for the other RQs, it can be skipped. \ 
+
+__example__ <br />
+To evaluate a patch generated to repair the most frequent errors of *cnn1* (*3->5*) (RQ5), 
+
+```
+./run_mdl.sh 5 final_data/data cifar10 $dest/model.misclf-rq5.0.0-3-5.pkl 0 cnn1 
+```
 
 ### Results
 
 #### Patch files
 
-Either `model.pkey.json` (for a patch generated from multiple types of misbehaviour) \
- or `model.misclf-pkey-true_label-pred_label.json` (for a patch generated from a specific type of misbehaviour)
-This json file stores a new value for the weight variable in the last layer of a model. (dictionary with key *weight*)
+Either`model.misclf-rq#.$seed-$true_label-$pred_label.pkl` (for a patch generated from a specific type of misbehaviour (RQs 3 to 7)) \
+or `model.rq2.$seed.pkl` (for a patch generated from multiple types of misbehaviour (RQ2)). \ 
+This *pkl* file contains a new value for the weight variable from which at least one neural weight has been selected. 
 
 #### Prediction results
 
-Either `pred.pkey.dtype.csv` (for a patch generated from multiple types of misbehaviour) \
- or `pred.misclf-pkey-true_label-pred_label.dtype.csv` (for a patch generated from a specific type of misbehaviour).
-*dtype* can be *train*, *test*, and *val*(for RQ5,RQ6). 
+The prediction files (i.e., the output of running `run_mdl.sh`) are stored under *pred*, a directory under the same directory \
+where the patches were saved (`$dest`). A prediction file contains a dataframe of the combined results of intial prediction \
+and the prediction after applying the patch. It has four columns: *true*, *pred*, *new_pred*, *init_flag*. \
+*true* is the true label. *pred* and *new_pred* indicate a prediction result before and after the patch. *init_flag* is whether \ 
+an intial prediction is correct (True) or not (False). 
+
 
 The prediction result file is a csv file with a header row `[index,true,pred]`. 
 Here, *index* refers to the index to an individual inputs in the dataset, and *true* and *pred* refer to a ground-truth and a predicted label of the input. 

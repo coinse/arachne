@@ -1,6 +1,0 @@
-t_weight,fw3
-t_bias,fb3
-t_prediction,predc
-t_correct_prediction,correct_predc
-t_prev_v,Gathered
-t_lab_loss,per_label_loss

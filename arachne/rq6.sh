@@ -1,13 +1,32 @@
 #!/bin/bash
 
 datadir=$1
-patch_key=$2
-dest=$3
+dest=$2
+pa=2
+seed=0 # 0 .. 29
 
-seed=0 # can be 0 .. 29
-patch_aggr=1
-indices_file="indices/lfw/test/lfw.misclf.indices.csv"
-female_lst_file='data/lfw_np/female_names_lfw.txt' # store a list of females (for labeling purpose)
+model_dir="final_data/models/rq6"
 iter_num=100
+index_dir="final_data/indices"
+logdir="logs/rq6"
 
-python3 main_rq6.py -datadir $datadir -tensor_name_file data/tensor_names/tensor.lastLayer.names -patch_key ${patch_key}.${seed} -path_to_keras_model data/models/saved_models/LFW_GenderClassifier.pth -seed $seed -iter_num $iter_num -target_indices_file $indices_file -dest $dest -patch_aggr $patch_aggr -female_lst_file $female_lst_file 
+if [ ! -d "$logdir" ]; then
+    mkdir $logdir
+fi
+
+python3 main_rq3_7.py \
+-datadir $datadir/lfw/lfw_data \
+-which lfw_vgg \
+-which_data lfw \
+-patch_key rq6.0.$seed \
+-seed $seed \
+-path_to_keras_model $model_dir/LFW_gender_classifier_best.h5 \
+-iter_num 100 \
+-target_indices_file $index_dir/lfw/test/lfw.init_pred.indices.csv \
+-dest $dest \
+-patch_aggr $pa \
+-batch_size 512 \
+-female_lst_file $datadir/lfw/lfw_np/female_names_lfw.txt \
+-top_n 0 \
+-num_label 2 > $logdir/pa$pa.$seed.out &
+wait $!

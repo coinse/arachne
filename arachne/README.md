@@ -5,16 +5,15 @@
 This document is to replicate the experiments conducted to evaluate Arachne. 
 
 Models used in the experiments of Arachne can be downloaded through this link: https://www.dropbox.com/s/p5n91wtc7b4s6b8/models.tar.gz?dl=0 <br />
-After downloading the zipped file, please decompress them to *final_data* directory <br />
-where all the models as well as image and text datasets used in the experiements will be stored. <br />
+After downloading the zipped file, please decompress them to *final_data* directory where all the models as well as image <br />
+and text datasets used in the experiements will be stored. <br />
 
 ``` tar -zxvf models.tar.gz -C  data ```
 
 The datasets used in the experiments can be download through this link: https://www.dropbox.com/s/i7ttm3iqyur2usk/data.tar.gz?dl=0 <br />
 The downloaded *data.tar* contains the GTSBR, LFW, and Twitter US Airline Sentiment datasets preprocessed for the experiements, <br />
 and the corresponding index files that contain predictions results along with the indices to each datapoint. <br />
-Please unzip this file under *final_data* directory.  <br />
-FashionMNIST and CIFAR-10 datasets will be automatically downloaded when they are first accessed. <br />
+Please unzip this file under *final_data* directory.  FashionMNIST and CIFAR-10 datasets will be automatically downloaded when they are first accessed. <br />
 
 
 ### Experiements 
@@ -182,12 +181,12 @@ This *pkl* file contains a new value for the weight variable from which at least
 The prediction files (i.e., the output of running `run_mdl.sh`) are stored under *pred*, a directory under the same directory <br />
 where the patches were saved (`$dest`). A prediction file contains a dataframe of the combined results of intial prediction <br />
 and the prediction after applying the patch. It has four columns: *true*, *pred*, *new_pred*, *init_flag*. <br />
-*true* is the true label. *pred* and *new_pred* indicate a prediction result before and after the patch. *init_flag* is whether <br />
-an intial prediction is correct (True) or not (False). <br />
+*true* is the true label. *pred* and *new_pred* indicate a prediction result before and after the patch. *init_flag* is whether an intial prediction <br />
+is correct (True) or not (False). <br />
 
 
 The prediction result file is a csv file with a header row `[index,true,pred]`. <br />
-Here, *index* refers to the index to an individual inputs in the dataset, and *true* and *pred* refer to a ground-truth <br />
-and a predicted label of the input. <br />
+Here, *index* refers to the index to an individual inputs in the dataset, and *true* and *pred* refer to a ground-truth and <br /> 
+a predicted label of the input. <br />
 
 

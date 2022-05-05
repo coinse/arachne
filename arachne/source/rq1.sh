@@ -34,7 +34,7 @@ if [ $which_data == 'cifar10' ]; then
 	-seed ${seed} \
 	-target_all 1 \
 	-fid_file $fid_filedir/cifar10.target.fault_ids.csv \
-	-dest $dest \
+	-dest $dest/$loc_method \
 	-on_test > $logdir/c10/$loc_method.$seed.c10.out &
 	wait $!
 	#done
@@ -56,7 +56,7 @@ elif [ $which_data == 'fashion_mnist' ]; then
 	-seed ${seed} \
 	-target_all 1 \
 	-fid_file $fid_filedir/fm.target.fault_ids.csv \
-	-dest $dest \
+	-dest $dest/$loc_method \
 	-on_test  > $logdir/fm/$loc_method.$seed.fm.out &
 	wait $!
 	#done
@@ -79,7 +79,7 @@ else
 	-seed ${seed} \
 	-target_all 1 \
 	-fid_file $fid_filedir/gtsrb.target.fault_ids.csv \
-	-dest $dest \
+	-dest $dest/$loc_method \
 	-on_test > $logdir/gtsrb/$loc_method.${seed}.gtsrb.out &
 	wait $!
 	#done

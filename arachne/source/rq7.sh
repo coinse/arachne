@@ -3,7 +3,7 @@
 datadir=$1 
 dest=$2 
 
-seed=20 # 0 .. 29
+seed=0 # 0 .. 29
 patch_key=rq7
 iter_num=100
 patch_aggr=1

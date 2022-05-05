@@ -120,12 +120,12 @@ if __name__ == "__main__":
 
 	args = parser.parse_args()
 
-	loc_loc_file = "c_loc/loc.all_cost.loc.{}.1.pkl" \
-		if not args.on_test else "c_loc/on_test/loc.all_cost.loc.{}.1.pkl"
-	loc_grad_file = "grad/loc.all_cost.loc.{}.1.grad.pkl" \
-			if not args.on_test else "grad/on_test/loc.all_cost.loc.{}.1.grad.pkl"
-	loc_random_file = "random/loc.all_cost.loc.{}.1.random.pkl" \
-		if not args.on_test else "random/on_test/loc.all_cost.loc.{}.1.random.pkl"
+	loc_loc_file = "c_loc/loc.loc.{}.1.all_cost.pkl" \
+		if not args.on_test else "c_loc/on_test/loc.loc.{}.1.all_cost.pkl"
+	loc_grad_file = "grad/loc.loc.{}.1.grad.all_cost.pkl" \
+			if not args.on_test else "grad/on_test/loc.loc.{}.1.grad.all_cost.pkl"
+	loc_random_file = "random/loc.loc.{}.1.random.all_cost.pkl" \
+		if not args.on_test else "random/on_test/loc.loc.{}.1.random.all_cost.pkl"
 
 	if args.loc_which == 'localiser':
 		loc_file = loc_loc_file
@@ -163,10 +163,8 @@ if __name__ == "__main__":
 		pairs = get_weight_and_cost(args.loc_which, seed, curr_loc_file, target_weights, gts, method = 'max')
 		df = pd.DataFrame(list(pairs.items()))
 		pairfile = os.path.join(dest, "{}.pairs.csv".format(seed))
-		print (pairfile)	
 		df.to_csv(pairfile, sep = ";", header = False, index = False)
-		print (df)	
-		print ("For {}".format(seed))
+
 		ranks = []
 		for gt in gts:
 			#output = df.loc[list(map(comp, df[0].values, [gt]*len(df[0])))].index.values

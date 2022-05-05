@@ -184,7 +184,7 @@ def patch(
 		print ("Saved to", destfile)
 		if only_loc:
 			all_cost_file = os.path.join(loc_dest, 
-				"loc.all_cost.{}.{}.grad.pkl".format(patch_target_key, int(target_all)))
+				"loc.{}.{}.grad.all_cost.pkl".format(patch_target_key, int(target_all)))
 			with open(all_cost_file, 'wb') as f:
 				import pickle
 				pickle.dump(indices_w_costs, f)	
@@ -209,7 +209,7 @@ def patch(
 			print ("Saved to", destfile)
 			if only_loc:
 				all_cost_file = os.path.join(loc_dest, 
-					"loc.all_cost.{}.{}.pkl".format(patch_target_key, int(target_all)))
+					"loc.{}.{}.all_cost.pkl".format(patch_target_key, int(target_all)))
 				with open(all_cost_file, 'wb') as f:
 					import pickle
 					pickle.dump(front_lst, f)

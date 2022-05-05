@@ -18,7 +18,7 @@ parser.add_argument("-dest", type = str, default = ".")
 parser.add_argument("-which_data", type = str, default = "cifar10", help = "cifar10, FM")
 parser.add_argument("-is_train", type = int, default = 1)
 parser.add_argument("-female_lst_file", action = 'store',
-	default = None, help = 'data/lfw_np/female_names_lfw.txt', type = str)
+	default = None, help = 'final_data/data/lfw/lfw_np/female_names_lfw.txt', type = str)
 args = parser.parse_args()
 
 import torch
@@ -69,29 +69,12 @@ elif args.which_data in ['GTSRB', 'imdb', 'reuters', 'lfw', 'us_airline']: # gts
 		X,y = train_data
 	else:
 		X,y = test_data
-else:# will be deleted later
-	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
-	if bool(args.is_train):
-		X,y = train_data
-	else:
-		X,y = test_data
-
-	from sklearn.preprocessing import MinMaxScaler
-	import pandas as pd
-	datafile = "data/lstm/airline-passengers.csv"
-	dataframe = pd.read_csv(datafile, usecols=[1], engine='python')
-	dataset = dataframe.values
-	dataset = dataset.astype('float32')
-
-	scaler = MinMaxScaler(feature_range=(0, 1))
-	scaler.fit(dataset)	
-
 
 loaded_model = load_model(args.model)
 loaded_model.summary()
 
 ret_raw = False #True
-if args.which_data in ['cifar10', 'GTSRB', 'imdb', 'reuters', 'simple_lstm', 'lfw', 'us_airline']: # and also GTSRB
+if args.which_data in ['cifar10', 'GTSRB', 'lfw', 'us_airline']: # and also GTSRB
 	predicteds = loaded_model.predict(X)
 else:
 	if loaded_model.inputs[0].shape[1:] == images.numpy()[0].shape:

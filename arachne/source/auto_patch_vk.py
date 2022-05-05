@@ -173,7 +173,7 @@ def patch(
 		
 		# retrieve only the indices
 		indices_to_places_to_fix = [v[0] for v in indices_w_costs[:top_n]]
-		loc_dest = os.path.join(loc_dest, "{}/gl".format(which))
+		loc_dest = os.path.join(loc_dest, "gl")
 		os.makedirs(loc_dest, exist_ok=True)
 
 		output_df = pd.DataFrame(
@@ -202,7 +202,7 @@ def patch(
 				{'layer':[vs[0] for vs in indices_to_places_to_fix], 
 				'weight':[vs[1] for vs in indices_to_places_to_fix]})
 
-			loc_dest = os.path.join(loc_dest, "{}/bl".format(which))
+			loc_dest = os.path.join(loc_dest, "bl")
 			os.makedirs(loc_dest, exist_ok= True)
 			destfile = os.path.join(loc_dest, "loc.{}.{}.pkl".format(patch_target_key, int(target_all)))
 			output_df.to_pickle(destfile)
@@ -234,7 +234,7 @@ def patch(
 		indices_to_places_to_fix = run_localise.localise_by_random_selection(
 			num_random_sample, target_weights)	 
 
-		loc_dest = os.path.join(loc_dest, "{}/rd".format(which))	
+		loc_dest = os.path.join(loc_dest, "rd")	
 		os.makedirs(loc_dest, exist_ok=True)
 		output_df = pd.DataFrame({
 			'layer':[vs[0] for vs in indices_to_places_to_fix], 

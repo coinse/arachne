@@ -3,6 +3,7 @@
 datadir=$1
 loc_method=$2 # localiser (BL), gradient_loss (GL), random (Random)
 which_data=$3
+dest=$4
 seed=0 #$3
 index_dir="final_data/indices" #
 fid_filedir="final_data/rq1/fault_ids/"
@@ -33,6 +34,7 @@ if [ $which_data == 'cifar10' ]; then
 	-seed ${seed} \
 	-target_all 1 \
 	-fid_file $fid_filedir/cifar10.target.fault_ids.csv \
+	-dest $dest \
 	-on_test > $logdir/c10/$loc_method.$seed.c10.out &
 	wait $!
 	#done
@@ -54,6 +56,7 @@ elif [ $which_data == 'fashion_mnist' ]; then
 	-seed ${seed} \
 	-target_all 1 \
 	-fid_file $fid_filedir/fm.target.fault_ids.csv \
+	-dest $dest \
 	-on_test  > $logdir/fm/$loc_method.$seed.fm.out &
 	wait $!
 	#done
@@ -76,6 +79,7 @@ else
 	-seed ${seed} \
 	-target_all 1 \
 	-fid_file $fid_filedir/gtsrb.target.fault_ids.csv \
+	-dest $dest \
 	-on_test > $logdir/gtsrb/$loc_method.${seed}.gtsrb.out &
 	wait $!
 	#done

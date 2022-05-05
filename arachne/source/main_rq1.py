@@ -85,6 +85,7 @@ if __name__ == "__main__":
 		help = 'if given, localise based on the behaviour difference on the test data')
 	parser.add_argument("-fid_file", type = str, 
 		help = "a file that contains the ids (used seeds) of target faulty model", default = None)
+	parser.add_argument("-dest", action = "store", default = ".")
 
 	args = parser.parse_args()	
 
@@ -92,6 +93,7 @@ if __name__ == "__main__":
 	if path_to_faulty_model is None:
 		print ('Seed {} not our target for layer {}'.format(args.seed, LAYER))
 		sys.exit()
+	os.makedirs(args.dest, exist_ok = True)
 
 	# is_input_2d = True => to match the format with faulty model
 	train_data, test_data = data_util.load_data(args.which_data, args.datadir)
@@ -139,14 +141,14 @@ if __name__ == "__main__":
 		target_layer_idx=args.target_layer_idx,
 		which = args.which,
 		loc_method = args.loc_method, 
-		patch_target_key = "loc.{}".format(args.seed),
+		patch_target_key = args.seed,
 		path_to_keras_model = path_to_faulty_model, 
 		predef_indices_to_chgd = indices_to_chgd, 
 		predef_indices_to_unchgd = indices_to_unchgd,
 		seed = args.seed,
 		target_all = bool(args.target_all),
 		only_loc = True,
-		loc_dest = "results/rq1")
+		loc_dest = args.dest)
 
 	# for evaluation 
 	gt_df = pd.read_pickle(gt_file)
